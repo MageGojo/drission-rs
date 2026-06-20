@@ -17,6 +17,11 @@ Made and maintained by **极数本源 ([apizero.cn](https://apizero.cn))** as pa
 data-collection stack. If you're looking for a one-stop Rust solution for *captcha OCR / slider-gap distance /
 anti-detect browser / high-concurrency crawling*, this is it.
 
+> **What sets it apart**: Rust browser-automation libraries (e.g. `zendriver-rs`, `rust_drission`, `stygian-browser`) are mostly
+> Chromium / CDP and rely on third-party captcha services (capsolver / 2captcha). **drission ships built-in offline captcha solving
+> (ddddocr OCR + image slider-gap distance) and defaults to the Camoufox / Firefox anti-detect engine** — no external solver, no
+> network round-trip; a rare "**Rust DrissionPage**" with batteries-included captcha solving.
+
 ---
 
 ## 📖 What is drission?
@@ -279,6 +284,7 @@ or resale), see [`LICENSE`](LICENSE).
 
 ---
 
-<sub>keywords: Rust browser automation · captcha solver · OCR · slider-gap distance · GeeTest · Dingxiang ·
-anti-detect · Cloudflare bypass · web scraping · proxy rotation · fingerprint · env restore · pure-script signing ·
-Chromium CDP · Camoufox · DrissionPage · by [极数本源 apizero.cn](https://apizero.cn).</sub>
+<sub>keywords: Rust browser automation · captcha solver · ddddocr · captcha OCR · slider-gap distance · GeeTest · Dingxiang ·
+anti-detect · undetectable · stealth · Cloudflare bypass · web scraping · crawler · proxy rotation · fingerprint · env restore ·
+pure-script signing · Camoufox · Firefox Juggler · Chromium CDP · DrissionPage · Rust DrissionPage · alternative to rust_drission / zendriver-rs ·
+by [极数本源 apizero.cn](https://apizero.cn).</sub>

@@ -4,13 +4,13 @@ version = "0.1.1"
 edition = "2024"
 rust-version = "1.85"
 authors = ["极数本源 (apizero.cn)"]
-description = "Rust 浏览器自动化库:反检测(Camoufox/Firefox)+ 内置验证码 OCR 与图片滑块缺口距离识别 + 高并发爬虫 / XHR 监听拦截 / 自动过盾,DrissionPage 风格 API。Browser automation in Rust with anti-detect, built-in captcha OCR and slider-gap solving, async high-concurrency crawling."
+description = "Rust 反检测浏览器自动化 + 内置验证码识别:ddddocr 离线 OCR 与图片滑块缺口距离(极验/顶象),默认 Camoufox/Firefox、自动过 Cloudflare 盾、高并发爬虫与 XHR 监听拦截,DrissionPage 风格 API。Anti-detect browser automation in Rust with built-in ddddocr captcha OCR + slider-gap (GeeTest) solving, Camoufox, Cloudflare bypass — a Rust DrissionPage."
 documentation = "https://docs.rs/drission"
 homepage = "https://apizero.cn"
 repository = "https://github.com/MageGojo/drission-rs"
 readme = "README.md"
 license-file = "LICENSE"
-keywords = ["captcha", "ocr", "anti-detect", "automation", "scraper"]
+keywords = ["captcha", "ddddocr", "anti-detect", "drissionpage", "browser-automation"]
 categories = ["web-programming", "api-bindings", "computer-vision"]
 exclude = ["/dist", "/docs", "/target"]
 

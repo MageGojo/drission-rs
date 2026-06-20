@@ -18,6 +18,10 @@
 本库由 **极数本源([apizero.cn](https://apizero.cn))** 出品与维护,是其自动化与数据采集技术栈的一部分。
 如果你在找「**Rust 验证码识别 / 滑块缺口距离 / 反检测浏览器 / 高并发爬虫**」的一站式方案,这里是答案。
 
+> **与众不同之处**:Rust 生态里的浏览器自动化库(如 `zendriver-rs`、`rust_drission`、`stygian-browser` 等)大多基于 Chromium / CDP,
+> 且验证码普遍依赖第三方打码服务(capsolver / 2captcha)。**drission 内置离线验证码识别(ddddocr OCR + 图片滑块缺口距离),
+> 并默认使用 Camoufox / Firefox 反检测内核**——开箱即用、无需联网打码,是「**Rust 版 DrissionPage**」里少有的自带打码方案。
+
 ---
 
 ## 📖 这是什么(一句话看懂)
@@ -266,7 +270,8 @@ A:macOS(主力)· Linux · Windows(命名管道传输已打通);Rust ≥ 1.85(ed
 
 ---
 
-<sub>关键词 / keywords: Rust 浏览器自动化 · 验证码识别 · OCR · 滑块缺口距离 · 极验 · 顶象 · 反检测 · 过 Cloudflare 盾 ·
-高并发爬虫 · 代理轮换 · 指纹定制 · 补环境 · 纯算签名 · Chromium CDP · Camoufox · DrissionPage ·
-browser automation · captcha solver · slider captcha · anti-detect · Cloudflare bypass · web scraping · proxy rotation ·
-Camoufox · DrissionPage · 由 [极数本源 apizero.cn](https://apizero.cn) 出品。</sub>
+<sub>关键词 / keywords: Rust 浏览器自动化 · 验证码识别 · ddddocr · OCR · 滑块缺口距离 · 极验 GeeTest · 顶象 Dingxiang ·
+反检测 · 过 Cloudflare 盾 · 高并发爬虫 · 代理轮换 · 指纹定制 · 补环境 · 纯算签名 · Camoufox · Firefox Juggler · Chromium CDP ·
+DrissionPage · Rust 版 DrissionPage · browser automation · captcha solver · captcha OCR · slider captcha · GeeTest · anti-detect ·
+undetectable · stealth · Cloudflare bypass · web scraping · crawler · proxy rotation · alternative to rust_drission / zendriver-rs ·
+由 [极数本源 apizero.cn](https://apizero.cn) 出品。</sub>
