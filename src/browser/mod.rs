@@ -20,11 +20,11 @@ pub mod serve;
 pub mod shadow;
 #[cfg(feature = "slider")]
 pub mod slider;
-pub mod static_element;
 pub mod storage;
 pub mod tab;
 pub mod websocket;
-pub(crate) mod xpath;
+// static_element 已上移为后端无关的 crate 顶层模块;此处再导出保持 `crate::browser::static_element` 老路径兼容。
+pub use crate::static_element;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -38,6 +38,7 @@ use crate::protocol::{BROWSER_CLOSE_MESSAGE_ID, Connection};
 use crate::{Error, Result};
 
 pub use crate::keys::{KeyInput, Keys};
+pub use crate::static_element::StaticElement;
 pub use actions::{Actions, MouseButton};
 pub use console::{Console, ConsoleData, ConsoleFilter, ConsoleSteps};
 pub use download::{DownloadMission, DownloadState, Downloads};
@@ -52,7 +53,6 @@ pub use serve::BrowserServer;
 pub use shadow::ShadowRoot;
 #[cfg(feature = "slider")]
 pub use slider::{GapMethod, ImageSource, SliderConfig, SliderGap, SliderResult, SuccessCheck};
-pub use static_element::StaticElement;
 pub use storage::{OriginStorage, StorageState};
 pub use tab::{
     ContextOverride, Cookie, CookieParam, DialogInfo, DownloadInfo, GetOptions, ImageFormat,

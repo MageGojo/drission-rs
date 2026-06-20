@@ -234,7 +234,7 @@ fn collect_ids(root: ElementRef<'_>, q: &StaticQuery) -> Result<Vec<NodeId>> {
                 .map(|e| e.id())
                 .collect())
         }
-        StaticQuery::Xpath(xp) => crate::browser::xpath::eval(*root, xp),
+        StaticQuery::Xpath(xp) => crate::xpath::eval(*root, xp),
     }
 }
 

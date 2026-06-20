@@ -17,6 +17,7 @@ use serde_json::{Value, json};
 use tokio::time::sleep;
 
 use crate::cdp::core::{CdpCore, Xorshift, human_drag_track, seed_from_clock};
+use crate::cdp::shadow::ChromiumShadowRoot;
 use crate::keys::KeyInput;
 use crate::locator::{self, Query};
 use crate::{Error, Result};
@@ -169,6 +170,29 @@ impl ChromiumElement {
         Ok(v.as_str().unwrap_or_default().to_string())
     }
 
+    /// 在本元素 HTML 快照内静态查找第一个匹配元素(对齐 camoufox `Element::s_ele`)。
+    pub async fn s_ele(&self, selector: &str) -> Result<crate::static_element::StaticElement> {
+        crate::static_element::StaticElement::parse(&self.html().await?)?.ele(selector)
+    }
+
+    /// 在本元素 HTML 快照内静态查找所有匹配元素(对齐 camoufox `Element::s_eles`)。
+    pub async fn s_eles(
+        &self,
+        selector: &str,
+    ) -> Result<Vec<crate::static_element::StaticElement>> {
+        crate::static_element::StaticElement::parse(&self.html().await?)?.eles(selector)
+    }
+
+    /// 把本元素(或其内首个 `<table>`)解析为二维文本表格。对齐 camoufox `Element::table`。
+    pub async fn table(&self) -> Result<Vec<Vec<String>>> {
+        crate::static_element::StaticElement::parse(&self.html().await?)?.table()
+    }
+
+    /// 表格转记录(首行作表头)。对齐 camoufox `Element::table_records`。
+    pub async fn table_records(&self) -> Result<Vec<std::collections::HashMap<String, String>>> {
+        crate::static_element::StaticElement::parse(&self.html().await?)?.table_records()
+    }
+
     /// 是否可见(有客户端矩形 + 非 `hidden`/`none`)。
     pub async fn is_displayed(&self) -> Result<bool> {
         let v = self
@@ -195,6 +219,68 @@ impl ChromiumElement {
             .call_value("function(){ return !!this.checked; }", vec![])
             .await?;
         Ok(v.as_bool().unwrap_or(false))
+    }
+
+    /// 是否在视口内(与视口有交叠)。对齐 camoufox `is_in_viewport`。
+    pub async fn is_in_viewport(&self) -> Result<bool> {
+        let v = self
+            .call_value(
+                "function(){ const r=this.getBoundingClientRect(); \
+                 return r.bottom>0 && r.right>0 && r.top<innerHeight && r.left<innerWidth; }",
+                vec![],
+            )
+            .await?;
+        Ok(v.as_bool().unwrap_or(false))
+    }
+
+    /// 中心点是否被其它元素遮挡(`elementFromPoint` 命中的不是自身/血缘)。对齐 camoufox `is_covered`。
+    pub async fn is_covered(&self) -> Result<bool> {
+        let v = self
+            .call_value(
+                "function(){ const r=this.getBoundingClientRect(); \
+                 const x=r.left+r.width/2, y=r.top+r.height/2; const el=document.elementFromPoint(x,y); \
+                 if(!el) return false; return !(el===this || this.contains(el) || el.contains(this)); }",
+                vec![],
+            )
+            .await?;
+        Ok(v.as_bool().unwrap_or(false))
+    }
+
+    /// 是否可点击(可见 + 可用 + 在视口 + 未被遮挡)。对齐 camoufox `is_clickable`。
+    pub async fn is_clickable(&self) -> Result<bool> {
+        Ok(self.is_displayed().await?
+            && self.is_enabled().await?
+            && self.is_in_viewport().await?
+            && !self.is_covered().await?)
+    }
+
+    /// 元素左上角的**页面坐标** `(x, y)`(含滚动)。对齐 camoufox `location`。
+    pub async fn location(&self) -> Result<(f64, f64)> {
+        let r = self.rect().await?;
+        Ok((r.x, r.y))
+    }
+
+    /// 计算样式某属性值(`getComputedStyle`,如 `style("background-color")`)。对齐 camoufox `style`。
+    pub async fn style(&self, name: &str) -> Result<String> {
+        let v = self
+            .call_value(
+                "function(n){ return getComputedStyle(this).getPropertyValue(n); }",
+                vec![json!({ "value": name })],
+            )
+            .await?;
+        Ok(v.as_str().unwrap_or("").trim().to_string())
+    }
+
+    /// 从 DOM 移除本元素(对齐 camoufox `remove`)。
+    pub async fn remove(&self) -> Result<()> {
+        self.call_value("function(){ this.remove(); }", vec![])
+            .await?;
+        Ok(())
+    }
+
+    /// 元素级等待句柄:`ele.wait().displayed(..)/hidden/deleted/clickable`(对齐 camoufox `ele.wait()`)。
+    pub fn wait(&self) -> ChromiumElementWait {
+        ChromiumElementWait { ele: self.clone() }
     }
 
     /// 元素几何信息(页面坐标 + 视口坐标 + 尺寸)。
@@ -305,6 +391,61 @@ impl ChromiumElement {
             vec![],
         )
         .await
+    }
+
+    /// 向上找到第一个匹配 `selector`(**仅 CSS**,`closest`)的祖先。对齐 camoufox `parent_until`。
+    pub async fn parent_until(&self, selector: &str) -> Result<ChromiumElement> {
+        let css = match locator::parse(selector) {
+            Query::Css(s) => s,
+            Query::Xpath(_) => {
+                return Err(Error::msg("parent_until 仅支持 CSS 选择器(xpath 改用 ele)"));
+            }
+        };
+        self.call_to_element(
+            "function(sel){ return this.parentElement ? this.parentElement.closest(sel) : null; }",
+            vec![json!({ "value": css })],
+            "parent_until",
+        )
+        .await
+    }
+
+    /// 之后的所有同级元素(文档顺序)。对齐 camoufox `nexts`。
+    pub async fn nexts(&self) -> Result<Vec<ChromiumElement>> {
+        self.call_to_elements(
+            "function(){ const a=[]; let e=this.nextElementSibling; while(e){a.push(e); e=e.nextElementSibling;} return a; }",
+            vec![],
+        )
+        .await
+    }
+
+    /// 之前的所有同级元素(文档顺序)。对齐 camoufox `prevs`。
+    pub async fn prevs(&self) -> Result<Vec<ChromiumElement>> {
+        self.call_to_elements(
+            "function(){ const a=[]; let e=this.previousElementSibling; while(e){a.unshift(e); e=e.previousElementSibling;} return a; }",
+            vec![],
+        )
+        .await
+    }
+
+    /// 取本元素的 **open** shadow root(`this.shadowRoot`)用于查找;无则报错。对齐 camoufox `shadow_root`。
+    pub async fn shadow_root(&self) -> Result<ChromiumShadowRoot> {
+        match self
+            .core
+            .call_handle(
+                &self.object_id,
+                "function(){ return this.shadowRoot; }",
+                vec![],
+            )
+            .await?
+        {
+            Some(oid) => Ok(ChromiumShadowRoot::new(self.core.clone(), oid)),
+            None => Err(Error::msg("元素没有 open shadowRoot")),
+        }
+    }
+
+    /// 取本 `<iframe>` 的内容帧用于在帧内查找(对齐 camoufox `content_frame`)。
+    pub async fn content_frame(&self) -> Result<crate::cdp::frame::ChromiumFrame> {
+        crate::cdp::frame::ChromiumFrame::from_iframe(self.core.clone(), &self.object_id).await
     }
 
     // ── 动作 ──────────────────────────────────────────────────────────────
@@ -440,6 +581,17 @@ impl ChromiumElement {
         Ok(())
     }
 
+    /// **修饰组合键 / 热键**(先聚焦本元素):最后一项为主键,其余为修饰键(`Control`/`Ctrl`、
+    /// `Shift`、`Alt`、`Meta`/`Cmd`)。CDP 原生 `modifiers` 位掩码,页面读得到 `e.ctrlKey` 等为 `true`。
+    ///
+    /// ```ignore
+    /// ele.shortcut(&[Keys::CONTROL, "a"]).await?; // 选中本输入框全部文本
+    /// ```
+    pub async fn shortcut(&self, keys: &[&str]) -> Result<()> {
+        self.focus().await?;
+        self.core.key_combo(keys).await
+    }
+
     /// 清空输入框(focus 后置空并派发 input/change 事件)。
     pub async fn clear(&self) -> Result<()> {
         self.call_value(
@@ -460,6 +612,20 @@ impl ChromiumElement {
              this.dispatchEvent(new Event('input',{bubbles:true})); \
              this.dispatchEvent(new Event('change',{bubbles:true})); }",
             vec![json!({ "value": value })],
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// 为 `<select>` 按**可见文本**选中选项,并派发 input/change。对齐 camoufox `select_text`。
+    pub async fn select_text(&self, text: &str) -> Result<()> {
+        self.call_value(
+            "function(t){ const opts=Array.from(this.options||[]); \
+             const o=opts.find(o=>o.text===t || (o.textContent||'').trim()===t); \
+             if(o){ this.value=o.value; \
+             this.dispatchEvent(new Event('input',{bubbles:true})); \
+             this.dispatchEvent(new Event('change',{bubbles:true})); } }",
+            vec![json!({ "value": text })],
         )
         .await?;
         Ok(())
@@ -489,6 +655,63 @@ impl ChromiumElement {
             )
             .await?;
         Ok(())
+    }
+
+    /// 给 `<input type=file>` 设置单个上传文件(对齐 camoufox `upload`)。
+    pub async fn upload(&self, path: &str) -> Result<()> {
+        self.set_files(&[path]).await
+    }
+
+    /// **自然上传**:点本元素(触发系统文件框)→ 拦截 `fileChooser` → 自动填入 `paths`。
+    /// 对齐 camoufox `click_to_upload`;CDP 走原生 `Page.setInterceptFileChooserDialog`+`fileChooserOpened`。
+    pub async fn click_to_upload(&self, paths: &[&str], timeout: Option<Duration>) -> Result<bool> {
+        let mut events = self.core.conn.subscribe();
+        let sid = self.core.session_id.clone();
+        self.core
+            .send(
+                "Page.setInterceptFileChooserDialog",
+                json!({ "enabled": true }),
+            )
+            .await?;
+        // 点击触发文件框。
+        self.click().await?;
+        let dur = timeout.unwrap_or_else(|| self.core.timeout());
+        let backend = tokio::time::timeout(dur, async {
+            loop {
+                match events.recv().await {
+                    Ok(ev)
+                        if ev.method == "Page.fileChooserOpened"
+                            && ev.session_id.as_deref() == Some(&sid) =>
+                    {
+                        return ev.params["backendNodeId"].as_i64();
+                    }
+                    Ok(_) => continue,
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                    Err(_) => return None,
+                }
+            }
+        })
+        .await
+        .ok()
+        .flatten();
+        let _ = self
+            .core
+            .send(
+                "Page.setInterceptFileChooserDialog",
+                json!({ "enabled": false }),
+            )
+            .await;
+        let Some(bn) = backend else {
+            return Ok(false);
+        };
+        let files: Vec<String> = paths.iter().map(|p| p.to_string()).collect();
+        self.core
+            .send(
+                "DOM.setFileInputFiles",
+                json!({ "files": files, "backendNodeId": bn }),
+            )
+            .await?;
+        Ok(true)
     }
 
     /// 元素截图,返回 PNG 字节。先把元素**滚到视口中央**再按其页面矩形裁剪。
@@ -527,6 +750,80 @@ impl ChromiumElement {
             .await
             .map_err(|e| Error::msg(format!("写入截图 {} 失败: {e}", path.display())))?;
         Ok(path)
+    }
+}
+
+/// 元素级等待句柄(由 [`ChromiumElement::wait`] 返回),对齐 camoufox `ElementWait`。
+/// 各方法在 `timeout`(`None` 用标签默认超时)内轮询,**超时返回 `false` 而非报错**。
+pub struct ChromiumElementWait {
+    ele: ChromiumElement,
+}
+
+impl ChromiumElementWait {
+    /// 等元素变为可见。
+    pub async fn displayed(&self, timeout: Option<Duration>) -> Result<bool> {
+        self.poll(timeout, |e| async move {
+            e.is_displayed().await.unwrap_or(false)
+        })
+        .await
+    }
+
+    /// 等元素变为不可见(仍在 DOM 但隐藏)。
+    pub async fn hidden(&self, timeout: Option<Duration>) -> Result<bool> {
+        self.poll(timeout, |e| async move {
+            !e.is_displayed().await.unwrap_or(false)
+        })
+        .await
+    }
+
+    /// 等元素从 DOM 删除(`isConnected===false` 或句柄失效)。
+    pub async fn deleted(&self, timeout: Option<Duration>) -> Result<bool> {
+        let deadline =
+            std::time::Instant::now() + timeout.unwrap_or_else(|| self.ele.core.timeout());
+        loop {
+            let gone = match self
+                .ele
+                .call_value("function(){ return this.isConnected===false; }", vec![])
+                .await
+            {
+                Ok(v) => v.as_bool().unwrap_or(false),
+                Err(_) => true, // objectId 失效 = 已删除
+            };
+            if gone {
+                return Ok(true);
+            }
+            if std::time::Instant::now() >= deadline {
+                return Ok(false);
+            }
+            sleep(Duration::from_millis(80)).await;
+        }
+    }
+
+    /// 等元素变为可点击(可见 + 可用 + 在视口 + 未遮挡)。
+    pub async fn clickable(&self, timeout: Option<Duration>) -> Result<bool> {
+        self.poll(timeout, |e| async move {
+            e.is_clickable().await.unwrap_or(false)
+        })
+        .await
+    }
+
+    /// 轮询直到 `pred(ele)` 为真或超时。
+    async fn poll<F, Fut>(&self, timeout: Option<Duration>, pred: F) -> Result<bool>
+    where
+        F: Fn(ChromiumElement) -> Fut,
+        Fut: std::future::Future<Output = bool>,
+    {
+        let deadline =
+            std::time::Instant::now() + timeout.unwrap_or_else(|| self.ele.core.timeout());
+        loop {
+            if pred(self.ele.clone()).await {
+                return Ok(true);
+            }
+            if std::time::Instant::now() >= deadline {
+                return Ok(false);
+            }
+            sleep(Duration::from_millis(80)).await;
+        }
     }
 }
 

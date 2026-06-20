@@ -340,6 +340,35 @@ impl SessionPage {
         tab.set_cookies(self.jar.to_params()).await
     }
 
+    /// **CDP 浏览器 → Session**:把某 Chromium 标签的 cookie(含 httpOnly)灌进本会话。
+    ///
+    /// 与 [`load_cookies_from_tab`](Self::load_cookies_from_tab) 等价,但接收 CDP 后端
+    /// (Cloak-Browser / Chrome for Testing)的 [`ChromiumTab`](crate::cdp::ChromiumTab)。
+    /// 典型用法:CDP 浏览器里登录/过盾后,后续抓取改走纯 HTTP。
+    #[cfg(feature = "cdp")]
+    pub async fn load_cookies_from_cdp_tab(&mut self, tab: &crate::cdp::ChromiumTab) -> Result<()> {
+        let raw = tab.get_cookies().await?;
+        let mut params = Vec::with_capacity(raw.len());
+        for c in raw {
+            let name = c["name"].as_str().unwrap_or_default().to_string();
+            if name.is_empty() {
+                continue;
+            }
+            params.push(CookieParam {
+                name,
+                value: c["value"].as_str().unwrap_or_default().to_string(),
+                url: None,
+                domain: c["domain"].as_str().map(str::to_string),
+                path: c["path"].as_str().map(str::to_string),
+                secure: c["secure"].as_bool(),
+                http_only: c["httpOnly"].as_bool(),
+                expires: c["expires"].as_f64(),
+            });
+        }
+        self.set_cookies(params);
+        Ok(())
+    }
+
     /// 把 cookie 存到磁盘(JSON),便于跨进程/重启复用登录态。
     pub fn save_cookies(&self, path: &str) -> Result<()> {
         std::fs::write(path, serde_json::to_string_pretty(&self.jar.cookies)?)?;

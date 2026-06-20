@@ -33,17 +33,19 @@ camoufox = []
 slider = ["camoufox"]
 # 验证码 OCR(ddddocr 预训练模型 + 纯 Rust tract 推理)。Ocr 识别器后端无关;
 # tab.ocr_image 便捷方法需 camoufox。可选,避免给不需要的用户引入重依赖。
-ocr = ["dep:image", "dep:tract-onnx"]
+ocr = ["dep:image", "dep:tract-onnx", "dep:fontdue"]
 tract-onnx = ["dep:tract-onnx"]
 image = ["dep:image"]
 # 纯算签名运行器:内嵌 QuickJS(rquickjs),把吐出的 env.js 编进单个二进制。后端无关,默认关、按需开。
 signer = ["dep:rquickjs"]
+fontdue = ["dep:fontdue"]
 
 [dependencies]
 async-trait = "0.1.89"
 bytes = "1.12.0"
 dirs = "6.0.0"
 ego-tree = "0.11"
+fontdue = { version = "0.9.3", optional = true }
 futures-util = "0.3.32"
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg"], optional = true }
 libc = "0.2.186"
@@ -79,10 +81,70 @@ required-features = ["cdp"]
 name = "cdp_advanced"
 required-features = ["cdp"]
 
+# Chrome 自动下载分发(对标 CloakBrowser 首次运行自动下载)。
+[[example]]
+name = "cdp_fetch"
+required-features = ["cdp"]
+
+# 指纹探针:dump 全面指纹 JSON,有头/无头 diff 出无头破绽(反检测诊断工具)。
+[[example]]
+name = "cdp_fp"
+required-features = ["cdp"]
+
+# 多任务下载管理 tab.downloads()(CDP 原生下载事件,真机端到端)。
+[[example]]
+name = "cdp_download"
+required-features = ["cdp"]
+
+# 键盘:拟人输入 + 修饰组合键/热键(Ctrl/Cmd+A 等,CDP 原生 modifiers)。
+[[example]]
+name = "cdp_keyboard"
+required-features = ["cdp"]
+
+# CDP 高并发池 ChromiumPool(多 worker + 每任务独立 context + 断点续抓)。
+[[example]]
+name = "cdp_pool"
+required-features = ["cdp"]
+
+# CDP 吐环境 tab.dump_env()(探针 + env.js + 导出工程 + 同构双跑验证,复用 envkit)。
+[[example]]
+name = "cdp_dump_env"
+required-features = ["cdp"]
+
 # 纯算签名运行器(QuickJS,不开浏览器)。
 [[example]]
 name = "env_signer"
 required-features = ["signer"]
+
+# 目标检测(点选验证码)可行性探针:Det 跑通 common_det.onnx(CDP 截图喂入)。
+[[example]]
+name = "det_probe"
+required-features = ["cdp", "ocr"]
+
+# 点选/文字点选验证码(易盾 picture-click):det → 逐框 OCR → 按序可信点击(CDP)。
+[[example]]
+name = "yidun_click"
+required-features = ["cdp", "ocr"]
+
+# OCR/检测模型热替换(自训模型上线):自定义字符集 + 原地热替换 + 环境变量零改码(后端无关)。
+[[example]]
+name = "ocr_hotswap"
+required-features = ["ocr"]
+
+# 易盾点选样本采集(为阶段3 自训攒数据):反复弹挑战 → 切字框落盘 + OCR 猜测标签(CDP)。
+[[example]]
+name = "yidun_collect"
+required-features = ["cdp", "ocr"]
+
+# 易盾点选请求侦察:监听网络看验证码图片格式/来源 + 提示文字下发方式(CDP)。
+[[example]]
+name = "yidun_probe"
+required-features = ["cdp"]
+
+# 易盾点选风控侦察:普查监听事件 + 测点击事件密度 + 抓提交/check 请求(CDP)。
+[[example]]
+name = "yidun_detect"
+required-features = ["cdp"]
 
 # 滑块/缺口识别示例(slider 自动带入 camoufox)。
 [[example]]
@@ -129,7 +191,7 @@ required-features = ["camoufox"]
 
 [[example]]
 name = "exa_cf"
-required-features = ["camoufox"]
+required-features = ["cdp"]
 
 [[example]]
 name = "fetch_browser"
@@ -279,6 +341,7 @@ windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_Security",
     "Win32_Storage_FileSystem",
+    "Win32_System_JobObjects",
     "Win32_System_Registry",
     "Win32_System_Threading",
 ] }

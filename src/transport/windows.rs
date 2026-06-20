@@ -32,6 +32,10 @@ use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, HANDLE, INVALID_HANDLE_VALUE};
 use windows_sys::Win32::Security::SECURITY_ATTRIBUTES;
 use windows_sys::Win32::Storage::FileSystem::CreateFileW;
+use windows_sys::Win32::System::JobObjects::{
+    AssignProcessToJobObject, CreateJobObjectW, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+    SetInformationJobObject,
+};
 use windows_sys::Win32::System::Threading::{
     CreateProcessW, GetExitCodeProcess, PROCESS_INFORMATION, STARTUPINFOW, TerminateProcess,
     WaitForSingleObject,
@@ -55,6 +59,63 @@ const FOPEN: u8 = 0x01;
 const FPIPE: u8 = 0x08;
 const FDEV: u8 = 0x40;
 
+// Job Object 常量(以字面量给出,避免依赖 windows-sys 各版本的具体常量命名):
+// JOBOBJECTINFOCLASS::JobObjectExtendedLimitInformation = 9。
+const JOB_OBJECT_EXTENDED_LIMIT_INFO_CLASS: i32 = 9;
+// JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000:最后一个 Job 句柄关闭时,终止 Job 内所有进程。
+const JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE: u32 = 0x0000_2000;
+
+/// 一个绑定了 `KILL_ON_JOB_CLOSE` 的 Job 句柄。**Drop 关闭句柄 → Windows 终止 Job 内所有进程**
+/// (含 Firefox launcher 再 fork 出的真浏览器、Chrome 的渲染/GPU 等子进程),解决
+/// "我们持的是 launcher 句柄、`TerminateProcess` 打不到真浏览器 → 孤儿进程"的问题。
+///
+/// 进程一旦被 `AssignProcessToJobObject` 绑入,其后代默认也在同 Job 内(Win8+ 支持嵌套 Job),
+/// 故关闭本句柄即可级联杀整棵进程树。创建/绑定失败时返回 `None`,调用方优雅降级到普通 kill。
+pub(crate) struct JobHandle(HANDLE);
+
+// 仅作整数句柄搬运;关闭只在 Drop 串行发生,故跨线程持有安全。
+unsafe impl Send for JobHandle {}
+unsafe impl Sync for JobHandle {}
+
+impl JobHandle {
+    /// 新建 Job(KILL_ON_JOB_CLOSE)并把 `process` 绑入。失败返回 `None`。
+    pub(crate) fn create_for(process: HANDLE) -> Option<JobHandle> {
+        if process.is_null() {
+            return None;
+        }
+        unsafe {
+            let job = CreateJobObjectW(core::ptr::null(), core::ptr::null());
+            if job.is_null() {
+                return None;
+            }
+            let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = core::mem::zeroed();
+            info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+            let set_ok = SetInformationJobObject(
+                job,
+                JOB_OBJECT_EXTENDED_LIMIT_INFO_CLASS,
+                &info as *const _ as *const c_void,
+                core::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+            );
+            if set_ok == 0 || AssignProcessToJobObject(job, process) == 0 {
+                CloseHandle(job);
+                return None;
+            }
+            Some(JobHandle(job))
+        }
+    }
+}
+
+impl Drop for JobHandle {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.0.is_null() {
+                // KILL_ON_JOB_CLOSE:关闭最后一个句柄即终止 Job 内全部进程(整棵树)。
+                CloseHandle(self.0);
+            }
+        }
+    }
+}
+
 /// 已启动的浏览器子进程及其异步通信端(字段含义同 unix,只是父端类型为命名管道)。
 pub struct Spawned {
     pub child: WinChild,
@@ -75,6 +136,8 @@ pub struct WinChild {
     #[allow(dead_code)]
     pid: u32,
     exit_code: Option<u32>,
+    /// 绑定该进程(树)的 Job;Drop 时关闭即级联终止 launcher 再 fork 的真浏览器等子进程。
+    job: Option<JobHandle>,
 }
 
 // `HANDLE` 是裸指针,默认非 Send/Sync;此处句柄仅经 `&mut self` 或 `Mutex` 串行访问,故安全。
@@ -107,6 +170,8 @@ impl WinChild {
 
     /// 发送终止信号(不等待回收)。进程可能已退出,失败不视为致命。
     pub fn start_kill(&mut self) -> std::io::Result<()> {
+        // 关闭 Job(KILL_ON_JOB_CLOSE)级联终止整棵进程树,再补 TerminateProcess。
+        let _ = self.job.take();
         if self.exit_code.is_none() {
             unsafe { TerminateProcess(self.process, 1) };
         }
@@ -122,6 +187,8 @@ impl WinChild {
 
 impl Drop for WinChild {
     fn drop(&mut self) {
+        // 先关闭 Job(KILL_ON_JOB_CLOSE → 终止整棵进程树,含真浏览器),再补一刀 TerminateProcess。
+        let _ = self.job.take();
         unsafe {
             if self.exit_code.is_none() {
                 TerminateProcess(self.process, 1);
@@ -226,12 +293,17 @@ pub async fn spawn(program: &Path, args: &[String], envs: &[(String, String)]) -
         )));
     }
 
+    // 把进程绑入 KILL_ON_JOB_CLOSE 的 Job:即便我们持的是 launcher 句柄,关闭 Job 也能级联
+    // 杀掉它再 fork 出的真浏览器(失败则 None,降级到 TerminateProcess)。
+    let job = JobHandle::create_for(pi.hProcess);
+
     Ok(Spawned {
         child: WinChild {
             process: pi.hProcess,
             thread: pi.hThread,
             pid: pi.dwProcessId,
             exit_code: None,
+            job,
         },
         writer: cmd.server,
         reader: resp.server,

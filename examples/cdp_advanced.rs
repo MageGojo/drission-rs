@@ -47,8 +47,8 @@ async fn main() -> drission::Result<()> {
 
     let headless = std::env::var("HL").map(|v| v != "0").unwrap_or(true);
     println!("[*] 启动 Chrome(headless={headless})");
-    let browser = ChromiumBrowser::launch(headless).await?;
-    let tab = browser.new_tab("about:blank").await?;
+    let browser = ChromiumBrowser::launch(ChromiumOptions::new().headless(headless)).await?;
+    let tab = browser.new_tab(Some("about:blank")).await?;
     tab.get(&format!("{base}/")).await?;
 
     let mut failed = false;

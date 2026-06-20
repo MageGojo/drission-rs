@@ -13,10 +13,15 @@
 //! ele.input_keys(&[KeyInput::text("hello"), KeyInput::key(Keys::ENTER)]).await?;
 //! ```
 //!
-//! **平台限制(Camoufox 后端)**:Camoufox 当前的 Juggler `dispatchKeyEvent` **没有 `modifiers` 字段**,
-//! 也不会跨调用跟踪"修饰键按下态"(合成的主键事件 `e.ctrlKey` 仍为 false)→ **修饰组合键
-//! (Ctrl+A / Ctrl+C 等)的原生效果无法合成**(非库缺陷)。需要"全选"等可用 JS:如
-//! `ele.run_js("node.select()")`(输入框)或 `tab.run_js("document.execCommand('selectAll')")`。
+//! **修饰组合键 / 热键**:
+//! - **CDP / Chromium 后端**:**已支持**。`tab.key_combo(&[Keys::CONTROL, "a"])` /
+//!   `ele.shortcut(&[Keys::META, "a"])`——CDP 原生 `modifiers` 位掩码下发(页面读得到 `e.ctrlKey`/
+//!   `metaKey` 等为 `true`),并对常见编辑快捷键(Ctrl/Cmd + A/C/X/V/Z/Y)带上 CDP `commands` 让
+//!   浏览器**真正执行**编辑动作(selectAll/copy…),无头下也生效。
+//! - **平台限制(Camoufox 后端)**:Camoufox 当前的 Juggler `dispatchKeyEvent` **没有 `modifiers` 字段**,
+//!   也不会跨调用跟踪"修饰键按下态"(合成的主键事件 `e.ctrlKey` 仍为 false)→ **修饰组合键的原生
+//!   效果无法合成**(非库缺陷)。需要"全选"等可用 JS:如 `ele.run_js("node.select()")`(输入框)
+//!   或 `tab.run_js("document.execCommand('selectAll')")`。
 
 /// 常用特殊键名常量(值即 DOM 的 `key` 名)。
 pub struct Keys;

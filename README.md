@@ -165,7 +165,8 @@ use drission::prelude::*;
 
 #[tokio::main]
 async fn main() -> drission::Result<()> {
-    // 自动定位 Google Chrome(CHROME_BIN/DRISSION_CHROME → 安装路径 → Windows 注册表 → PATH)。
+    // 自动定位 Google Chrome(CHROME_BIN/DRISSION_CHROME → 安装路径 → Windows 注册表 → PATH);
+    // 找不到则自动下载 Chrome for Testing 到 ~/.cache/drission/chrome/(对标 CloakBrowser)。
     // 要指定浏览器:ChromiumBrowser::launch_with("C:\\...\\chrome.exe", true)
     let browser = ChromiumBrowser::launch(true).await?;     // headless
     let tab = browser.new_tab("https://example.com").await?;
@@ -204,6 +205,7 @@ async fn main() -> drission::Result<()> {
 
 ```bash
 cargo run --example cdp_demo                                  # 默认 Chromium / CDP 后端(Google Chrome)
+cargo run --example cdp_fetch                                 # 自动下载 Chrome for Testing 并驱动(对标 CloakBrowser)
 cargo run --example quickstart    --features camoufox         # Camoufox 最小闭环
 cargo run --example pool_crawl    --features camoufox         # 高并发池 + 代理/指纹轮换 + 断点续抓
 cargo run --example ocr_captcha   --features camoufox,ocr     # 验证码 OCR
@@ -232,7 +234,10 @@ A:API 语法刻意对齐 DrissionPage,从 Python DP 迁移几乎零成本(见 [A
 A:不需要。字符 OCR 用 ddddocr 预训练模型 + 纯 Rust 推理**离线**完成;滑块缺口距离是本地图像算法。首次仅自动下载一次模型到缓存。
 
 **Q:支持 Chrome 吗?默认用哪个浏览器?**
-A:**默认就是 Google Chrome**(Chromium / CDP 后端,开箱即用,也支持 Edge / Brave / Chromium / Electron)。本机 Chrome 路径自动探测(`CHROME_BIN` / `DRISSION_CHROME` → 安装路径 → **Windows 注册表 `App Paths`** → `PATH`,对标 DrissionPage),找不到可用 `ChromiumBrowser::launch_with(path, headless)` 指定。要 Firefox 反检测内核则开 `--features camoufox`。
+A:**默认就是 Google Chrome**(Chromium / CDP 后端,开箱即用,也支持 Edge / Brave / Chromium / Electron)。本机 Chrome 路径自动探测(`CHROME_BIN` / `DRISSION_CHROME` → 安装路径 → **Windows 注册表 `App Paths`** → `PATH`,对标 DrissionPage)。**找不到系统 Chrome 时自动从官方 [Chrome for Testing](https://googlechromelabs.github.io/chrome-for-testing/) 下载并缓存**(对标 CloakBrowser 首次运行自动下载,三平台 mac / win / linux),也可用 `ChromiumBrowser::launch_with(path, headless)` 指定。要 Firefox 反检测内核则开 `--features camoufox`。
+
+**Q:没装 Chrome 也能用吗?**
+A:能。`ChromiumBrowser::launch(headless)` 找不到系统浏览器会**自动下载 Chrome for Testing** 到 `~/.cache/drission/chrome/`;也可显式 `ChromiumBrowser::download_chrome()`(返回路径、不启动),或 `drission::cdp::download_chrome_for("win64", "Stable")` **跨平台预取**(如在 mac 上为分发下载 Windows 版)。
 
 **Q:能过 Cloudflare 吗?**
 A:可以。`tab.pass_cloudflare()` 支持交互式 Turnstile 可信点击与非交互式自动放行。

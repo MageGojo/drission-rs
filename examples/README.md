@@ -143,6 +143,7 @@ page.quit().await?;
 |---|---|---|
 | [cdp_demo](cdp_demo.rs) | CDP 后端 demo:启动/接管 Google Chrome → 导航 → run_js → 元素文本 → 截图(默认浏览器,自动探测路径) | 🌐 |
 | [cdp_advanced](cdp_advanced.rs) | CDP 深化能力端到端自验证(进程内 HTTP 服务,Chrome 访问 localhost) | 🔌 |
+| [cdp_fetch](cdp_fetch.rs) | **自动下载 Chrome for Testing**(对标 CloakBrowser 首次运行自动下载)并用它驱动 example.com;`DRISSION_PREFETCH_WIN=1` 顺带预取 win64 | 🌐 |
 
 ## Windows 专项(在 Windows 上运行)
 

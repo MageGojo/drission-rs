@@ -15,10 +15,10 @@ async fn main() -> drission::Result<()> {
         ChromiumBrowser::connect(&url).await?
     } else {
         println!("[*] 启动 Chrome(headless={headless})");
-        ChromiumBrowser::launch(headless).await?
+        ChromiumBrowser::launch(ChromiumOptions::new().headless(headless)).await?
     };
 
-    let tab = browser.new_tab("about:blank").await?;
+    let tab = browser.new_tab(Some("about:blank")).await?;
     tab.get("https://example.com").await?;
     println!("[*] title = {:?}", tab.title().await?);
     println!("[*] url   = {:?}", tab.url().await?);

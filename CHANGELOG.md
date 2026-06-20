@@ -7,6 +7,66 @@
 
 ## [Unreleased]
 
+### 新增 Added
+
+- **CDP 修饰组合键 / 热键**(`tab.key_combo(&[Keys::CONTROL, "a"])` / `ele.shortcut(...)`):CDP 原生
+  `modifiers` 位掩码下发,页面读得到 `e.ctrlKey`/`metaKey` 等为 `true`(真组合键);对常见编辑快捷键
+  (Ctrl/Cmd + A/C/X/V/Z/Y)额外带 CDP `commands`(selectAll/copy…),**无头下也真正执行编辑动作**
+  (对齐 Puppeteer 做法)。补齐"CDP 能真做 Ctrl+A"的能力(Camoufox/Juggler 无 modifiers 字段、仍是
+  已知限制)。示例 `cdp_keyboard` 真机自验证 ALL PASS(拟人输入 + Cmd/Ctrl+A 全选 + 删除清空)。
+- **CDP 吐环境 `tab.dump_env()`**(对齐 camoufox):把吐环境**后端无关核心**抽到新模块 `crate::envkit`
+  (探针/`env.js`/导出工程/同构双跑验证 + canvas/webgl/audio/字体/像素/WebRTC/plugins 指纹回放 + 反 hook +
+  签名 sink 定位 + 资产模板),两后端经新 `EnvBackend` trait(导航前注入 + 求值)复用同一套逻辑;camoufox
+  `dump_env` 改为薄胶水(零行为变化)。CDP 注入走 `Page.addScriptToEvaluateOnNewDocument`、求值走
+  `Runtime.evaluate`。`EnvDump`/`EnvScope`/`EnvTarget` 后端无关;`EnvDumper`/`EnvProbe` canonical cdp 优先
+  (camoufox 用 `Camoufox*`、cdp 用 `Chromium*` 显式名)。示例 `cdp_dump_env` 真机自验证 ALL PASS(采种子 →
+  生成 env.js → 导出工程 → **同构双跑 45/45 字段一致**)。
+- **CDP 高并发池 `ChromiumPool`**(对齐 camoufox `BrowserPool`):多 worker(Chrome 进程)+ 信号量并发上限
+  + 失败重试(指数退避)+ 健康自愈(连接断/进程退惰性重建)+ `map`(保序)/ `map_resumable`(断点续抓,
+  配 `Checkpoint`)/ `run`/`run_keyed`/`shutdown`。**每任务一个独立 `BrowserContext`**(cookie/缓存/storage
+  隔离),带 `proxy` 时该上下文走 **CDP 原生 per-context 代理**(`Target.createBrowserContext{proxyServer}`)+
+  UA/locale/时区经会话级 `Emulation` 覆盖;`ChromiumContextOverride` + `ChromiumBrowser::new_tab_with` +
+  `ChromiumTab::close` 配套。后端无关的 `RetryPolicy`/`RotateStrategy`/`Checkpoint` 抽为 cdp/camoufox 共用
+  (`crate::pool` 改 `any(camoufox, cdp)` 编译)。prelude canonical:`Pool`(=ChromiumPool),cdp-only 时
+  `PoolOptions`/`ContextOverride` 亦为 canonical。示例 `cdp_pool` 真机自验证 ALL PASS(2×2 并发=4、保序 map、
+  每任务 context 隔离、断点续抓续跑只补未完成)。
+- **Windows 进程生命周期兜底(Job Object)**:两后端启动浏览器后把进程绑入 `KILL_ON_JOB_CLOSE` 的
+  Job —— Camoufox `WinChild`(解决"持的是 Firefox launcher 句柄、`TerminateProcess` 打不到再 fork 的
+  真浏览器 → 孤儿进程")、CDP `ChromiumBrowser`(`kill_on_drop` 只杀主进程,会留渲染/GPU 子进程)。
+  `quit`/`Drop` 关闭 Job 即级联终止整棵进程树。`x86_64-pc-windows-gnu` 交叉编译 + clippy 干净。
+
+- **CDP 后端全面对齐 Camoufox**(同一份用户代码,切 feature 即换后端):在已对齐的导航/元素/输入/
+  静态元素之上,补齐高层句柄与能力 —— iframe(`tab.get_frame`/`ele.content_frame`)、Shadow DOM
+  (`ele.shadow_root`)、动作链(`tab.actions()`)、控制台 / WebSocket 监听(`tab.console()`/
+  `tab.websocket()`)、`wait()`/`scroll()`/`set()`/`set().window()` 句柄、对话框(`handle_next_dialog`)、
+  文件上传(`set_files`/`click_to_upload`)、登录态(`storage_state`/`apply_storage_state`)、cookie
+  (`cookies`/`set_cookies`)、翻页(`paginate`)、录像(`tab.screencast()`)、OCR(`tab.ocr_image`)。
+- **CDP 下载管理 `tab.downloads()`**(`ChromiumDownloads`,对齐 camoufox `Downloads`):多任务并发跟踪 +
+  任务列表 + 实时进度 + 自定义重命名。**基于 CDP 原生 `Page.downloadWillBegin`/`downloadProgress`
+  事件按 `guid` 聚合**(比文件系统轮询更准、自带 received/total 字节)。下载目录用新增的
+  `ChromiumOptions::download_path` 或 `tab.set_download_path` 设置。`start`/`wait_new`/`wait_done`/
+  `wait_count_done`/`missions`/`stop` + `DownloadMission`(`save_as`/`downloaded_bytes`)。
+  `Downloads`/`DownloadMission`/`DownloadState` 进 `prelude`(canonical:cdp 优先,camoufox 用
+  `CamoufoxDownloads`)。示例 `cdp_download`:进程内 HTTP 服务以 `Content-Disposition: attachment`
+  供文件,真实 Chrome 点 `<a download>` 触发下载,**真机端到端自验证 ALL CHECKS PASSED**(顺序
+  `wait_new`+`wait_done`、**并发** `wait_count_done(2)`、20KB 文件 `received==total==20000` 证 CDP
+  事件自带真实进度字节、`missions()==3`、`save_as` 重命名、`stop` 翻转)。
+- **点选 / 文字点选验证码**(`feature = "ocr"`,对标 ddddocr `det=True`):
+  - **`Det`** —— ddddocr 目标检测模型 `common_det.onnx`(YOLOX),**tract 纯 Rust 推理**(无原生 onnxruntime):
+    416 灰边 letterbox + 解码 + NMS → `Vec<BBox>`(原图坐标 + 置信度)。`Det::new()` 首次自动下载模型到缓存。
+  - **`ClickWord`** —— 点选求解器:`chars()`(检测 → 逐框 OCR)、`points_for(img, targets)`(按提示顺序匹配出
+    **依次点击点**)。配合浏览器可信点击即可自动点选。
+  - 导出 `BBox` / `Det` / `ClickWord` 进 `prelude`(ocr feature)。
+  - 示例 `det_probe`(检测可行性)、`yidun_click`(易盾 picture-click 全链路)。
+  - 局限:单字艺术体 OCR 非 100%(ddddocr 固有);易盾另有行为风控,字点准≠必过。详见 `docs/第三梯队.md` 里程碑 54。
+
+### 修复 Fixed
+
+- `det_probe` / `yidun_click` 示例的 `required-features` 由 `["ocr"]` 补为 `["cdp", "ocr"]`:它们驱动
+  `ChromiumBrowser`(CDP),原配置在 `--features camoufox,ocr`(无 cdp)构建下编译失败。
+- `cdp::stealth::stealth_args()` 在非 macOS 目标(Windows / Linux)的 `unused_mut` 警告
+  (`--use-mock-keychain` 仅 macOS 追加)—— 改条件 shadow,跨平台零警告。
+
 ## [0.2.0] - 2026-06-20
 
 > 后端架构调整 + Windows 稳定支持 + **默认 Google Chrome**。

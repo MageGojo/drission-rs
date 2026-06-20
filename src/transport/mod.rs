@@ -26,6 +26,9 @@ pub use unix::{Spawned, spawn};
 mod windows;
 #[cfg(windows)]
 pub use windows::{Spawned, spawn};
+// Windows 进程树兜底杀手(Job Object,KILL_ON_JOB_CLOSE);CDP 后端也用它绑 Chrome 进程树。
+#[cfg(windows)]
+pub(crate) use windows::JobHandle;
 
 // ── 跨平台传输类型别名 ────────────────────────────────────────────────────────
 // 子进程句柄:unix 直接用 tokio 的 `Child`;windows 用自管理的 `WinChild`(同名方法

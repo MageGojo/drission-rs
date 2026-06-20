@@ -9,6 +9,12 @@
 *.log
 # 示例运行产物(可能含本机路径/测试数据,不入库不发布)
 /drission_*_result.json
+# 验证码 / 截图类示例产物(根目录兜底;示例本应写到 target/ 下)
+/*.png
+/*.jpg
+/yidun_*.png
+# 易盾点选样本采集产物(自训模型用的图片/CSV,体积大且属运行产物,不入库)
+/yidun_samples/
 # 吐环境运行产物(含真实 cookie/webid/指纹 等,不入库)
 /dump-env/
 /dump-env-fp/

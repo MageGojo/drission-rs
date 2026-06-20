@@ -39,8 +39,15 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
-      # slider 零额外依赖、cdp 仅 Chromium 后端代码;两者一起检查覆盖更广。
-      - run: cargo clippy --all-targets --features slider,cdp -- -D warnings
+      # ── 按后端分开 clippy ──────────────────────────────────────────────────
+      # 两后端的统一名(Browser/Tab/…)是 **cdp 优先**:同时开 cdp+camoufox 时 canonical=cdp,
+      # 此时 camoufox 示例(用 canonical 名)会被按 cdp 类型编译而失败 —— 故 **示例必须按后端分开编**。
+      # 默认后端(cdp):lib + cdp 示例。
+      - run: cargo clippy --all-targets -- -D warnings
+      # Camoufox 后端(关掉 cdp,canonical=camoufox):lib + camoufox/slider 示例。
+      - run: cargo clippy --all-targets --no-default-features --features camoufox,slider -- -D warnings
+      # 零后端(仅后端无关模块):lib 必须干净。
+      - run: cargo clippy --lib --no-default-features -- -D warnings
 
   test:
     name: test (${{ matrix.os }})
@@ -54,7 +61,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       # 单测 + 离线集成测试(tests/);不跑需要浏览器/网络的 example。
-      - run: cargo test --features slider,cdp --lib --tests
+      # `--lib --tests`(不带 --all-targets)不编译示例,故两后端可同时开。
+      - run: cargo test --features camoufox,cdp,slider --lib --tests
+      # 零后端:后端无关模块的单测必须独立通过(防只在某后端下才编译的回归)。
+      - run: cargo test --no-default-features --lib
 
   ocr:
     name: build+test (ocr feature)
@@ -62,9 +72,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
       - uses: Swatinem/rust-cache@v2
-      # OCR 引入 tract/image 重依赖,单独一档;只跑不需要下载模型的纯单测。
+      # OCR 引入 tract/image 重依赖,单独一档(仅 ubuntu)。只跑不需要下载模型的纯单测。
       - run: cargo test --features ocr --lib
+      # OCR 示例按后端分开 clippy(det/yidun 走 cdp;ocr_captcha/apizero/hotswap 走 camoufox)。
+      - run: cargo clippy --all-targets --features cdp,ocr -- -D warnings
+      - run: cargo clippy --all-targets --no-default-features --features camoufox,slider,ocr -- -D warnings
+
+  signer:
+    name: build+test (signer feature)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      # 纯算签名运行器(内嵌 QuickJS / rquickjs)。后端无关,单独一档。
+      - run: cargo clippy --all-targets --no-default-features --features signer -- -D warnings
+      - run: cargo test --no-default-features --features signer --lib
 
   cross-windows-gnu:
     name: cross-check (x86_64-pc-windows-gnu)
@@ -75,7 +103,8 @@ jobs:
         with:
           targets: x86_64-pc-windows-gnu
       - uses: Swatinem/rust-cache@v2
-      - run: cargo check --target x86_64-pc-windows-gnu --features slider,cdp
+      # 两后端 lib 一起交叉编译(验证 Windows 注册表 / 命名管道分支类型正确)。
+      - run: cargo check --lib --target x86_64-pc-windows-gnu --features camoufox,cdp,slider
 
   docs:
     name: docs.rs build
