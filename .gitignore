@@ -4,6 +4,8 @@
 **/*.rs.bk
 .DS_Store
 *.log
+# 示例运行产物(可能含本机路径/测试数据,不入库不发布)
+/drission_*_result.json
 # 吐环境运行产物(含真实 cookie/webid/指纹 等,不入库)
 /dump-env/
 /dump-env-fp/
