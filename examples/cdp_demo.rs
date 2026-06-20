@@ -23,7 +23,11 @@ async fn main() -> drission::Result<()> {
     println!("[*] 1+2   = {}", tab.run_js("1+2").await?);
     println!("[*] h1    = {:?}", tab.ele_text("h1").await?);
     let png = tab.screenshot_bytes().await?;
-    println!("[*] 截图 {} bytes(头 {:02X?})", png.len(), &png[..png.len().min(4)]);
+    println!(
+        "[*] 截图 {} bytes(头 {:02X?})",
+        png.len(),
+        &png[..png.len().min(4)]
+    );
 
     browser.quit().await?;
     println!("==== CDP demo 完成 ====");

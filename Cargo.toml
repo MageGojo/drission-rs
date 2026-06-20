@@ -1,6 +1,6 @@
 [package]
 name = "drission"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.85"
 authors = ["极数本源 (apizero.cn)"]
@@ -14,7 +14,20 @@ keywords = ["captcha", "ocr", "anti-detect", "automation", "scraper"]
 categories = ["web-programming", "api-bindings", "computer-vision"]
 exclude = ["/dist", "/docs", "/target"]
 
+# docs.rs:用全部 feature 构建,确保 ocr / slider / cdp 的 API 在文档站可见
+# (默认 docs.rs 只用 default features → 这些 feature-gated 类型会被隐藏)。
+# 配合 src/lib.rs 顶部的 `#![cfg_attr(docsrs, feature(doc_auto_cfg))]` 显示 feature 徽标。
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [features]
+# 后端选择(默认即"我们的版本":Camoufox/Firefox 的 Juggler 后端)。
+default = ["camoufox"]
+# Camoufox / Firefox(Juggler)后端 —— 本库核心,默认开、始终编译。
+camoufox = []
+# Chromium(Chrome / Edge / Brave / Electron,CDP)后端 —— 可选、实验性;开启后可 `ChromiumBrowser` 等。
+cdp = []
 # 滑块/图片缺口距离识别(通用滑块 + 极验 + 顶象 ContentNcc)。纯 JS+std 零额外依赖,默认关、按需开。
 slider = []
 # 验证码 OCR(ddddocr 预训练模型 + 纯 Rust tract 推理)。可选,避免给不需要的用户引入重依赖。
@@ -31,7 +44,7 @@ futures-util = "0.3.32"
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg"], optional = true }
 libc = "0.2.186"
 os_pipe = { version = "1.2.3", features = ["io_safety"] }
-reqwest = { version = "0.13.4", features = ["json", "stream"] }
+reqwest = { version = "0.13.4", features = ["json", "stream", "socks"] }
 scraper = "0.27.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
@@ -43,6 +56,7 @@ tract-onnx = { version = "0.23.3", optional = true }
 zip = "8.6.0"
 
 [dev-dependencies]
+criterion = "0.7.0"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 
 # OCR 示例用到 feature-gated 的 tab.ocr_image,仅在 --features ocr 时编译。
@@ -67,6 +81,15 @@ required-features = ["slider"]
 name = "slider_local"
 required-features = ["slider"]
 
+# Chromium/CDP 后端示例需 --features cdp。
+[[example]]
+name = "cdp_demo"
+required-features = ["cdp"]
+
+[[example]]
+name = "cdp_advanced"
+required-features = ["cdp"]
+
 [target."cfg(unix)".dependencies]
 command-fds = { version = "0.3.3", features = ["tokio"] }
 
@@ -77,3 +100,8 @@ windows-sys = { version = "0.61", features = [
     "Win32_Storage_FileSystem",
     "Win32_System_Threading",
 ] }
+
+# 基准:纯函数(编解码 / 定位解析 / 采集导出),不开浏览器,CI 可跑。
+[[bench]]
+name = "parsing"
+harness = false

@@ -59,7 +59,9 @@ async fn main() -> drission::Result<()> {
     let li2 = tab.s_ele("xpath://li[2]").await?.text()?;
     let title = tab.s_ele("xpath://*[@id='title']").await?.text()?;
     let xpath_ok = li_count == 3 && li2 == "二" && title == "Extras";
-    println!("[1] 静态XPath: //ul/li 数={li_count}  //li[2]={li2:?}  //*[@id=title]={title:?}  (ok={xpath_ok})");
+    println!(
+        "[1] 静态XPath: //ul/li 数={li_count}  //li[2]={li2:?}  //*[@id=title]={title:?}  (ok={xpath_ok})"
+    );
 
     // ---------- iframe 内元素 ----------
     let frame = tab.get_frame("#ifr").await?;
@@ -70,7 +72,10 @@ async fn main() -> drission::Result<()> {
 
     // ---------- 文件上传 ----------
     let upload_str = upload_path.to_string_lossy().to_string();
-    tab.ele("#file").await?.set_files(&[upload_str.as_str()]).await?;
+    tab.ele("#file")
+        .await?
+        .set_files(&[upload_str.as_str()])
+        .await?;
     let fname = tab
         .run_js("(document.getElementById('file').files[0]||{}).name || ''")
         .await?;
@@ -79,8 +84,10 @@ async fn main() -> drission::Result<()> {
 
     // ---------- JS 对话框(confirm + prompt)----------
     // confirm:与触发动作并发——run_js 会阻塞到对话框被处理。
-    let (confirm_res, confirm_info) =
-        tokio::join!(tab.run_js("confirm('go?')"), tab.handle_next_dialog(true, None));
+    let (confirm_res, confirm_info) = tokio::join!(
+        tab.run_js("confirm('go?')"),
+        tab.handle_next_dialog(true, None)
+    );
     let confirm_info = confirm_info?;
     let confirm_ok = confirm_res?.as_bool() == Some(true) && confirm_info.message == "go?";
     println!(

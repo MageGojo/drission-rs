@@ -73,7 +73,10 @@ impl DownloadMission {
         let part = self
             .path
             .with_file_name(format!("{}.part", self.suggested_filename));
-        tokio::fs::metadata(&part).await.map(|m| m.len()).unwrap_or(0)
+        tokio::fs::metadata(&part)
+            .await
+            .map(|m| m.len())
+            .unwrap_or(0)
     }
 
     /// 把已下载的文件移动/重命名到 `dest`(自定义重命名;跨盘自动回退为复制+删除)。返回最终路径。

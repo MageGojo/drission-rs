@@ -101,7 +101,9 @@ async fn main() -> drission::Result<()> {
         tab.wait().secs(0.2).await;
     }
     if !loaded {
-        return Err(drission::Error::msg(format!("页面未正确加载(疑似沙箱拒读):{url}")));
+        return Err(drission::Error::msg(format!(
+            "页面未正确加载(疑似沙箱拒读):{url}"
+        )));
     }
 
     // ---------- 写法 1:自然上传 · 分步(set_upload_files → click → wait_upload_paths_inputted) ----------
@@ -110,16 +112,25 @@ async fn main() -> drission::Result<()> {
     // 2. 点击会唤起文件框的按钮(这里按钮内部又 `real.click()` 程序化点了隐藏的 <input type=file>)
     tab.ele("#pick").await?.click().await?;
     // 3. 等待文件路径被填入(超时返回 false,不报错)
-    let inputted = tab.wait().upload_paths_inputted(Some(std::time::Duration::from_secs(5))).await?;
+    let inputted = tab
+        .wait()
+        .upload_paths_inputted(Some(std::time::Duration::from_secs(5)))
+        .await?;
     tab.wait().secs(0.2).await; // 给 change 事件一点点落地时间(只为读 #picked 展示)
     let name1 = file_name(&tab, "real").await?;
     let picked1 = tab.ele("#picked").await?.text().await?;
     let ok1 = inputted && name1 == "alpha.txt" && picked1 == "alpha.txt";
-    println!("[1] 自然上传·分步: inputted={inputted} files[0]={name1:?} #picked={picked1:?} (ok={ok1})");
+    println!(
+        "[1] 自然上传·分步: inputted={inputted} files[0]={name1:?} #picked={picked1:?} (ok={ok1})"
+    );
 
     // ---------- 写法 2:自然上传 · 一步(ele.click.to_upload) ----------
     // 一行搞定:武装 + 点击本元素 + 等待。会替换上一次的文件。
-    let done2 = tab.ele("#pick").await?.click_to_upload(&[pb.as_str()], None).await?;
+    let done2 = tab
+        .ele("#pick")
+        .await?
+        .click_to_upload(&[pb.as_str()], None)
+        .await?;
     tab.wait().secs(0.2).await;
     let name2 = file_name(&tab, "real").await?;
     let picked2 = tab.ele("#picked").await?.text().await?;

@@ -34,7 +34,14 @@ async fn main() -> drission::Result<()> {
     // 自动过盾:非交互式 challenge 等待其自动放行;交互式 Turnstile 自动**可信点击**复选框。
     let passed = tab.pass_cloudflare(Duration::from_secs(40)).await?;
     let title = tab.title().await.unwrap_or_default();
-    println!("\n结果: {}", if passed { "已过 CF 盾" } else { "仍被 CF 拦截 / 未过" });
+    println!(
+        "\n结果: {}",
+        if passed {
+            "已过 CF 盾"
+        } else {
+            "仍被 CF 拦截 / 未过"
+        }
+    );
     println!("最终标题: {title:?}");
 
     browser.quit().await?;

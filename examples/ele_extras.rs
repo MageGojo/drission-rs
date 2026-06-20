@@ -79,7 +79,10 @@ async fn main() -> drission::Result<()> {
     let attr_ok = attrs.get("id").map(|s| s == "inp").unwrap_or(false)
         && bg.replace(' ', "") == "rgb(255,0,0)"
         && dis_prop.as_bool() == Some(true);
-    println!("[3] attrs.id={:?} bg={bg:?} dis.disabled={dis_prop} (ok={attr_ok})", attrs.get("id"));
+    println!(
+        "[3] attrs.id={:?} bg={bg:?} dis.disabled={dis_prop} (ok={attr_ok})",
+        attrs.get("id")
+    );
 
     // remove + ele.wait().deleted
     let rm = tab.ele("#rm").await?;
@@ -90,11 +93,17 @@ async fn main() -> drission::Result<()> {
     println!("[4] remove → wait.deleted={deleted} 再查不到={gone} (ok={remove_ok})");
 
     // ele.wait().displayed(惰性显示)
-    let lazy_shown = tab.ele("#lazy").await?.wait().displayed(Some(Duration::from_secs(2))).await?;
+    let lazy_shown = tab
+        .ele("#lazy")
+        .await?
+        .wait()
+        .displayed(Some(Duration::from_secs(2)))
+        .await?;
     println!("[5] #lazy wait.displayed={lazy_shown}");
 
     // input_keys: 文本 + Enter 触发表单提交
-    tab.ele("#finp").await?
+    tab.ele("#finp")
+        .await?
         .input_keys(&[KeyInput::text("abc"), KeyInput::key(Keys::ENTER)])
         .await?;
     let finp_val = tab.run_js("document.getElementById('finp').value").await?;
@@ -113,7 +122,11 @@ async fn main() -> drission::Result<()> {
     let pass = geo_ok && states_ok && attr_ok && remove_ok && lazy_shown && inputkeys_ok && key_ok;
     println!(
         "\n==== {} ====",
-        if pass { "ALL CHECKS PASSED" } else { "SOME CHECKS FAILED" }
+        if pass {
+            "ALL CHECKS PASSED"
+        } else {
+            "SOME CHECKS FAILED"
+        }
     );
     browser.quit().await?;
     if pass {

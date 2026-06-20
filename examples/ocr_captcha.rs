@@ -17,7 +17,10 @@ const XP: &str = "xpath:/html/body/main/div/main/div/form/div[3]/button/img";
 #[tokio::main]
 async fn main() -> drission::Result<()> {
     let headless = std::env::var("HL").map(|v| v != "0").unwrap_or(true);
-    let n: u32 = std::env::var("N").ok().and_then(|v| v.parse().ok()).unwrap_or(8);
+    let n: u32 = std::env::var("N")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(8);
 
     let browser = Browser::launch(BrowserOptions::new().headless(headless)).await?;
     let tab = browser.latest_tab().await?;
@@ -25,7 +28,12 @@ async fn main() -> drission::Result<()> {
     println!("[*] 打开 {URL}");
     tab.get(URL).await?;
     sleep(Duration::from_secs(3)).await;
-    if tab.wait().ele_displayed(XP, Some(Duration::from_secs(10))).await.is_err() {
+    if tab
+        .wait()
+        .ele_displayed(XP, Some(Duration::from_secs(10)))
+        .await
+        .is_err()
+    {
         println!("[!] 验证码 img 未出现");
         browser.quit().await?;
         return Ok(());
@@ -36,7 +44,11 @@ async fn main() -> drission::Result<()> {
     for k in 1..=n {
         match tab.ocr_image(XP).await {
             Ok(code) => {
-                println!("[*] #{k}:验证码 = {:?}  (大写 {:?})", code, code.to_uppercase());
+                println!(
+                    "[*] #{k}:验证码 = {:?}  (大写 {:?})",
+                    code,
+                    code.to_uppercase()
+                );
                 if code.chars().count() == 4 {
                     ok += 1;
                 }

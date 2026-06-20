@@ -21,8 +21,14 @@ async fn main() -> drission::Result<()> {
     println!("== 基础指纹 ==");
     println!("  webdriver = {}", tab.run_js("navigator.webdriver").await?);
     println!("  platform  = {}", tab.run_js("navigator.platform").await?);
-    println!("  languages = {}", tab.run_js("JSON.stringify(navigator.languages)").await?);
-    println!("  hardwareConcurrency = {}", tab.run_js("navigator.hardwareConcurrency").await?);
+    println!(
+        "  languages = {}",
+        tab.run_js("JSON.stringify(navigator.languages)").await?
+    );
+    println!(
+        "  hardwareConcurrency = {}",
+        tab.run_js("navigator.hardwareConcurrency").await?
+    );
     println!(
         "  RTCPeerConnection (block_webrtc 后应为 undefined) = {}",
         tab.run_js("typeof window.RTCPeerConnection").await?
@@ -33,8 +39,12 @@ async fn main() -> drission::Result<()> {
     // 等页面里的异步检测脚本跑完。
     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
-    let passed = tab.run_js("document.querySelectorAll('.passed').length").await?;
-    let failed = tab.run_js("document.querySelectorAll('.failed, .warn').length").await?;
+    let passed = tab
+        .run_js("document.querySelectorAll('.passed').length")
+        .await?;
+    let failed = tab
+        .run_js("document.querySelectorAll('.failed, .warn').length")
+        .await?;
     println!("  passed = {passed}, failed/warn = {failed}");
 
     let webdriver_row = tab

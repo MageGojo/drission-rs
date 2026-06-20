@@ -20,7 +20,9 @@ use serde_json::Value;
 async fn main() -> drission::Result<()> {
     tracing_subscriber::fmt().with_env_filter("warn").init();
     let mut a = std::env::args().skip(1);
-    let start = a.next().unwrap_or_else(|| "https://v.douyin.com/I1mlU0fBFhI/".into());
+    let start = a
+        .next()
+        .unwrap_or_else(|| "https://v.douyin.com/I1mlU0fBFhI/".into());
     let want: usize = a.next().and_then(|s| s.parse().ok()).unwrap_or(3);
     let proxy_on = std::env::var("DUMP_PROXY").is_ok();
 
@@ -76,7 +78,8 @@ async fn main() -> drission::Result<()> {
         // 打开下一个未抓过的视频直链(触发它自己签名的 detail)。
         while let Some(id) = queue.pop_front() {
             if !seen.contains(&id) {
-                tab.get(&format!("https://www.douyin.com/video/{id}")).await?;
+                tab.get(&format!("https://www.douyin.com/video/{id}"))
+                    .await?;
                 tab.press_key("ArrowDown").await?;
                 break;
             }
@@ -93,13 +96,18 @@ async fn main() -> drission::Result<()> {
     dump.write_to(&out)?;
 
     println!("\n==== 吐环境完成,产物目录: {} ====", out.display());
-    println!("  seed.json            环境种子(吐全:navigator/screen/document/storage + canvas/webgl/audio 指纹)");
+    println!(
+        "  seed.json            环境种子(吐全:navigator/screen/document/storage + canvas/webgl/audio 指纹)"
+    );
     println!("  env.js               Node 补环境(含指纹回放;require 即挂全局或 vm 沙箱 setup)");
     println!(
         "  targets.json         命中目标参数 {} 条(a_bogus 真实上线值 + 调用栈)",
         dump.targets.len()
     );
-    println!("  sinks.json           签名请求 writer(URL + 调用栈) {} 条", dump.sinks.len());
+    println!(
+        "  sinks.json           签名请求 writer(URL + 调用栈) {} 条",
+        dump.sinks.len()
+    );
 
     // 签名脚本通用化定位(从调用栈自动定位,任意站点通用)。
     let signers = dump.signers();
@@ -118,18 +126,26 @@ async fn main() -> drission::Result<()> {
     let proj = std::env::current_dir()?.join("douyin-env");
     dump.export_project(&proj, EnvScope::Full)?;
     println!("\n==== 已导出补环境工程: {} ====", proj.display());
-    println!("  cd {} && node verify.js   # 验证 env.js 回放;node demo.js  # 纯算签名(先把 signer 下到 signer/)", proj.display());
+    println!(
+        "  cd {} && node verify.js   # 验证 env.js 回放;node demo.js  # 纯算签名(先把 signer 下到 signer/)",
+        proj.display()
+    );
     if dump.has_access() {
         let n = dump.access["order"].as_array().map(Vec::len).unwrap_or(0);
         println!("  access.json          访问路径 {n} 项(诊断模式)");
         println!("  env.accessed.js      只吐关键环境(按访问路径从种子裁剪)");
     } else {
-        println!("  access.json          (空)—— 设 DUMP_PROXY=1 才追踪访问路径并吐 env.accessed.js");
+        println!(
+            "  access.json          (空)—— 设 DUMP_PROXY=1 才追踪访问路径并吐 env.accessed.js"
+        );
     }
 
     // ===== 自验证:吐的 env.js 是否忠实还原浏览器(同构双跑逐字段对比) =====
     let report = dump.verify(&tab, &out, EnvScope::Full).await?;
-    std::fs::write(out.join("verify-report.json"), serde_json::to_string_pretty(&report)?)?;
+    std::fs::write(
+        out.join("verify-report.json"),
+        serde_json::to_string_pretty(&report)?,
+    )?;
     print_verify(&report);
 
     browser.quit().await?;

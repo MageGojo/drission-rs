@@ -38,7 +38,14 @@ async fn main() -> drission::Result<()> {
     println!("  按钮回调读到的值 = {result}");
 
     let ok = result.as_str() == Some("hello drission");
-    println!("\n{}", if ok { "✅ 输入+点击 验证通过" } else { "❌ 验证失败" });
+    println!(
+        "\n{}",
+        if ok {
+            "✅ 输入+点击 验证通过"
+        } else {
+            "❌ 验证失败"
+        }
+    );
 
     browser.quit().await?;
     Ok(())

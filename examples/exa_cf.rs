@@ -9,8 +9,7 @@ use std::time::Duration;
 use drission::prelude::*;
 
 const EMAIL: &str = "12341423@gmail.com";
-const TURNSTILE_TOKEN_JS: &str =
-    "(() => { const e = document.querySelector('[name=cf-turnstile-response]'); return e ? e.value : ''; })()";
+const TURNSTILE_TOKEN_JS: &str = "(() => { const e = document.querySelector('[name=cf-turnstile-response]'); return e ? e.value : ''; })()";
 
 #[tokio::main]
 async fn main() -> drission::Result<()> {
@@ -29,7 +28,8 @@ async fn main() -> drission::Result<()> {
     .await?;
     let tab = browser.latest_tab().await?;
 
-    tab.get("https://auth.exa.ai/?callbackUrl=https%3A%2F%2Fdashboard.exa.ai%2F").await?;
+    tab.get("https://auth.exa.ai/?callbackUrl=https%3A%2F%2Fdashboard.exa.ai%2F")
+        .await?;
     tokio::time::sleep(Duration::from_secs(2)).await;
 
     // 填邮箱(只碰 type=email 的真实输入框,避开 name=website 蜜罐)。

@@ -321,7 +321,15 @@ impl WsListener {
 
     /// 当前已知连接的状态快照(URL / 是否打开 / 是否关闭)。
     pub async fn sockets(&self) -> Vec<WsSocket> {
-        self.tab.core.ws.sockets.lock().await.values().cloned().collect()
+        self.tab
+            .core
+            .ws
+            .sockets
+            .lock()
+            .await
+            .values()
+            .cloned()
+            .collect()
     }
 
     /// 清空已获取但未返回的帧。
@@ -385,7 +393,10 @@ async fn ws_loop(
         match ev.method.as_str() {
             "Page.webSocketCreated" => {
                 let id = socket_id(&ev.params);
-                let url = ev.params["requestURL"].as_str().unwrap_or_default().to_string();
+                let url = ev.params["requestURL"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string();
                 let mut socks = shared.sockets.lock().await;
                 let s = socks.entry(id.clone()).or_default();
                 s.socket_id = id;
@@ -395,7 +406,10 @@ async fn ws_loop(
             }
             "Page.webSocketOpened" => {
                 let id = socket_id(&ev.params);
-                let url = ev.params["effectiveURL"].as_str().unwrap_or_default().to_string();
+                let url = ev.params["effectiveURL"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string();
                 let mut socks = shared.sockets.lock().await;
                 let s = socks.entry(id.clone()).or_default();
                 s.socket_id = id;

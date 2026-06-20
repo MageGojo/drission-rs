@@ -92,10 +92,21 @@ async fn main() -> drission::Result<()> {
     for (name, b) in &checks {
         println!("  {} {name}", if *b { "✅" } else { "❌" });
     }
-    println!("\n{}", if ok { "✅ 填表端到端验证通过" } else { "❌ 有字段未通过" });
+    println!(
+        "\n{}",
+        if ok {
+            "✅ 填表端到端验证通过"
+        } else {
+            "❌ 有字段未通过"
+        }
+    );
 
     browser.quit().await?;
-    if ok { Ok(()) } else { Err(Error::Other("填表校验失败".into())) }
+    if ok {
+        Ok(())
+    } else {
+        Err(Error::Other("填表校验失败".into()))
+    }
 }
 
 /// 点击"下一步/提交"按钮并稍候,等步骤切换。

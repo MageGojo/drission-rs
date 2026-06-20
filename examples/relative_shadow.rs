@@ -70,18 +70,29 @@ async fn main() -> drission::Result<()> {
     let i2 = tab.ele("#i2").await?;
 
     let parent = i2.parent().await?;
-    let parent_ok = parent.tag().await? == "ul" && parent.attr("id").await?.as_deref() == Some("list");
-    println!("[1] parent(): <{}> id={:?} (ok={parent_ok})", parent.tag().await?, parent.attr("id").await?);
+    let parent_ok =
+        parent.tag().await? == "ul" && parent.attr("id").await?.as_deref() == Some("list");
+    println!(
+        "[1] parent(): <{}> id={:?} (ok={parent_ok})",
+        parent.tag().await?,
+        parent.attr("id").await?
+    );
 
     let gp = i2.parent_n(2).await?;
     let parent_n_ok = gp.attr("id").await?.as_deref() == Some("box");
-    println!("[2] parent_n(2): id={:?} (ok={parent_n_ok})", gp.attr("id").await?);
+    println!(
+        "[2] parent_n(2): id={:?} (ok={parent_n_ok})",
+        gp.attr("id").await?
+    );
 
     let until_tag = i2.parent_until("tag:div").await?;
     let until_cls = i2.parent_until(".container").await?;
     let parent_until_ok = until_tag.attr("id").await?.as_deref() == Some("box")
         && until_cls.attr("id").await?.as_deref() == Some("box");
-    println!("[3] parent_until(tag:div / .container): id={:?} (ok={parent_until_ok})", until_tag.attr("id").await?);
+    println!(
+        "[3] parent_until(tag:div / .container): id={:?} (ok={parent_until_ok})",
+        until_tag.attr("id").await?
+    );
 
     let next_t = i2.next().await?.text().await?;
     let prev_t = i2.prev().await?.text().await?;

@@ -20,7 +20,10 @@ const LOGIN_BTN: &str = "button[type=submit]";
 #[tokio::main]
 async fn main() -> drission::Result<()> {
     let headless = std::env::var("HL").map(|v| v != "0").unwrap_or(true);
-    let n: u32 = std::env::var("N").ok().and_then(|v| v.parse().ok()).unwrap_or(5);
+    let n: u32 = std::env::var("N")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(5);
     let email = std::env::var("EMAIL").unwrap_or_else(|_| "test@example.com".into());
     let password = std::env::var("PASSWORD").unwrap_or_else(|_| "Test123456".into());
 
@@ -33,7 +36,10 @@ async fn main() -> drission::Result<()> {
 
     let mut captcha_pass = 0u32;
     for k in 1..=n {
-        let _ = tab.wait().ele_displayed(CAPTCHA_IMG, Some(Duration::from_secs(8))).await;
+        let _ = tab
+            .wait()
+            .ele_displayed(CAPTCHA_IMG, Some(Duration::from_secs(8)))
+            .await;
         // React 兼容方式填邮箱/密码。
         let okm = fill(&tab, EMAIL, &email).await;
         let okp = fill(&tab, PASSWORD, &password).await;
@@ -49,7 +55,12 @@ async fn main() -> drission::Result<()> {
         let okc = fill(&tab, CAPTCHA_INPUT, &code).await;
         sleep(Duration::from_millis(250)).await;
         // 点登录。
-        let _ = tab.run_js(&format!("(function(){{var e=document.querySelector({s}); if(e)e.click();}})()", s = json!(LOGIN_BTN))).await;
+        let _ = tab
+            .run_js(&format!(
+                "(function(){{var e=document.querySelector({s}); if(e)e.click();}})()",
+                s = json!(LOGIN_BTN)
+            ))
+            .await;
         // 轮询读站点结果短语。
         let mut msg = String::new();
         for _ in 0..16 {
@@ -65,13 +76,17 @@ async fn main() -> drission::Result<()> {
         }
         println!(
             "[*] #{k}:填表(邮箱{} 密码{} 验证码{})  OCR={code:<6} 站点反馈={msg:?} → {verdict}",
-            yn(okm), yn(okp), yn(okc)
+            yn(okm),
+            yn(okp),
+            yn(okc)
         );
         refresh_captcha(&tab).await;
         sleep(Duration::from_millis(500)).await;
     }
 
-    println!("\n==== apizero 登录案例:验证码识别通过 {captcha_pass}/{n} 次(账号密码假的,故不会登录成功)====");
+    println!(
+        "\n==== apizero 登录案例:验证码识别通过 {captcha_pass}/{n} 次(账号密码假的,故不会登录成功)===="
+    );
     if !headless {
         sleep(Duration::from_secs(3)).await;
     }
@@ -94,7 +109,11 @@ async fn fill(tab: &Tab, css: &str, value: &str) -> bool {
         sel = json!(css),
         val = json!(value)
     );
-    tab.run_js(&js).await.ok().and_then(|v| v.as_bool()).unwrap_or(false)
+    tab.run_js(&js)
+        .await
+        .ok()
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
 }
 
 /// 从页面正文扫描结果短语(站点把"账号或密码错误/验证码错误"等渲染在表单里,非 toast)。
@@ -119,7 +138,12 @@ fn classify(msg: &str) -> (bool, &'static str) {
         (true, "验证码通过 ✅(疑似登录成功)")
     } else if msg.contains("验证码") {
         (false, "验证码未通过 ❌(站点报验证码错)")
-    } else if msg.contains("密码") || msg.contains("账号") || msg.contains("邮箱") || msg.contains("用户") || msg.contains("不存在") {
+    } else if msg.contains("密码")
+        || msg.contains("账号")
+        || msg.contains("邮箱")
+        || msg.contains("用户")
+        || msg.contains("不存在")
+    {
         (true, "验证码通过 ✅(站点只报账号/密码错 → OCR 对了)")
     } else if msg.is_empty() {
         (false, "无反馈(未判定)")

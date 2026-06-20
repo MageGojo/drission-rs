@@ -30,7 +30,10 @@ async fn main() -> drission::Result<()> {
     let ok = tab
         .get_with(
             url,
-            &GetOptions::new().retry(2).interval(0.5).load_mode(LoadMode::Normal),
+            &GetOptions::new()
+                .retry(2)
+                .interval(0.5)
+                .load_mode(LoadMode::Normal),
         )
         .await?;
     let title = tab.title().await?;
@@ -55,7 +58,10 @@ async fn main() -> drission::Result<()> {
     let (vw, vh) = tab.size().await?;
     let (pw, ph) = tab.page_size().await?;
     let rect = tab.rect().await?;
-    println!("[D] viewport={vw}x{vh}  page={pw}x{ph}  dpr={}", rect.device_pixel_ratio);
+    println!(
+        "[D] viewport={vw}x{vh}  page={pw}x{ph}  dpr={}",
+        rect.device_pixel_ratio
+    );
     let shot_path = std::env::temp_dir().join("drission-page-basics/example.png");
     let saved = tab.get_screenshot(&shot_path, true).await?;
     let shot_len = tokio::fs::metadata(&saved).await?.len();

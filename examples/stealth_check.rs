@@ -75,8 +75,16 @@ async fn main() -> drission::Result<()> {
             let ua = v.get("ua").and_then(|x| x.as_str()).unwrap_or("");
             let ua_ok = ua.contains("Firefox") && !ua.contains("Camoufox");
             let rtc_ok = v.get("rtc").and_then(|x| x.as_str()) == Some("undefined");
-            let screen_h = v.get("screen").and_then(|s| s.get(1)).and_then(|x| x.as_u64()).unwrap_or(0);
-            let outer_h = v.get("outer").and_then(|s| s.get(1)).and_then(|x| x.as_u64()).unwrap_or(u64::MAX);
+            let screen_h = v
+                .get("screen")
+                .and_then(|s| s.get(1))
+                .and_then(|x| x.as_u64())
+                .unwrap_or(0);
+            let outer_h = v
+                .get("outer")
+                .and_then(|s| s.get(1))
+                .and_then(|x| x.as_u64())
+                .unwrap_or(u64::MAX);
             let screen_ok = screen_h > 0 && outer_h <= screen_h;
             println!(
                 "  -> webdriver=false:{webdriver_ok}  UA无Camoufox:{ua_ok}  WebRTC关闭:{rtc_ok}  屏幕自洽(outer<=screen):{screen_ok}"
@@ -145,11 +153,27 @@ async fn main() -> drission::Result<()> {
             Ok(v) => {
                 let ua = v.get("user_agent").and_then(|x| x.as_str()).unwrap_or("?");
                 let tls = v.get("tls");
-                let ja3 = tls.and_then(|t| t.get("ja3_hash")).and_then(|x| x.as_str()).unwrap_or("?");
-                let ja4 = tls.and_then(|t| t.get("ja4")).and_then(|x| x.as_str()).unwrap_or("?");
-                let peet = tls.and_then(|t| t.get("peetprint_hash")).and_then(|x| x.as_str()).unwrap_or("?");
-                let http = v.get("http_version").and_then(|x| x.as_str()).unwrap_or("?");
-                let akamai = v.get("http2").and_then(|h| h.get("akamai_fingerprint_hash")).and_then(|x| x.as_str()).unwrap_or("?");
+                let ja3 = tls
+                    .and_then(|t| t.get("ja3_hash"))
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("?");
+                let ja4 = tls
+                    .and_then(|t| t.get("ja4"))
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("?");
+                let peet = tls
+                    .and_then(|t| t.get("peetprint_hash"))
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("?");
+                let http = v
+                    .get("http_version")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("?");
+                let akamai = v
+                    .get("http2")
+                    .and_then(|h| h.get("akamai_fingerprint_hash"))
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("?");
                 println!("  user_agent     = {ua}");
                 println!("  http_version   = {http}");
                 println!("  tls.ja3_hash   = {ja3}");
@@ -162,7 +186,10 @@ async fn main() -> drission::Result<()> {
                 tls_pass = ff && ja4_ok;
                 println!("  -> UA声称Firefox:{ff}  JA4为真TLS栈:{ja4_ok}  自洽:{tls_pass}");
             }
-            Err(_) => println!("  解析失败,raw 前 200 字:{}", raw.chars().take(200).collect::<String>()),
+            Err(_) => println!(
+                "  解析失败,raw 前 200 字:{}",
+                raw.chars().take(200).collect::<String>()
+            ),
         }
     } else {
         println!("  访问失败");
@@ -173,7 +200,10 @@ async fn main() -> drission::Result<()> {
     println!("\n===== browserleaks.com =====");
     let mut webrtc_pass = false;
     for (path, keys) in [
-        ("webgl", &["unmasked vendor", "unmasked renderer", "webgl report hash"][..]),
+        (
+            "webgl",
+            &["unmasked vendor", "unmasked renderer", "webgl report hash"][..],
+        ),
         ("canvas", &["signature", "uniqueness"][..]),
         ("webrtc", &["leak", "public ip", "local ip"][..]),
     ] {
@@ -234,7 +264,11 @@ async fn main() -> drission::Result<()> {
     println!(
         "  => {passed_n}/{} 通过 -> {}",
         results.len(),
-        if all { "全部通过,一打开即过" } else { "有未过项,见上方 FAIL" }
+        if all {
+            "全部通过,一打开即过"
+        } else {
+            "有未过项,见上方 FAIL"
+        }
     );
 
     browser.quit().await?;
@@ -244,7 +278,10 @@ async fn main() -> drission::Result<()> {
 /// 把一段 JSON 字符串缩进打印;非 JSON 原样打印。
 fn pretty(s: &str) {
     match serde_json::from_str::<serde_json::Value>(s) {
-        Ok(v) => println!("{}", serde_json::to_string_pretty(&v).unwrap_or_else(|_| s.to_string())),
+        Ok(v) => println!(
+            "{}",
+            serde_json::to_string_pretty(&v).unwrap_or_else(|_| s.to_string())
+        ),
         Err(_) => println!("{s}"),
     }
 }

@@ -1,0 +1,4 @@
+[toolchain]
+# 开发/CI 统一用 stable;MSRV(最低支持版本)单独由 Cargo.toml 的 rust-version 声明(1.85,edition 2024)。
+channel = "stable"
+components = ["rustfmt", "clippy"]

@@ -1,8 +1,8 @@
 //! 键名常量 [`Keys`] 与按键序列输入 [`KeyInput`](对标 DrissionPage 的 `Keys` 与 `ele.input` 序列)。
 //!
-//! - [`Keys`]:常用特殊键名常量,值即 Juggler/DOM 的 `key` 名;普通字符直接用字符串即可。
+//! - [`Keys`][]:常用特殊键名常量,值即 Juggler/DOM 的 `key` 名;普通字符直接用字符串即可。
 //!   用于 [`Tab::press_key`](crate::browser::Tab::press_key) / [`KeyInput::key`]。
-//! - [`KeyInput`]:把"文本 + 特殊键"混排成一个序列,交给
+//! - [`KeyInput`][]:把"文本 + 特殊键"混排成一个序列,交给
 //!   [`Element::input_keys`](crate::browser::Element::input_keys)(对应 DP `ele.input(['abc', Keys.ENTER])`)。
 //!
 //! ```ignore

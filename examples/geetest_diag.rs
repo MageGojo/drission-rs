@@ -160,7 +160,10 @@ fn save_data_url(dir: &Path, name: &str, data_url: &str) {
 
 /// 把 0..max 的剖面画成一行 sparkline。
 fn sparkline(prof: &[i64]) -> String {
-    let blocks = [' ', '\u{2581}', '\u{2582}', '\u{2583}', '\u{2584}', '\u{2585}', '\u{2586}', '\u{2587}', '\u{2588}'];
+    let blocks = [
+        ' ', '\u{2581}', '\u{2582}', '\u{2583}', '\u{2584}', '\u{2585}', '\u{2586}', '\u{2587}',
+        '\u{2588}',
+    ];
     let max = prof.iter().copied().max().unwrap_or(1).max(1);
     prof.iter()
         .map(|&v| {
@@ -197,7 +200,8 @@ async fn main() -> drission::Result<()> {
 
     // 三张 canvas 信息 + 落盘。
     let info = tab.run_js(CANVAS_INFO).await?;
-    let iv: serde_json::Value = serde_json::from_str(info.as_str().unwrap_or("{}")).unwrap_or_default();
+    let iv: serde_json::Value =
+        serde_json::from_str(info.as_str().unwrap_or("{}")).unwrap_or_default();
     println!("\n==== canvas 信息 ====");
     for key in ["bg", "full", "slice"] {
         let c = &iv[key];
@@ -218,13 +222,20 @@ async fn main() -> drission::Result<()> {
 
     // diff 剖面。
     let prof = tab.run_js(PROFILE_JS).await?;
-    let pv: serde_json::Value = serde_json::from_str(prof.as_str().unwrap_or("{}")).unwrap_or_default();
+    let pv: serde_json::Value =
+        serde_json::from_str(prof.as_str().unwrap_or("{}")).unwrap_or_default();
     if pv["ok"].as_bool() != Some(true) {
         println!("\n[!] 剖面读取失败: {}", pv["reason"]);
     } else {
         let w = pv["W"].as_i64().unwrap_or(0);
-        let prof: Vec<i64> = pv["prof"].as_array().map(|a| a.iter().map(|v| v.as_i64().unwrap_or(0)).collect()).unwrap_or_default();
-        let salpha: Vec<i64> = pv["salpha"].as_array().map(|a| a.iter().map(|v| v.as_i64().unwrap_or(0)).collect()).unwrap_or_default();
+        let prof: Vec<i64> = pv["prof"]
+            .as_array()
+            .map(|a| a.iter().map(|v| v.as_i64().unwrap_or(0)).collect())
+            .unwrap_or_default();
+        let salpha: Vec<i64> = pv["salpha"]
+            .as_array()
+            .map(|a| a.iter().map(|v| v.as_i64().unwrap_or(0)).collect())
+            .unwrap_or_default();
         println!(
             "\n==== diff 剖面 (W={w}, bgMean={}, fullMean={}) ====",
             pv["bgMean"], pv["fullMean"]
@@ -270,15 +281,27 @@ async fn main() -> drission::Result<()> {
         if !salpha.is_empty() {
             println!("\n  slice 逐列非透明像素数 (拼图块形状):");
             println!("  [{}]", sparkline(&salpha));
-            let piece_left = salpha.iter().position(|&a| a > 5).map(|p| p as i64).unwrap_or(-1);
-            let piece_right = salpha.iter().rposition(|&a| a > 5).map(|p| p as i64).unwrap_or(-1);
-            println!("  slice 非透明列: 左缘={piece_left} 右缘={piece_right} 宽={}", piece_right - piece_left + 1);
+            let piece_left = salpha
+                .iter()
+                .position(|&a| a > 5)
+                .map(|p| p as i64)
+                .unwrap_or(-1);
+            let piece_right = salpha
+                .iter()
+                .rposition(|&a| a > 5)
+                .map(|p| p as i64)
+                .unwrap_or(-1);
+            println!(
+                "  slice 非透明列: 左缘={piece_left} 右缘={piece_right} 宽={}",
+                piece_right - piece_left + 1
+            );
         }
     }
 
     // 三法位移对比 + 叠加验证图。
     let m = tab.run_js(MATCH_JS).await?;
-    let mv: serde_json::Value = serde_json::from_str(m.as_str().unwrap_or("{}")).unwrap_or_default();
+    let mv: serde_json::Value =
+        serde_json::from_str(m.as_str().unwrap_or("{}")).unwrap_or_default();
     if mv["ok"].as_bool() != Some(true) {
         println!("\n[!] 匹配失败: {}", mv["reason"]);
     } else {
@@ -286,11 +309,21 @@ async fn main() -> drission::Result<()> {
         let db = mv["Db"].as_i64().unwrap_or(-1);
         let dcur = mv["Dcur"].as_i64().unwrap_or(-1);
         println!("\n==== 位移三法对比(画布像素,1:1==CSS) ====");
-        println!("  px0={} alphaLeft={} gapX={}", mv["px0"], mv["alphaLeft"], mv["gapX"]);
+        println!(
+            "  px0={} alphaLeft={} gapX={}",
+            mv["px0"], mv["alphaLeft"], mv["gapX"]
+        );
         println!("  D_cur (当前算法: gapX - alphaLeft) = {dcur}");
         println!("  D_a   (拼图形状 vs diff,最大重叠)   = {da}");
-        println!("  D_b   (拼图颜色 vs fullbg,最小色差) = {db}  (平均残差 {}/765)", mv["bestBerr"]);
-        println!("  >> 三法差值: |D_a-D_b|={}  |D_cur-D_b|={}", (da - db).abs(), (dcur - db).abs());
+        println!(
+            "  D_b   (拼图颜色 vs fullbg,最小色差) = {db}  (平均残差 {}/765)",
+            mv["bestBerr"]
+        );
+        println!(
+            "  >> 三法差值: |D_a-D_b|={}  |D_cur-D_b|={}",
+            (da - db).abs(),
+            (dcur - db).abs()
+        );
         if let Some(curve) = mv["curveB"].as_array() {
             let c: Vec<i64> = curve.iter().map(|v| v.as_i64().unwrap_or(0)).collect();
             // D_b 是最小化,取负画 sparkline 让谷=峰。
@@ -299,7 +332,11 @@ async fn main() -> drission::Result<()> {
             println!("  D_b 残差曲线(谷=最佳,这里翻成峰):");
             println!("  [{}]", sparkline(&inv));
         }
-        for (key, name) in [("overlayCur", "overlay_cur.png"), ("overlayA", "overlay_a.png"), ("overlayB", "overlay_b.png")] {
+        for (key, name) in [
+            ("overlayCur", "overlay_cur.png"),
+            ("overlayA", "overlay_a.png"),
+            ("overlayB", "overlay_b.png"),
+        ] {
             if let Some(durl) = mv[key].as_str() {
                 save_data_url(&out_dir, name, durl);
             }

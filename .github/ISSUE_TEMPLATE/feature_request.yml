@@ -1,0 +1,26 @@
+name: 功能请求 / Feature request
+description: 建议一个新能力或改进
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 想解决的问题
+      description: 你在做什么场景时遇到了什么限制?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 期望的方案 / API
+      description: 如果有理想的调用方式,贴个伪代码。
+      render: rust
+  - type: input
+    id: dp-ref
+    attributes:
+      label: DrissionPage 对应能力(若有)
+      description: 对标的 DP 方法名,方便对齐语义。
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 备选方案 / 现状绕法

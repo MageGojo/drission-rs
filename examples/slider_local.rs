@@ -84,7 +84,10 @@ async fn main() -> drission::Result<()> {
 
     // 先看纯视觉算的距离。
     match tab.slider_gap(&cfg).await {
-        Ok(g) => println!("[*] slider_gap():拼图需移 {:.0}px(法={:?} 置信 {:.2})", g.displace, g.method, g.confidence),
+        Ok(g) => println!(
+            "[*] slider_gap():拼图需移 {:.0}px(法={:?} 置信 {:.2})",
+            g.displace, g.method, g.confidence
+        ),
         Err(e) => println!("[!] slider_gap 失败: {e}"),
     }
 

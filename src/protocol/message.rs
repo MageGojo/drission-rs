@@ -27,7 +27,12 @@ pub struct OutgoingMessage {
 }
 
 impl OutgoingMessage {
-    pub fn new(id: i64, method: impl Into<String>, params: Value, session_id: Option<String>) -> Self {
+    pub fn new(
+        id: i64,
+        method: impl Into<String>,
+        params: Value,
+        session_id: Option<String>,
+    ) -> Self {
         Self {
             id,
             method: method.into(),

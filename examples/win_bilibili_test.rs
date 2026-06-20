@@ -58,10 +58,17 @@ async fn main() -> drission::Result<()> {
     let want: usize = a.next().and_then(|s| s.parse().ok()).unwrap_or(3);
 
     let t0 = SystemTime::now();
-    let started_ms = t0.duration_since(UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0);
+    let started_ms = t0
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
 
     println!("== drission-rs Windows 硬核测试 (bilibili 长监听) ==");
-    println!("  OS/ARCH  : {}/{}", std::env::consts::OS, std::env::consts::ARCH);
+    println!(
+        "  OS/ARCH  : {}/{}",
+        std::env::consts::OS,
+        std::env::consts::ARCH
+    );
     println!("  URL      : {start}");
     println!("  目标数量 : {want}");
 
@@ -158,8 +165,9 @@ async fn main() -> drission::Result<()> {
                     if !p.url_has("playurl") {
                         continue;
                     }
-                    let Some(cid) =
-                        p.query("cid").filter(|c| !c.is_empty() && seen.insert(c.clone()))
+                    let Some(cid) = p
+                        .query("cid")
+                        .filter(|c| !c.is_empty() && seen.insert(c.clone()))
                     else {
                         continue;
                     };

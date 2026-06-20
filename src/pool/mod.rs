@@ -11,11 +11,13 @@
 
 pub mod checkpoint;
 pub mod fingerprint;
+pub mod health;
 pub mod proxy_pool;
 pub mod rotate;
 
 pub use checkpoint::Checkpoint;
 pub use fingerprint::{FingerprintPool, FingerprintProfile};
+pub use health::{ProxyGeo, ProxyHealth, locale_for_country};
 pub use proxy_pool::ProxyPool;
 pub use rotate::RotateStrategy;
 
@@ -226,19 +228,25 @@ impl BrowserPool {
 
         // 逐 worker 选定启动选项。
         let worker_opts: Vec<BrowserOptions> = (0..size)
-            .map(|i| worker_options.get(i).cloned().unwrap_or_else(|| base_options.clone()))
+            .map(|i| {
+                worker_options
+                    .get(i)
+                    .cloned()
+                    .unwrap_or_else(|| base_options.clone())
+            })
             .collect();
 
         // 并行启动;任一失败则整体失败(已起的浏览器经 Drop 兜底清理)。
-        let workers = futures_util::future::try_join_all(worker_opts.into_iter().map(|o| async move {
-            let browser = Browser::launch(o.clone()).await?;
-            Ok::<Arc<Worker>, Error>(Arc::new(Worker {
-                browser: Mutex::new(Arc::new(browser)),
-                options: o,
-                healthy: AtomicBool::new(true),
+        let workers =
+            futures_util::future::try_join_all(worker_opts.into_iter().map(|o| async move {
+                let browser = Browser::launch(o.clone()).await?;
+                Ok::<Arc<Worker>, Error>(Arc::new(Worker {
+                    browser: Mutex::new(Arc::new(browser)),
+                    options: o,
+                    healthy: AtomicBool::new(true),
+                }))
             }))
-        }))
-        .await?;
+            .await?;
 
         let concurrency = size * tabs_per_worker;
         Ok(Self {

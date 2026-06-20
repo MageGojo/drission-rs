@@ -322,7 +322,10 @@ fn build_crt_block(entries: &[(u8, HANDLE)]) -> Vec<u8> {
 
 /// UTF-16 + 末尾 NUL。
 fn to_wide(s: &str) -> Vec<u16> {
-    OsStr::new(s).encode_wide().chain(std::iter::once(0)).collect()
+    OsStr::new(s)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect()
 }
 
 /// 组装 `CreateProcessW` 的命令行(argv0=程序路径,随后各参数,按 Windows 规则转义)。
@@ -333,7 +336,10 @@ fn build_command_line(program: &Path, args: &[String]) -> Vec<u16> {
         s.push(' ');
         append_arg(&mut s, a);
     }
-    OsStr::new(&s).encode_wide().chain(std::iter::once(0)).collect()
+    OsStr::new(&s)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect()
 }
 
 /// 单个参数按 Windows `CommandLineToArgvW` 规则追加(必要时加引号、转义反斜杠/引号)。

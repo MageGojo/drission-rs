@@ -91,7 +91,11 @@ async fn main() -> drission::Result<()> {
     let pass = status1 == "DROPPED";
     println!(
         "\n==== {} ====",
-        if pass { "ALL CHECKS PASSED" } else { "SOME CHECKS FAILED" }
+        if pass {
+            "ALL CHECKS PASSED"
+        } else {
+            "SOME CHECKS FAILED"
+        }
     );
 
     if !headless {

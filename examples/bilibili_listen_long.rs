@@ -59,7 +59,10 @@ async fn main() -> drission::Result<()> {
             if !p.url_has("playurl") {
                 continue;
             }
-            let Some(cid) = p.query("cid").filter(|c| !c.is_empty() && seen.insert(c.clone())) else {
+            let Some(cid) = p
+                .query("cid")
+                .filter(|c| !c.is_empty() && seen.insert(c.clone()))
+            else {
                 continue;
             };
             got += 1;

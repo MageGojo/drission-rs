@@ -18,9 +18,9 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::Result;
 use crate::browser::Cookie;
 use crate::browser::tab::{CookieParam, Tab};
-use crate::Result;
 
 /// 一整套可持久化的登录态:cookie + 各源的 web storage。
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -111,7 +111,11 @@ fn cookie_to_param(c: Cookie) -> CookieParam {
         path: Some(c.path),
         secure: Some(c.secure),
         http_only: Some(c.http_only),
-        expires: if c.expires > 0.0 { Some(c.expires) } else { None },
+        expires: if c.expires > 0.0 {
+            Some(c.expires)
+        } else {
+            None
+        },
     }
 }
 

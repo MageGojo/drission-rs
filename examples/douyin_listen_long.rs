@@ -18,7 +18,9 @@ use drission::prelude::*;
 async fn main() -> drission::Result<()> {
     tracing_subscriber::fmt().with_env_filter("warn").init();
     let mut a = std::env::args().skip(1);
-    let start = a.next().unwrap_or_else(|| "https://v.douyin.com/I1mlU0fBFhI/".into());
+    let start = a
+        .next()
+        .unwrap_or_else(|| "https://v.douyin.com/I1mlU0fBFhI/".into());
     let want: usize = a.next().and_then(|s| s.parse().ok()).unwrap_or(5);
 
     let browser = Browser::launch(
@@ -61,7 +63,8 @@ async fn main() -> drission::Result<()> {
         // 打开下一个未抓过的视频(触发它自己的签名 detail)。
         while let Some(id) = queue.pop_front() {
             if !seen.contains(&id) {
-                tab.get(&format!("https://www.douyin.com/video/{id}")).await?;
+                tab.get(&format!("https://www.douyin.com/video/{id}"))
+                    .await?;
                 tab.press_key("ArrowDown").await?;
                 break;
             }

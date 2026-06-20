@@ -1,9 +1,9 @@
 //! 高层浏览器 API(DrissionPage 风格)。
 //!
-//! - [`Browser`]:启动 / 退出 / 标签管理。每个标签是一个独立 BrowserContext(cookie 隔离)。
-//! - [`tab::Tab`]:页面操作(get/run_js/ele/cookies/listen…)。
-//! - [`element::Element`]:元素操作(click/input/text/attr…)。
-//! - [`listener::DataPacket`]:网络监听数据包。
+//! - [`Browser`][]:启动 / 退出 / 标签管理。每个标签是一个独立 BrowserContext(cookie 隔离)。
+//! - [`tab::Tab`][]:页面操作(get/run_js/ele/cookies/listen…)。
+//! - [`element::Element`][]:元素操作(click/input/text/attr…)。
+//! - [`listener::DataPacket`][]:网络监听数据包。
 
 pub mod actions;
 pub mod cloudflare;
@@ -199,7 +199,9 @@ impl Browser {
     /// 退出浏览器:优雅关闭 → 超时则强杀 → 清理临时 profile。
     pub async fn quit(&self) -> Result<()> {
         if let Some(mut child) = self.child.lock().await.take() {
-            let _ = self.conn.fire(BROWSER_CLOSE_MESSAGE_ID, "Browser.close", json!({}));
+            let _ = self
+                .conn
+                .fire(BROWSER_CLOSE_MESSAGE_ID, "Browser.close", json!({}));
             tokio::select! {
                 _ = child.wait() => {}
                 _ = tokio::time::sleep(Duration::from_secs(3)) => {
@@ -298,7 +300,9 @@ mod tests {
         let ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:150.0) Gecko/20100101 Camoufox/150.0.2-beta.25";
         assert_eq!(
             clean_camoufox_ua(ua).as_deref(),
-            Some("Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:150.0) Gecko/20100101 Firefox/150.0")
+            Some(
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:150.0) Gecko/20100101 Firefox/150.0"
+            )
         );
     }
 

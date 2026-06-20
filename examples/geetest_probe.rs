@@ -165,11 +165,16 @@ async fn main() -> drission::Result<()> {
                 "    {:<11} trusted={} client=({},{}) screen=({},{}) move=({},{}) btn={}/{} ptr={}/{}",
                 e["type"].as_str().unwrap_or("?"),
                 e["trusted"],
-                e["clientX"], e["clientY"],
-                e["screenX"], e["screenY"],
-                e["movementX"], e["movementY"],
-                e["button"], e["buttons"],
-                e["pointerType"], e["pressure"],
+                e["clientX"],
+                e["clientY"],
+                e["screenX"],
+                e["screenY"],
+                e["movementX"],
+                e["movementY"],
+                e["button"],
+                e["buttons"],
+                e["pointerType"],
+                e["pressure"],
             );
         }
     }
@@ -194,27 +199,46 @@ async fn main() -> drission::Result<()> {
     let has_mouse = counts.keys().any(|k| k.starts_with("mouse"));
     println!(
         "  指针事件(pointer*): {}",
-        if has_pointer { "✅ 有" } else { "❌ 无(极验 v4 主要监听 pointer*,缺失则轨迹为空)" }
+        if has_pointer {
+            "✅ 有"
+        } else {
+            "❌ 无(极验 v4 主要监听 pointer*,缺失则轨迹为空)"
+        }
     );
-    println!("  鼠标事件(mouse*): {}", if has_mouse { "✅ 有" } else { "❌ 无" });
+    println!(
+        "  鼠标事件(mouse*): {}",
+        if has_mouse { "✅ 有" } else { "❌ 无" }
+    );
     // 检查 movementX/screenX 是否恒为可疑值。
     if let Some(arr) = lv["ev"].as_array() {
         let moves: Vec<&serde_json::Value> = arr
             .iter()
-            .filter(|e| e["type"].as_str() == Some("mousemove") || e["type"].as_str() == Some("pointermove"))
+            .filter(|e| {
+                e["type"].as_str() == Some("mousemove") || e["type"].as_str() == Some("pointermove")
+            })
             .collect();
         let all_move_zero = !moves.is_empty()
-            && moves.iter().all(|e| e["movementX"].as_f64().unwrap_or(0.0) == 0.0);
+            && moves
+                .iter()
+                .all(|e| e["movementX"].as_f64().unwrap_or(0.0) == 0.0);
         let screen_eq_client = moves.iter().take(3).all(|e| {
             e["screenX"].as_f64().unwrap_or(-1.0) == e["clientX"].as_f64().unwrap_or(-2.0)
         });
         println!(
             "  movementX 恒为 0: {}",
-            if all_move_zero { "⚠️ 是(真实鼠标移动必非 0,这是 bot tell)" } else { "✅ 否" }
+            if all_move_zero {
+                "⚠️ 是(真实鼠标移动必非 0,这是 bot tell)"
+            } else {
+                "✅ 否"
+            }
         );
         println!(
             "  screenX==clientX: {}",
-            if screen_eq_client { "⚠️ 是(真实环境 screenX=clientX+window.screenX+边框,相等可疑)" } else { "✅ 否" }
+            if screen_eq_client {
+                "⚠️ 是(真实环境 screenX=clientX+window.screenX+边框,相等可疑)"
+            } else {
+                "✅ 否"
+            }
         );
     }
 

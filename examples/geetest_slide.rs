@@ -27,7 +27,10 @@ async fn main() -> drission::Result<()> {
         .init();
 
     let headless = std::env::var("HL").map(|v| v != "0").unwrap_or(true);
-    let tries: u32 = std::env::var("TRY").ok().and_then(|v| v.parse().ok()).unwrap_or(6);
+    let tries: u32 = std::env::var("TRY")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(6);
 
     let browser = Browser::launch(BrowserOptions::new().headless(headless)).await?;
     let tab = browser.latest_tab().await?;
@@ -60,9 +63,16 @@ async fn main() -> drission::Result<()> {
 
     println!(
         "\n==== {} ====",
-        if r.passed { "验证通过 ✅(通用滑块库能力)" } else { "未通过 ❌" }
+        if r.passed {
+            "验证通过 ✅(通用滑块库能力)"
+        } else {
+            "未通过 ❌"
+        }
     );
-    println!("[*] 尝试 {} 次,最佳对齐误差 {:.1}px", r.attempts, r.align_error);
+    println!(
+        "[*] 尝试 {} 次,最佳对齐误差 {:.1}px",
+        r.attempts, r.align_error
+    );
     if !r.passed {
         println!("[i] 对齐误差已 ≤2px(缺口算对);未过多为本机出网不稳/极验限频,与缺口计算无关。");
     }
@@ -74,6 +84,8 @@ async fn main() -> drission::Result<()> {
     if r.passed {
         Ok(())
     } else {
-        Err(drission::Error::msg("多次尝试未通过(对齐正确,疑为网络/风控)"))
+        Err(drission::Error::msg(
+            "多次尝试未通过(对齐正确,疑为网络/风控)",
+        ))
     }
 }

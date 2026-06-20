@@ -33,7 +33,11 @@ async fn main() {
     let mut checks: Vec<(String, bool, String)> = Vec::new();
 
     println!("== drission-rs Session 双模自验证 ==");
-    println!("  OS/ARCH : {}/{}", std::env::consts::OS, std::env::consts::ARCH);
+    println!(
+        "  OS/ARCH : {}/{}",
+        std::env::consts::OS,
+        std::env::consts::ARCH
+    );
     println!("  URL     : {url}\n");
 
     // ── 1) 纯 HTTP(不开浏览器)────────────────────────────────────────────
@@ -48,9 +52,19 @@ async fn main() {
     };
     match sess.get(&url).await {
         Ok(ok2xx) => {
-            record(&mut checks, "http_get", ok2xx, format!("status={} url={}", sess.status(), sess.url()));
+            record(
+                &mut checks,
+                "http_get",
+                ok2xx,
+                format!("status={} url={}", sess.status(), sess.url()),
+            );
             let title = sess.title().unwrap_or_default();
-            record(&mut checks, "http_title", !title.is_empty(), format!("{title:?}"));
+            record(
+                &mut checks,
+                "http_title",
+                !title.is_empty(),
+                format!("{title:?}"),
+            );
             match sess.s_ele("tag:h1") {
                 Ok(h1) => {
                     let t = h1.text().unwrap_or_default();
@@ -59,7 +73,12 @@ async fn main() {
                 Err(e) => record(&mut checks, "s_ele_h1", false, e.to_string()),
             }
             let links = sess.s_eles("tag:a").map(|v| v.len()).unwrap_or(0);
-            record(&mut checks, "s_eles_links", links >= 1, format!("{links} 个链接"));
+            record(
+                &mut checks,
+                "s_eles_links",
+                links >= 1,
+                format!("{links} 个链接"),
+            );
         }
         Err(e) => record(&mut checks, "http_get", false, e.to_string()),
     }
@@ -69,13 +88,33 @@ async fn main() {
     let interop = browser_cookie_interop(&url).await;
     match interop {
         Ok((got_in_session, after_disk_roundtrip, applied_back)) => {
-            record(&mut checks, "cookie_browser_to_session", got_in_session, "灌入会话".into());
-            record(&mut checks, "cookie_save_load_disk", after_disk_roundtrip, "存盘读盘复用".into());
-            record(&mut checks, "cookie_session_to_browser", applied_back, "回灌浏览器".into());
+            record(
+                &mut checks,
+                "cookie_browser_to_session",
+                got_in_session,
+                "灌入会话".into(),
+            );
+            record(
+                &mut checks,
+                "cookie_save_load_disk",
+                after_disk_roundtrip,
+                "存盘读盘复用".into(),
+            );
+            record(
+                &mut checks,
+                "cookie_session_to_browser",
+                applied_back,
+                "回灌浏览器".into(),
+            );
         }
         Err(e) => {
             // 浏览器不可用时不算硬失败(纯 HTTP 已证 Session 模式);但记录原因。
-            record(&mut checks, "cookie_interop", false, format!("浏览器交接跳过/失败: {e}"));
+            record(
+                &mut checks,
+                "cookie_interop",
+                false,
+                format!("浏览器交接跳过/失败: {e}"),
+            );
         }
     }
 
@@ -148,5 +187,12 @@ fn finish(checks: &[(String, bool, String)], url: &str) {
         eprintln!("写结果文件失败: {e}");
     }
     println!("\n结果文件:{out}");
-    println!("{}", if all_ok { "ALL CHECKS PASSED ✅" } else { "SOME CHECKS FAILED ❌" });
+    println!(
+        "{}",
+        if all_ok {
+            "ALL CHECKS PASSED ✅"
+        } else {
+            "SOME CHECKS FAILED ❌"
+        }
+    );
 }

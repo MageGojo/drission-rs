@@ -10,10 +10,10 @@
 use serde_json::{Value, json};
 use tokio::sync::mpsc;
 
+use crate::Result;
 use crate::browser::listener::{ListenFilter, parse_headers};
 use crate::protocol::Connection;
 use crate::util::base64_encode;
-use crate::Result;
 
 /// 改写放行时可覆盖的字段(均为可选;`None` 表示保持原值)。
 #[derive(Debug, Clone, Default)]
@@ -121,7 +121,11 @@ impl InterceptedRequest {
             "base64body": base64_encode(body.as_bytes()),
         });
         self.conn
-            .send("Network.fulfillInterceptedRequest", p, Some(&self.session_id))
+            .send(
+                "Network.fulfillInterceptedRequest",
+                p,
+                Some(&self.session_id),
+            )
             .await?;
         Ok(())
     }

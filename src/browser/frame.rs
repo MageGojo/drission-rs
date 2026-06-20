@@ -104,12 +104,9 @@ impl Frame {
         let query = locator::parse(selector);
         let expr = single_query_expr(&query);
         let result = self.core.evaluate_in(&self.frame_id, &expr, false).await?;
-        Ok(result
-            .get("objectId")
-            .and_then(|v| v.as_str())
-            .map(|oid| {
-                Element::new_in_frame(self.core.clone(), oid.to_string(), self.frame_id.clone())
-            }))
+        Ok(result.get("objectId").and_then(|v| v.as_str()).map(|oid| {
+            Element::new_in_frame(self.core.clone(), oid.to_string(), self.frame_id.clone())
+        }))
     }
 
     /// 解析该帧 HTML,取第一个匹配的**静态元素**。

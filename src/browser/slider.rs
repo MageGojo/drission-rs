@@ -3,8 +3,8 @@
 //! 滑块类验证码的共性:一张**带缺口的底图** + 一块**拼图**,把拼图水平拖到缺口即过。难点是
 //! ①算准"拼图要移多远"②拟人地把把手拖到位。本模块把这两件事做成**与厂商无关**的通用能力:
 //!
-//! - [`Tab::slider_gap`]:纯视觉,按 [`SliderConfig`] 读图、自动选法算出位移 → [`SliderGap`]。
-//! - [`Tab::solve_slider`]:一把梭(弹出→匹配→闭环拟人拖动→判定→换图重试)→ [`SliderResult`]。
+//! - [`Tab::slider_gap`][]:纯视觉,按 [`SliderConfig`] 读图、自动选法算出位移 → [`SliderGap`]。
+//! - [`Tab::solve_slider`][]:一把梭(弹出→匹配→闭环拟人拖动→判定→换图重试)→ [`SliderResult`]。
 //! - 预设:[`SliderConfig::geetest_v4`] + 便捷方法 [`Tab::solve_geetest_slide`] / [`Tab::geetest_slide_gap`]。
 //!
 //! ## 缺口算法(按可得素材自动选)
@@ -192,7 +192,9 @@ impl SliderConfig {
         Self {
             bg: ImageSource::canvas(format!("#dx_captcha_basic_bg_{i} canvas")),
             full_bg: None,
-            piece: Some(ImageSource::shot(format!("#dx_captcha_basic_sub-slider_{i} img"))),
+            piece: Some(ImageSource::shot(format!(
+                "#dx_captcha_basic_sub-slider_{i} img"
+            ))),
             handle: format!("#dx_captcha_basic_slider_{i}"),
             open: None,
             refresh: Some(format!("#dx_captcha_basic_btn-refresh_{i}")),
@@ -377,7 +379,11 @@ impl Tab {
         }
         let scale = v["scale"].as_f64().unwrap_or(1.0);
         let method = GapMethod::parse(v["method"].as_str().unwrap_or("notch"));
-        let chosen = if method == GapMethod::TwoImage { choose_displacement(da, db) } else { da };
+        let chosen = if method == GapMethod::TwoImage {
+            choose_displacement(da, db)
+        } else {
+            da
+        };
         // 双图法的置信度看两法一致程度(da==db→1.0,这是最可信的情形);其余法用 JS 给的峰值比。
         let confidence = if method == GapMethod::TwoImage {
             (1.0 - (da - db).abs().min(20.0) / 20.0).clamp(0.0, 1.0)
@@ -403,7 +409,11 @@ impl Tab {
         };
         let bg_sel = cfg.bg.sel().to_string();
         // 浏览器级截图拼图(绕过 canvas taint),注入到离 widget 远的 body 末尾隐藏 img。
-        let bytes = self.ele(&format!("css:{piece_sel}")).await?.screenshot_bytes().await?;
+        let bytes = self
+            .ele(&format!("css:{piece_sel}"))
+            .await?
+            .screenshot_bytes()
+            .await?;
         let data_url = format!("data:image/png;base64,{}", base64_encode(&bytes));
         self.run_js(&format!(
             "(function(){{var im=document.getElementById('__drission_shot'); if(!im){{im=document.createElement('img'); im.id='__drission_shot'; im.style.display='none'; document.body.appendChild(im);}} im.src='{data_url}';}})()"
@@ -500,7 +510,11 @@ impl Tab {
     /// 一把梭求解顶象滑块(预设 [`SliderConfig::dingxiang`])。弹出式传 `open` 触发按钮(如 `#btn-popup`)。
     /// 注:顶象 demo 对自动化拖动有轨迹/IP 行为风控会弹回(与缺口算法无关);本方法只保证**缺口找得准 +
     /// 拖到位**。要自定义尝试次数等改用 `solve_slider(&SliderConfig::dingxiang(i)...)`。
-    pub async fn solve_dingxiang_slide(&self, index: u32, open: Option<&str>) -> Result<SliderResult> {
+    pub async fn solve_dingxiang_slide(
+        &self,
+        index: u32,
+        open: Option<&str>,
+    ) -> Result<SliderResult> {
         let mut cfg = SliderConfig::dingxiang(index);
         if let Some(o) = open {
             cfg = cfg.open(o);
@@ -632,10 +646,12 @@ async fn nudge_refresh(tab: &Tab, cfg: &SliderConfig) {
         );
         let _ = tab.run_js(&js).await;
     } else if let Some(open) = &cfg.open {
-        let _ = tab.run_js(&format!(
-            "(function(){{var e=document.querySelector({sel}); if(e)e.click();}})()",
-            sel = json!(open)
-        )).await;
+        let _ = tab
+            .run_js(&format!(
+                "(function(){{var e=document.querySelector({sel}); if(e)e.click();}})()",
+                sel = json!(open)
+            ))
+            .await;
     }
     sleep(Duration::from_millis(1300)).await;
 }
@@ -647,10 +663,16 @@ async fn check_success(tab: &Tab, check: &SuccessCheck) -> bool {
             "(function(){{var e=document.querySelector({sel}); if(!e)return false; var r=e.getBoundingClientRect(); return r.width>0&&r.height>0;}})()",
             sel = json!(sel)
         ),
-        SuccessCheck::Js(expr) => format!("(function(){{try{{return !!({expr});}}catch(e){{return false;}}}})()"),
+        SuccessCheck::Js(expr) => {
+            format!("(function(){{try{{return !!({expr});}}catch(e){{return false;}}}})()")
+        }
         SuccessCheck::None => return true,
     };
-    tab.run_js(&js).await.ok().and_then(|v| v.as_bool()).unwrap_or(false)
+    tab.run_js(&js)
+        .await
+        .ok()
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
 }
 
 /// 读元素中心视口坐标 `[x,y]`。
@@ -681,7 +703,11 @@ async fn piece_left(tab: &Tab, src: &ImageSource) -> f64 {
             sel = json!(sel)
         ),
     };
-    tab.run_js(&js).await.ok().and_then(|v| v.as_f64()).unwrap_or(-1.0)
+    tab.run_js(&js)
+        .await
+        .ok()
+        .and_then(|v| v.as_f64())
+        .unwrap_or(-1.0)
 }
 
 /// 闭环/开环拖动把手,使拼图水平移动 `displace`(CSS px)。返回对齐误差(无 `piece` 则 `NaN`)。
@@ -695,7 +721,8 @@ async fn slide_drag(tab: &Tab, cfg: &SliderConfig, displace: f64) -> Result<f64>
     let (ax, ay) = (press_x - 46.0, press_y - 28.0);
     for i in 1..=6 {
         let t = i as f64 / 6.0;
-        tab.mouse_move(ax + (press_x - ax) * t, ay + (press_y - ay) * t).await?;
+        tab.mouse_move(ax + (press_x - ax) * t, ay + (press_y - ay) * t)
+            .await?;
         sleep(Duration::from_millis(25 + i * 6)).await;
     }
     hx = press_x;
@@ -802,9 +829,15 @@ mod tests {
     fn dingxiang_preset_uses_shot_and_content_ncc() {
         let c = SliderConfig::dingxiang(4);
         assert_eq!(c.bg, ImageSource::canvas("#dx_captcha_basic_bg_4 canvas"));
-        assert_eq!(c.piece, Some(ImageSource::shot("#dx_captcha_basic_sub-slider_4 img")));
+        assert_eq!(
+            c.piece,
+            Some(ImageSource::shot("#dx_captcha_basic_sub-slider_4 img"))
+        );
         assert_eq!(c.handle, "#dx_captcha_basic_slider_4");
-        assert_eq!(c.refresh.as_deref(), Some("#dx_captcha_basic_btn-refresh_4"));
+        assert_eq!(
+            c.refresh.as_deref(),
+            Some("#dx_captcha_basic_btn-refresh_4")
+        );
         assert!(matches!(c.success, SuccessCheck::Js(_)));
     }
 

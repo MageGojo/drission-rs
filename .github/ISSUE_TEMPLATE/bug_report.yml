@@ -1,0 +1,60 @@
+name: Bug 报告 / Bug report
+description: 报告一个可复现的问题
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈!请尽量提供可复现信息。安全漏洞请勿走这里,见 SECURITY.md。
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 问题描述
+      description: 发生了什么?期望是什么?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤 / 最小代码
+      description: 越小越好。能附一个最小 example 最佳。
+      render: rust
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: drission 版本
+      placeholder: "0.1.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: backend
+    attributes:
+      label: 后端
+      options:
+        - Camoufox / Juggler(默认)
+        - Chromium / CDP(--features cdp)
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: 操作系统
+      options:
+        - macOS
+        - Linux
+        - Windows
+    validations:
+      required: true
+  - type: input
+    id: features
+    attributes:
+      label: 启用的 feature
+      placeholder: "slider, ocr ..."
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 报错
+      description: 设 `RUST_LOG=drission=debug` 可拿到更多;粘贴关键片段即可。
+      render: shell

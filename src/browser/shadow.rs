@@ -120,7 +120,9 @@ impl ShadowRoot {
 
     /// shadow 内的 HTML(`innerHTML`)。
     pub async fn html(&self) -> Result<String> {
-        let v = self.call("root => root.innerHTML ?? ''", vec![], true).await?;
+        let v = self
+            .call("root => root.innerHTML ?? ''", vec![], true)
+            .await?;
         Ok(v.as_str().unwrap_or_default().to_string())
     }
 

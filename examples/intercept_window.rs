@@ -38,7 +38,9 @@ async fn main() -> drission::Result<()> {
     let mut iw = 0.0;
     let mut ih = 0.0;
     for _ in 0..20 {
-        let v = tab.run_js("[window.innerWidth, window.innerHeight]").await?;
+        let v = tab
+            .run_js("[window.innerWidth, window.innerHeight]")
+            .await?;
         iw = v.get(0).and_then(|x| x.as_f64()).unwrap_or(0.0);
         ih = v.get(1).and_then(|x| x.as_f64()).unwrap_or(0.0);
         if iw as u32 == 800 && ih as u32 == 600 {
@@ -50,7 +52,9 @@ async fn main() -> drission::Result<()> {
     println!("[1] window().size(800,600) → innerWidth={iw} innerHeight={ih} (ok={size_ok})");
 
     // max():铺满可用屏幕。
-    let avail = tab.run_js("[screen.availWidth, screen.availHeight]").await?;
+    let avail = tab
+        .run_js("[screen.availWidth, screen.availHeight]")
+        .await?;
     let aw = avail.get(0).and_then(|x| x.as_f64()).unwrap_or(0.0) as u32;
     tab.set().window().max().await?;
     let mut max_w = 0u32;
@@ -80,7 +84,10 @@ async fn main() -> drission::Result<()> {
     .await?;
 
     let req = tab.intercept().next().await?;
-    println!("[3] 拦截到: {} {} [{}]", req.method, req.url, req.resource_type);
+    println!(
+        "[3] 拦截到: {} {} [{}]",
+        req.method, req.url, req.resource_type
+    );
     req.fulfill(
         200,
         vec![

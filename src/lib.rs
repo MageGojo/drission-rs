@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 //! # drission
 //!
 //! 一个 **Rust** 编写的浏览器自动化库,默认驱动 [Camoufox](https://github.com/daijro/camoufox)
@@ -11,16 +12,19 @@
 //! - **高性能 / 并发**:基于 `tokio` 异步,多标签可并发操作,各标签独立会话与 cookie。
 //!
 //! ## 模块
-//! - [`codec`]:Juggler 线格式(null 分隔 JSON)编解码。
-//! - [`protocol`]:Juggler 协议消息类型(后续:连接 / 会话 / 方法封装)。
-//! - [`locator`]:DP 风格元素定位语法解析。
-//! - [`launcher`]:启动选项、指纹配置、Camoufox 自动下载分发。
-//! - [`error`]:统一错误类型。
+//! - [`codec`][]:Juggler 线格式(null 分隔 JSON)编解码。
+//! - [`protocol`][]:Juggler 协议消息类型(后续:连接 / 会话 / 方法封装)。
+//! - [`locator`][]:DP 风格元素定位语法解析。
+//! - [`launcher`][]:启动选项、指纹配置、Camoufox 自动下载分发。
+//! - [`error`][]:统一错误类型。
 //!
 //! > 当前进度见 `docs/进度.md`。底层控制协议是 Firefox 的 **Juggler**(非 CDP),
 //! > 因为 Camoufox 只支持 Juggler。
 
 pub mod browser;
+/// Chromium(Chrome/Edge/Brave/Electron)后端,经 CDP。**可选**:`--features cdp` 开启;
+/// 默认后端是 Camoufox/Juggler(见 [`browser`])。
+#[cfg(feature = "cdp")]
 pub mod cdp;
 pub mod codec;
 pub mod error;
@@ -30,9 +34,11 @@ pub mod locator;
 pub mod ocr;
 pub mod pool;
 pub mod protocol;
+pub mod scrape;
 pub mod session;
 pub mod transport;
 pub(crate) mod util;
+pub mod web_page;
 
 pub use error::{Error, Result};
 
@@ -43,28 +49,36 @@ pub use error::{Error, Result};
 /// let _opts = BrowserOptions::new().headless(true);
 /// ```
 pub mod prelude {
-    pub use crate::cdp::{ChromiumBrowser, ChromiumTab};
     pub use crate::browser::{
         Actions, Browser, BrowserServer, Console, ConsoleData, ConsoleFilter, ConsoleSteps,
-        ContextOverride, Cookie, CookieParam, DataPacket, DialogInfo, DownloadInfo, DownloadMission,
-        DownloadState, Downloads, Element, ElementRect, ElementWait, EnvDump, EnvDumper, EnvProbe,
-        EnvScope, EnvTarget, Frame,
-        GetOptions, ImageFormat, Intercept, InterceptedRequest, KeyInput, Keys, Listen, ListenFilter,
-        ListenStream, LoadMode, MouseButton, OriginStorage, PageRect, Screencast, ScreencastMode,
-        Scroll, SetTab,
-        ShadowRoot, ShotOpts, StaticElement, StorageState, Tab, Wait, Window, WsDirection, WsFilter,
-        WsListener, WsMessage, WsSocket, WsSteps,
+        ContextOverride, Cookie, CookieParam, DataPacket, DialogInfo, DownloadInfo,
+        DownloadMission, DownloadState, Downloads, Element, ElementRect, ElementWait, EnvDump,
+        EnvDumper, EnvProbe, EnvScope, EnvTarget, Frame, GetOptions, ImageFormat, Intercept,
+        InterceptedRequest, KeyInput, Keys, Listen, ListenFilter, ListenStream, LoadMode,
+        MouseButton, OriginStorage, PageRect, Screencast, ScreencastMode, Scroll, SetTab,
+        ShadowRoot, ShotOpts, StaticElement, StorageState, Tab, Wait, Window, WsDirection,
+        WsFilter, WsListener, WsMessage, WsSocket, WsSteps,
     };
     #[cfg(feature = "slider")]
-    pub use crate::browser::{GapMethod, ImageSource, SliderConfig, SliderGap, SliderResult, SuccessCheck};
+    pub use crate::browser::{
+        GapMethod, ImageSource, SliderConfig, SliderGap, SliderResult, SuccessCheck,
+    };
+    /// Chromium/CDP 后端类型(仅 `--features cdp` 时可用)。
+    #[cfg(feature = "cdp")]
+    pub use crate::cdp::{
+        CdpIntercept, CdpInterceptedRequest, CdpListen, ChromiumBrowser, ChromiumElement,
+        ChromiumElementRect, ChromiumTab,
+    };
     pub use crate::error::{Error, Result};
     pub use crate::launcher::{BrowserOptions, Fingerprint, Geolocation, OsType, Proxy};
     pub use crate::locator::{Query, parse as parse_locator};
     #[cfg(feature = "ocr")]
     pub use crate::ocr::Ocr;
     pub use crate::pool::{
-        BrowserPool, Checkpoint, FingerprintPool, FingerprintProfile, PoolOptions, ProxyPool,
-        RetryPolicy, RotateStrategy,
+        BrowserPool, Checkpoint, FingerprintPool, FingerprintProfile, PoolOptions, ProxyGeo,
+        ProxyHealth, ProxyPool, RetryPolicy, RotateStrategy,
     };
+    pub use crate::scrape::{records_to_csv, records_to_json, rows_to_csv, write_csv, write_json};
     pub use crate::session::{PostData, SessionOptions, SessionPage};
+    pub use crate::web_page::{PageMode, WebPage};
 }

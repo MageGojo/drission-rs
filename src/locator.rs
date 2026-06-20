@@ -228,7 +228,10 @@ mod tests {
     fn explicit_css_and_xpath() {
         assert_eq!(parse("css:div.box"), Query::Css("div.box".into()));
         assert_eq!(parse("c:div.box"), Query::Css("div.box".into()));
-        assert_eq!(parse("xpath://div[@id='a']"), Query::Xpath("//div[@id='a']".into()));
+        assert_eq!(
+            parse("xpath://div[@id='a']"),
+            Query::Xpath("//div[@id='a']".into())
+        );
         assert_eq!(parse("x://a"), Query::Xpath("//a".into()));
     }
 
@@ -285,7 +288,10 @@ mod tests {
     fn static_query_mapping() {
         assert_eq!(parse_static("#kw"), StaticQuery::Css("#kw".into()));
         assert_eq!(parse_static(".a.b"), StaticQuery::Css(".a.b".into()));
-        assert_eq!(parse_static("css:div.box"), StaticQuery::Css("div.box".into()));
+        assert_eq!(
+            parse_static("css:div.box"),
+            StaticQuery::Css("div.box".into())
+        );
         assert_eq!(parse_static("tag:li"), StaticQuery::Css("li".into()));
         assert_eq!(
             parse_static("@id:kw"),
@@ -302,7 +308,10 @@ mod tests {
             parse_static("text:登录"),
             StaticQuery::TextContains("登录".into())
         );
-        assert_eq!(parse_static("提交"), StaticQuery::TextContains("提交".into()));
+        assert_eq!(
+            parse_static("提交"),
+            StaticQuery::TextContains("提交".into())
+        );
         assert_eq!(
             parse_static("@text():你好"),
             StaticQuery::TextContains("你好".into())

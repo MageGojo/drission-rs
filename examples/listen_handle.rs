@@ -54,7 +54,10 @@ async fn main() -> drission::Result<()> {
         .listen()
         .wait_count(3, Some(Duration::from_secs(10)))
         .await?;
-    let b_ok = pkts.len() == 3 && pkts.iter().all(|p| p.response.body.starts_with("drission-listen"));
+    let b_ok = pkts.len() == 3
+        && pkts
+            .iter()
+            .all(|p| p.response.body.starts_with("drission-listen"));
     println!("[B] wait_count(3): 抓到 {} 个包  (ok={b_ok})", pkts.len());
 
     // ---------- C: steps() 长监听流式句柄 ----------
@@ -78,7 +81,10 @@ async fn main() -> drission::Result<()> {
     // ---------- stop ----------
     tab.listen().stop().await?;
     let listening_after = tab.listen().is_listening().await;
-    println!("[D] stop: is_listening={listening_after}  (ok={})", !listening_after);
+    println!(
+        "[D] stop: is_listening={listening_after}  (ok={})",
+        !listening_after
+    );
 
     let pass = a_ok && b_ok && c_ok && !listening_after;
     println!(

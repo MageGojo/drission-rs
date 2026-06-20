@@ -32,7 +32,10 @@ async fn main() -> drission::Result<()> {
             .await?;
             tab.get("https://example.com").await?;
             let cookies = tab.cookies().await?;
-            let seen: Vec<String> = cookies.iter().map(|c| format!("{}={}", c.name, c.value)).collect();
+            let seen: Vec<String> = cookies
+                .iter()
+                .map(|c| format!("{}={}", c.name, c.value))
+                .collect();
             Ok::<_, drission::Error>((i, tab.title().await?, seen))
         }));
     }
@@ -52,7 +55,10 @@ async fn main() -> drission::Result<()> {
     let packet = tab.listen_wait().await?;
     let body_preview: String = packet.response.body.chars().take(80).collect();
     println!("  捕获: {} [{}]", packet.url, packet.method);
-    println!("  状态: {} {}", packet.response.status, packet.response.status_text);
+    println!(
+        "  状态: {} {}",
+        packet.response.status, packet.response.status_text
+    );
     println!("  资源类型: {}", packet.resource_type);
     println!("  响应体预览: {body_preview:?}");
 

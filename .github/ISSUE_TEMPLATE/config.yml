@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 出品方 / 极数本源
+    url: https://apizero.cn
+    about: 商务或一般咨询
+  - name: 安全漏洞 / Security
+    url: https://github.com/MageGojo/drission-rs/security/advisories/new
+    about: 请通过私密通道报告安全问题(勿开公开 issue)

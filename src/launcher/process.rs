@@ -81,7 +81,12 @@ fn prepare_profile(opts: &BrowserOptions) -> Result<(PathBuf, bool)> {
         .map(|d| d.as_nanos())
         .unwrap_or(0);
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    let dir = std::env::temp_dir().join(format!("drission-camoufox-{}-{}-{}", std::process::id(), nanos, n));
+    let dir = std::env::temp_dir().join(format!(
+        "drission-camoufox-{}-{}-{}",
+        std::process::id(),
+        nanos,
+        n
+    ));
     std::fs::create_dir_all(&dir)?;
     Ok((dir, true))
 }

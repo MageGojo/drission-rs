@@ -14,19 +14,19 @@ use tokio::sync::{Mutex, mpsc, watch};
 use tokio::task::JoinHandle;
 use tokio::time::{Instant, timeout_at};
 
+use crate::browser::actions::Actions;
 use crate::browser::console::{Console, ConsoleShared};
+use crate::browser::download::{DownloadShared, Downloads};
 use crate::browser::element::Element;
 use crate::browser::frame::Frame;
-use crate::browser::websocket::{WsListener, WsShared};
-use crate::browser::actions::Actions;
 use crate::browser::handles::{Intercept, Listen, Scroll, SetTab, Wait};
 use crate::browser::interceptor::{Decision, InterceptedRequest, InterceptorState};
 use crate::browser::listener::{
     DRAIN_JS, DataPacket, ListenBuffer, ListenFilter, UNINSTALL_JS, hook_script, parse_packets,
 };
-use crate::browser::download::{DownloadShared, Downloads};
 use crate::browser::screencast::{Screencast, ScreencastShared};
 use crate::browser::static_element::StaticElement;
+use crate::browser::websocket::{WsListener, WsShared};
 use crate::launcher::{BrowserOptions, Geolocation, OsType, Proxy};
 use crate::locator::{self, Query};
 use crate::protocol::{Connection, Event};
@@ -492,7 +492,8 @@ impl TabCore {
 
     /// 运行时设置默认操作超时。
     pub(crate) fn set_timeout(&self, d: Duration) {
-        self.timeout_ms.store(d.as_millis() as u64, Ordering::Relaxed);
+        self.timeout_ms
+            .store(d.as_millis() as u64, Ordering::Relaxed);
     }
 
     /// 当前默认加载模式。
@@ -543,7 +544,9 @@ impl TabCore {
     pub(crate) async fn wait_upload(&self, timeout: Duration) -> Result<bool> {
         let deadline = Instant::now() + timeout;
         loop {
-            let captured = self.evaluate("window.__drission_upload_el || null", false).await?;
+            let captured = self
+                .evaluate("window.__drission_upload_el || null", false)
+                .await?;
             if let Some(oid) = captured.get("objectId").and_then(|v| v.as_str()) {
                 let files = self.upload.files.lock().await.clone().unwrap_or_default();
                 self.send_page(
@@ -552,7 +555,9 @@ impl TabCore {
                 )
                 .await?;
                 // 清掉标记,避免下次 wait 误命中同一个元素。
-                let _ = self.evaluate("window.__drission_upload_el = null", true).await;
+                let _ = self
+                    .evaluate("window.__drission_upload_el = null", true)
+                    .await;
                 return Ok(true);
             }
             if Instant::now() >= deadline {
@@ -564,9 +569,16 @@ impl TabCore {
 
     /// 低层:向视口坐标 `(x,y)` 派发一个鼠标事件(左键)。`buttons`:0=未按下,1=左键按住。
     /// `mousedown`/`mouseup` 自动带 `clickCount=1`,`mousemove` 为 0。
-    pub(crate) async fn dispatch_mouse(&self, ty: &str, x: f64, y: f64, buttons: i64) -> Result<()> {
+    pub(crate) async fn dispatch_mouse(
+        &self,
+        ty: &str,
+        x: f64,
+        y: f64,
+        buttons: i64,
+    ) -> Result<()> {
         let click_count = i64::from(ty == "mousedown" || ty == "mouseup");
-        self.dispatch_mouse_ex(ty, x, y, 0, buttons, click_count).await
+        self.dispatch_mouse_ex(ty, x, y, 0, buttons, click_count)
+            .await
     }
 
     /// 低层:派发鼠标事件(完整参数)。`button`:0=左/1=中/2=右;`buttons`:当前按下位掩码
@@ -676,7 +688,8 @@ impl TabCore {
         let mut base = serde_json::Map::new();
         base.insert("expression".into(), json!(expression));
         base.insert("returnByValue".into(), json!(return_by_value));
-        self.runtime_call_in(frame_id, "Runtime.evaluate", base).await
+        self.runtime_call_in(frame_id, "Runtime.evaluate", base)
+            .await
     }
 
     /// 在指定 frame 的执行上下文里 `Runtime.callFunction`。
@@ -815,7 +828,6 @@ impl TabCore {
         Ok(())
     }
 
-
     /// 把 listen hook(若有)与所有通用 init 脚本合并,一次性下发为页面 init scripts。
     pub(crate) async fn rebuild_init_scripts(&self) -> Result<()> {
         let mut scripts: Vec<Value> = Vec::new();
@@ -854,7 +866,11 @@ impl TabCore {
 
     /// 统一的 Runtime 调用:注入当前 executionContextId,并在"上下文失效"时
     /// 等待新上下文后自动重试(导航瞬间 / 初始上下文重建常见)。
-    async fn runtime_call(&self, method: &str, base: serde_json::Map<String, Value>) -> Result<Value> {
+    async fn runtime_call(
+        &self,
+        method: &str,
+        base: serde_json::Map<String, Value>,
+    ) -> Result<Value> {
         for _ in 0..4 {
             let ctx = self.exec_ctx_id().await?;
             let mut params = base.clone();
@@ -992,6 +1008,8 @@ impl Tab {
     /// 复用调用方已有的事件订阅 `events`(里面应已含/即将含该 page 的 frame/ctx 事件),
     /// 等到主帧与执行上下文后建内核 + 启动事件泵。`browserContextId` 沿用打开者所在上下文
     /// (弹窗与打开者同上下文,故指纹/代理/cookie 与打开者一致)。
+    // 弹窗 / 点击打开新标签的装配入口:能力已就绪,尚未在公开 API 接线(见路线图)。
+    #[allow(dead_code)]
     pub(crate) async fn from_attached(
         conn: Connection,
         target_id: String,
@@ -1082,7 +1100,9 @@ impl Tab {
     /// 访问网址(带选项:重试 / 间隔 / 超时 / 加载模式 / referer)。返回是否加载成功。
     pub async fn get_with(&self, url: &str, opts: &GetOptions) -> Result<bool> {
         let timeout = opts.timeout.unwrap_or_else(|| self.core.timeout());
-        let mode = opts.load_mode.unwrap_or_else(|| self.core.current_load_mode());
+        let mode = opts
+            .load_mode
+            .unwrap_or_else(|| self.core.current_load_mode());
         let attempts = opts.retry.saturating_add(1);
         let mut ok = false;
         for attempt in 0..attempts {
@@ -1253,11 +1273,16 @@ impl Tab {
                     if ev.session_id.as_deref() == Some(&self.core.session_id)
                         && ev.method == "Page.dialogOpened"
                     {
-                        let dialog_id =
-                            ev.params["dialogId"].as_str().unwrap_or_default().to_string();
+                        let dialog_id = ev.params["dialogId"]
+                            .as_str()
+                            .unwrap_or_default()
+                            .to_string();
                         let info = DialogInfo {
                             dialog_type: ev.params["type"].as_str().unwrap_or_default().to_string(),
-                            message: ev.params["message"].as_str().unwrap_or_default().to_string(),
+                            message: ev.params["message"]
+                                .as_str()
+                                .unwrap_or_default()
+                                .to_string(),
                             default_value: ev.params["defaultValue"].as_str().map(str::to_string),
                         };
                         let mut p = json!({ "dialogId": dialog_id, "accept": accept });
@@ -1319,7 +1344,10 @@ impl Tab {
     /// 前进。
     pub async fn forward(&self) -> Result<()> {
         self.core
-            .send_page("Page.goForward", json!({ "frameId": self.core.main_frame_id }))
+            .send_page(
+                "Page.goForward",
+                json!({ "frameId": self.core.main_frame_id }),
+            )
             .await?;
         Ok(())
     }
@@ -1390,6 +1418,45 @@ impl Tab {
             .into_iter()
             .map(|oid| Element::new(self.core.clone(), oid))
             .collect())
+    }
+
+    /// **翻页采集**:对每一页调用 `f` 收集结果,然后点击 `next_selector` 翻到下一页,直到
+    /// 下一页按钮不存在 / 不可点击,或达到 `max_pages`。返回每页结果(按页序)。
+    ///
+    /// `f(page_index)` 在**当前页**就绪后被调用(第 0 页即首屏)。点下一页后会等一小段让新页渲染;
+    /// 若站点是 AJAX 局部刷新、需要更精确的"等新内容"逻辑,可在 `f` 内部自行 `wait` 后再抓。
+    /// 闭包通常捕获一个 `tab.clone()` 在内部读元素(避免与本方法的 `&self` 借用冲突)。
+    ///
+    /// ```ignore
+    /// let t = tab.clone();
+    /// let pages = tab.paginate("css:.next:not(.disabled)", 10, move |i| {
+    ///     let t = t.clone();
+    ///     async move { t.ele("tag:table").await?.table().await }
+    /// }).await?;
+    /// ```
+    pub async fn paginate<F, Fut, T>(
+        &self,
+        next_selector: &str,
+        max_pages: usize,
+        mut f: F,
+    ) -> Result<Vec<T>>
+    where
+        F: FnMut(usize) -> Fut,
+        Fut: std::future::Future<Output = Result<T>>,
+    {
+        let mut out = Vec::new();
+        for page in 0..max_pages.max(1) {
+            out.push(f(page).await?);
+            // 找下一页按钮:不存在或不可点击 → 到末页,结束。
+            let next = match self.find_once(next_selector).await? {
+                Some(e) if e.is_clickable().await.unwrap_or(false) => e,
+                _ => break,
+            };
+            next.click().await?;
+            // 等新页渲染(站点差异大,这里给一个通用的小等待;精确等待可在 f 内做)。
+            tokio::time::sleep(Duration::from_millis(800)).await;
+        }
+        Ok(out)
     }
 
     /// 读取本标签(其 BrowserContext)的所有 cookie。
@@ -1473,7 +1540,9 @@ impl Tab {
     /// ```
     /// 多文件 / 任务列表 / 进度 / 重命名请用句柄式 [`downloads()`](Self::downloads)。
     pub async fn wait_download(&self, timeout: Duration) -> Result<DownloadInfo> {
-        use crate::browser::download::{DownloadState, list_dir_files, scan_new_files, size_stable};
+        use crate::browser::download::{
+            DownloadState, list_dir_files, scan_new_files, size_stable,
+        };
         let dir = self.core.download_path.clone().ok_or_else(|| {
             Error::Other("wait_download 需先用 BrowserOptions::download_path 设置下载目录".into())
         })?;
@@ -1691,7 +1760,10 @@ impl Tab {
     pub async fn wheel(&self, delta_x: f64, delta_y: f64) -> Result<()> {
         let c = self
             .core
-            .evaluate("[Math.floor(innerWidth/2), Math.floor(innerHeight/2)]", true)
+            .evaluate(
+                "[Math.floor(innerWidth/2), Math.floor(innerHeight/2)]",
+                true,
+            )
             .await
             .unwrap_or(Value::Null);
         let x = c.get(0).and_then(Value::as_f64).unwrap_or(200.0);
@@ -1895,7 +1967,9 @@ impl Tab {
 
     /// 可视视口尺寸 `(innerWidth, innerHeight)`。
     pub async fn size(&self) -> Result<(f64, f64)> {
-        let v = self.run_js("[window.innerWidth, window.innerHeight]").await?;
+        let v = self
+            .run_js("[window.innerWidth, window.innerHeight]")
+            .await?;
         Ok((
             v.get(0).and_then(Value::as_f64).unwrap_or(0.0),
             v.get(1).and_then(Value::as_f64).unwrap_or(0.0),
@@ -2007,7 +2081,10 @@ impl Tab {
     pub async fn intercept_stop(&self) -> Result<()> {
         let _ = self
             .core
-            .send_page("Network.setRequestInterception", json!({ "enabled": false }))
+            .send_page(
+                "Network.setRequestInterception",
+                json!({ "enabled": false }),
+            )
             .await;
         *self.core.interceptor.lock().await = None;
         *self.core.intercept_rx.lock().await = None;
@@ -2089,7 +2166,10 @@ async fn pump(
                 if name.is_empty() {
                     if let (Some(fid), Some(id)) = (frame, ev.params["executionContextId"].as_str())
                     {
-                        frame_ctxs.lock().await.insert(fid.to_string(), id.to_string());
+                        frame_ctxs
+                            .lock()
+                            .await
+                            .insert(fid.to_string(), id.to_string());
                         // 主帧另用 watch 通道(快路径 + 失效感知)。
                         if fid == main_frame_id {
                             let _ = ctx_tx.send(Some(id.to_string()));
@@ -2206,10 +2286,18 @@ fn key_descriptor(key: &str) -> (&str, &str, i64, &str) {
         "Shift" => ("Shift", "ShiftLeft", 16, ""),
         "Alt" => ("Alt", "AltLeft", 18, ""),
         "Meta" | "Command" | "Cmd" => ("Meta", "MetaLeft", 91, ""),
-        other => (other, "", 0, if other.chars().count() == 1 { other } else { "" }),
+        other => (
+            other,
+            "",
+            0,
+            if other.chars().count() == 1 {
+                other
+            } else {
+                ""
+            },
+        ),
     }
 }
-
 
 /// 应用上下文级覆盖(指纹/视口/代理等)。逐项 best-effort,单项失败只告警。
 async fn apply_context_overrides(conn: &Connection, bctx: &str, opts: &BrowserOptions) {
@@ -2425,10 +2513,7 @@ pub(crate) fn single_query_expr(query: &Query) -> String {
 /// 生成"查多个元素"的 JS 表达式,结果为节点数组。
 pub(crate) fn multi_query_expr(query: &Query) -> String {
     match query {
-        Query::Css(sel) => format!(
-            "Array.from(document.querySelectorAll({}))",
-            js_string(sel)
-        ),
+        Query::Css(sel) => format!("Array.from(document.querySelectorAll({}))", js_string(sel)),
         Query::Xpath(xp) => format!(
             "(() => {{ const r = document.evaluate({}, document, null, 7, null); const a = []; \
              for (let i = 0; i < r.snapshotLength; i++) a.push(r.snapshotItem(i)); return a; }})()",
@@ -2454,10 +2539,19 @@ mod tests {
     #[test]
     fn image_format_from_path_and_mime() {
         assert_eq!(ImageFormat::from_path(Path::new("a.png")), ImageFormat::Png);
-        assert_eq!(ImageFormat::from_path(Path::new("a.jpg")), ImageFormat::Jpeg);
-        assert_eq!(ImageFormat::from_path(Path::new("a.JPEG")), ImageFormat::Jpeg);
+        assert_eq!(
+            ImageFormat::from_path(Path::new("a.jpg")),
+            ImageFormat::Jpeg
+        );
+        assert_eq!(
+            ImageFormat::from_path(Path::new("a.JPEG")),
+            ImageFormat::Jpeg
+        );
         // 未知/无后缀回退 PNG。
-        assert_eq!(ImageFormat::from_path(Path::new("a.webp")), ImageFormat::Png);
+        assert_eq!(
+            ImageFormat::from_path(Path::new("a.webp")),
+            ImageFormat::Png
+        );
         assert_eq!(ImageFormat::from_path(Path::new("noext")), ImageFormat::Png);
         assert_eq!(ImageFormat::Png.mime(), "image/png");
         assert_eq!(ImageFormat::Jpeg.mime(), "image/jpeg");
@@ -2490,7 +2584,8 @@ mod tests {
         );
         // 捕获阶段(第三参 true)才能在按钮代理 input.click() 时先于页面拿到事件。
         assert!(
-            UPLOAD_HOOK_JS.contains("addEventListener('click'") && UPLOAD_HOOK_JS.contains(", true)"),
+            UPLOAD_HOOK_JS.contains("addEventListener('click'")
+                && UPLOAD_HOOK_JS.contains(", true)"),
             "hook 必须在捕获阶段监听 click"
         );
         // 必须拦掉原生系统文件框,否则会真的弹框卡住。

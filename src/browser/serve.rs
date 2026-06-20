@@ -216,7 +216,9 @@ async fn accept_loop(
         let want = want_path.clone();
         let active = active.clone();
         tokio::spawn(async move {
-            let check = move |req: &Request, resp: Response| -> std::result::Result<Response, ErrorResponse> {
+            let check = move |req: &Request,
+                              resp: Response|
+                  -> std::result::Result<Response, ErrorResponse> {
                 if req.uri().path() == want {
                     Ok(resp)
                 } else {

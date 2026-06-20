@@ -24,10 +24,17 @@ async fn main() -> drission::Result<()> {
         .unwrap_or_else(|| "https://www.scrapingcourse.com/cloudflare-challenge".to_string());
 
     let t0 = SystemTime::now();
-    let started_ms = t0.duration_since(UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0);
+    let started_ms = t0
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
 
     println!("== drission-rs Windows 测试 (过 CF 盾) ==");
-    println!("  OS/ARCH : {}/{}", std::env::consts::OS, std::env::consts::ARCH);
+    println!(
+        "  OS/ARCH : {}/{}",
+        std::env::consts::OS,
+        std::env::consts::ARCH
+    );
     println!("  URL     : {url}");
 
     let cam = drission::launcher::ensure_camoufox(None).await?;
@@ -66,7 +73,10 @@ async fn main() -> drission::Result<()> {
 
         // 自动过盾:交互式 Turnstile 会被拟人**可信点击**复选框,非交互式等待自动放行。
         println!("尝试自动通过 Cloudflare(最多 40s)…");
-        passed = tab.pass_cloudflare(Duration::from_secs(40)).await.unwrap_or(false);
+        passed = tab
+            .pass_cloudflare(Duration::from_secs(40))
+            .await
+            .unwrap_or(false);
 
         cf_debug_after = tab.cloudflare_debug().await.ok();
         final_title = tab.title().await.unwrap_or_default();
@@ -111,8 +121,22 @@ async fn main() -> drission::Result<()> {
     }
 
     println!();
-    println!("传输链路:{}", if transport_ok { "通 ✅" } else { "不通 ❌" });
-    println!("CF 盾   :{}", if passed { "已过 ✅" } else { "未过(可能被风控,与传输无关)" });
+    println!(
+        "传输链路:{}",
+        if transport_ok {
+            "通 ✅"
+        } else {
+            "不通 ❌"
+        }
+    );
+    println!(
+        "CF 盾   :{}",
+        if passed {
+            "已过 ✅"
+        } else {
+            "未过(可能被风控,与传输无关)"
+        }
+    );
     println!("最终标题:{final_title:?}");
     println!("结果文件:{out}(请把这个文件发回核对)");
 

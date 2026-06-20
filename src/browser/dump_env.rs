@@ -235,7 +235,10 @@ impl EnvProbe {
         {
             self.access = a;
         }
-        if let Ok(v) = self.tab.run_js("window.__DUMP__ ? window.__DUMP__.sinks : []").await
+        if let Ok(v) = self
+            .tab
+            .run_js("window.__DUMP__ ? window.__DUMP__.sinks : []")
+            .await
             && let Some(arr) = v.as_array()
         {
             for it in arr {
@@ -244,7 +247,10 @@ impl EnvProbe {
                 }
             }
         }
-        if let Ok(v) = self.tab.run_js("window.__DUMP__ ? window.__DUMP__.targets : []").await
+        if let Ok(v) = self
+            .tab
+            .run_js("window.__DUMP__ ? window.__DUMP__.targets : []")
+            .await
             && let Some(arr) = v.as_array()
         {
             for it in arr {
@@ -269,11 +275,11 @@ impl EnvProbe {
 
     /// 记录一个外部命中的目标值(例如从监听到的 [`DataPacket`](super::listener::DataPacket) 取到的真实上线值),去重累积。
     pub fn record_hit(&mut self, kind: &str, key: &str, value: &str, url: &str) {
-        let item = json!({ "kind": kind, "key": key, "value": value, "url": url, "source": "listen" });
-        let dup = self
-            .hits
-            .iter()
-            .any(|h| h["kind"] == item["kind"] && h["key"] == item["key"] && h["value"] == item["value"]);
+        let item =
+            json!({ "kind": kind, "key": key, "value": value, "url": url, "source": "listen" });
+        let dup = self.hits.iter().any(|h| {
+            h["kind"] == item["kind"] && h["key"] == item["key"] && h["value"] == item["value"]
+        });
         if !dup {
             self.hits.push(item);
         }
@@ -349,7 +355,9 @@ impl EnvDump {
             EnvScope::Accessed => self.accessed_seed(),
         };
         let snapshot = gen_snapshot_js(&seed);
-        let mut r_browser = tab.run_js(&format!("(function(){{ {snapshot} }})()")).await?;
+        let mut r_browser = tab
+            .run_js(&format!("(function(){{ {snapshot} }})()"))
+            .await?;
         // canvas/webgl/audio:浏览器侧改取录制值,与 Node 回放同源比对(见 fill_recorded_fp 说明)。
         fill_recorded_fp(&mut r_browser, &seed);
 
@@ -378,7 +386,9 @@ impl EnvDump {
             Err(e) => return Ok(json!({ "error": format!("无法运行 node: {e}") })),
         };
         if !output.status.success() {
-            return Ok(json!({ "error": String::from_utf8_lossy(&output.stderr).trim().to_string() }));
+            return Ok(
+                json!({ "error": String::from_utf8_lossy(&output.stderr).trim().to_string() }),
+            );
         }
         let r_node: Value = serde_json::from_slice(&output.stdout).unwrap_or(Value::Null);
         Ok(compare(&r_browser, &r_node))
@@ -533,11 +543,15 @@ fn gen_snapshot_js(seed: &Value) -> String {
     }
     if let Some(map) = seed.get("screen").and_then(Value::as_object) {
         for k in map.keys() {
-            items.push(format!("  \"screen.{k}\": g(function () {{ return screen.{k}; }})"));
+            items.push(format!(
+                "  \"screen.{k}\": g(function () {{ return screen.{k}; }})"
+            ));
         }
     }
     for k in ["host", "origin"] {
-        items.push(format!("  \"location.{k}\": g(function () {{ return location.{k}; }})"));
+        items.push(format!(
+            "  \"location.{k}\": g(function () {{ return location.{k}; }})"
+        ));
     }
     // canvas / webgl:Node 侧用配方在补环境里【回放】计算;浏览器侧改取录制值(见 verify 的 post-fill,
     // 因 Camoufox 可能逐次给 canvas 加噪,实时重算未必等于录制),故此处仅供 Node 计算回放值。
@@ -559,7 +573,10 @@ fn gen_snapshot_js(seed: &Value) -> String {
             ("webgl.renderer", "__W.parameters && __W.parameters[7937]"),
             ("webgl.version", "__W.parameters && __W.parameters[7938]"),
             ("webgl.glsl", "__W.parameters && __W.parameters[35724]"),
-            ("webgl.maxTextureSize", "__W.parameters && __W.parameters[3379]"),
+            (
+                "webgl.maxTextureSize",
+                "__W.parameters && __W.parameters[3379]",
+            ),
             ("webgl.extCount", "(__W.extensions || []).length"),
         ] {
             items.push(format!("  \"{key}\": g(function () {{ return {expr}; }})"));
@@ -613,7 +630,9 @@ fn fill_recorded_fp(browser: &mut Value, seed: &Value) {
         obj.insert("webgl.extCount".into(), json!(extc));
     }
     if sup("audio")
-        && let Some(sum) = fp.and_then(|f| f.pointer("/audio/sum")).and_then(Value::as_f64)
+        && let Some(sum) = fp
+            .and_then(|f| f.pointer("/audio/sum"))
+            .and_then(Value::as_f64)
     {
         obj.insert("audio.sum".into(), json!(round6(sum)));
     }
@@ -629,7 +648,11 @@ fn parse_signers(sinks: &[Value]) -> Vec<Value> {
     let mut map: HashMap<String, (u64, u64, u64, String)> = HashMap::new();
     for s in sinks {
         let stack = s.get("stack").and_then(Value::as_str).unwrap_or("");
-        let req = s.get("url").and_then(Value::as_str).unwrap_or("").to_string();
+        let req = s
+            .get("url")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
         if let Some((url, line, col)) = first_http_frame(stack) {
             let e = map.entry(url).or_insert((0, line, col, req));
             e.0 += 1;
@@ -717,8 +740,14 @@ mod tests {
         let replaced = PROBE_TEMPLATE
             .replace("__FP_RECIPES__", FP_RECIPES)
             .replace("__DUMP_CFG__", "{\"proxy\":false}");
-        assert!(!replaced.contains("__DUMP_CFG__"), "替换后不应再有配置占位符");
-        assert!(!replaced.contains("__FP_RECIPES__"), "替换后不应再有配方占位符");
+        assert!(
+            !replaced.contains("__DUMP_CFG__"),
+            "替换后不应再有配置占位符"
+        );
+        assert!(
+            !replaced.contains("__FP_RECIPES__"),
+            "替换后不应再有配方占位符"
+        );
         assert!(replaced.contains("var CFG = {\"proxy\":false};"));
         // 指纹配方已内联进探针。
         assert!(replaced.contains("function __fpCanvas()"));
@@ -787,8 +816,14 @@ mod tests {
         let access = json!({ "order": ["navigator.platform"], "count": {} });
         let pruned = prune_seed(&seed, &access);
         // 指纹与窗口度量整块保留(回放必需)。
-        assert_eq!(pruned.pointer("/fingerprint/canvas/dataURL"), Some(&json!("data:img")));
-        assert_eq!(pruned.pointer("/windowMetrics/devicePixelRatio"), Some(&json!(2)));
+        assert_eq!(
+            pruned.pointer("/fingerprint/canvas/dataURL"),
+            Some(&json!("data:img"))
+        );
+        assert_eq!(
+            pruned.pointer("/windowMetrics/devicePixelRatio"),
+            Some(&json!(2))
+        );
     }
 
     #[test]
@@ -845,8 +880,15 @@ mod tests {
     fn set_and_get_path() {
         let mut o = json!({});
         set_path(&mut o, &["navigator", "userAgent"], json!("UA"));
-        set_path(&mut o, &["navigator", "userAgentData", "platform"], json!("macOS"));
-        assert_eq!(get_path(&o, &["navigator", "userAgent"]), Some(&json!("UA")));
+        set_path(
+            &mut o,
+            &["navigator", "userAgentData", "platform"],
+            json!("macOS"),
+        );
+        assert_eq!(
+            get_path(&o, &["navigator", "userAgent"]),
+            Some(&json!("UA"))
+        );
         assert_eq!(
             get_path(&o, &["navigator", "userAgentData", "platform"]),
             Some(&json!("macOS"))
@@ -869,8 +911,14 @@ mod tests {
         });
         let pruned = prune_seed(&seed, &access);
         // 被访问的关键字段在。
-        assert_eq!(pruned.pointer("/navigator/platform"), Some(&json!("MacIntel")));
-        assert_eq!(pruned.pointer("/navigator/hardwareConcurrency"), Some(&json!(10)));
+        assert_eq!(
+            pruned.pointer("/navigator/platform"),
+            Some(&json!("MacIntel"))
+        );
+        assert_eq!(
+            pruned.pointer("/navigator/hardwareConcurrency"),
+            Some(&json!(10))
+        );
         assert_eq!(pruned.pointer("/screen/width"), Some(&json!(1920)));
         // 未访问的大字段不在(只吐关键)。
         assert!(pruned.get("localStorage").is_none());

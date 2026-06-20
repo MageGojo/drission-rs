@@ -22,7 +22,10 @@ const DEFAULT_URL: &str = "https://cdn.dingxiang-inc.com/ctu-group/captcha-ui/de
 #[tokio::main]
 async fn main() -> drission::Result<()> {
     let headless = std::env::var("HL").map(|v| v != "0").unwrap_or(true);
-    let n: u32 = std::env::var("N").ok().and_then(|v| v.parse().ok()).unwrap_or(5);
+    let n: u32 = std::env::var("N")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(5);
     let do_drag = std::env::var("NODRAG").is_err();
     let url = std::env::var("URL").unwrap_or_else(|_| DEFAULT_URL.to_string());
 
@@ -36,7 +39,9 @@ async fn main() -> drission::Result<()> {
     // 弹出式:点 #btn-popup 弹出 → **动态识别**弹框真实实例后缀(页面有多个验证码,写死会认错)
     // → 隐藏页面其它验证码,只留这一个弹框(消除"多个弹窗"干扰)。
     let before = dx_visible_suffixes(&tab).await;
-    let _ = tab.run_js("(function(){var b=document.querySelector('#btn-popup'); if(b)b.click();})()").await;
+    let _ = tab
+        .run_js("(function(){var b=document.querySelector('#btn-popup'); if(b)b.click();})()")
+        .await;
     sleep(Duration::from_secs(2)).await;
     let i = dx_new_popup_suffix(&tab, &before).await.unwrap_or(4);
     tab.run_js(&format!(
@@ -53,7 +58,10 @@ async fn main() -> drission::Result<()> {
     // 逐张验证:库的 `dingxiang_slide_gap` 找缺口 → 实时画框 →(可选)`solve_slider` 拖动 → 换图。
     let mut report: Vec<String> = Vec::new();
     for k in 1..=n {
-        let _ = tab.wait().ele_displayed(&handle, Some(Duration::from_secs(8))).await;
+        let _ = tab
+            .wait()
+            .ele_displayed(&handle, Some(Duration::from_secs(8)))
+            .await;
         sleep(Duration::from_millis(450)).await;
         let gap = match tab.dingxiang_slide_gap(i).await {
             Ok(g) => g,
@@ -71,22 +79,38 @@ async fn main() -> drission::Result<()> {
         let _ = tab.run_js(&dx_show_box(i, gap.displace)).await;
         if do_drag {
             sleep(Duration::from_millis(700)).await; // 先让看清框
-            match tab.solve_slider(&SliderConfig::dingxiang(i).max_attempts(1)).await {
+            match tab
+                .solve_slider(&SliderConfig::dingxiang(i).max_attempts(1))
+                .await
+            {
                 Ok(r) => {
                     println!(
                         "[*] #{k}:拖动对齐误差 {:.1}px  顶象判定={}",
                         r.align_error,
-                        if r.passed { "通过 ✅" } else { "弹回(算法已对齐;弹回属轨迹/IP 行为风控)" }
+                        if r.passed {
+                            "通过 ✅"
+                        } else {
+                            "弹回(算法已对齐;弹回属轨迹/IP 行为风控)"
+                        }
                     );
-                    report.push(format!("#{k} 位移={:.0}px {:?} 置信={:.2} 对齐={:.1}px", gap.displace, gap.method, gap.confidence, r.align_error));
+                    report.push(format!(
+                        "#{k} 位移={:.0}px {:?} 置信={:.2} 对齐={:.1}px",
+                        gap.displace, gap.method, gap.confidence, r.align_error
+                    ));
                 }
                 Err(e) => {
                     println!("[!] #{k}:拖动出错({e})");
-                    report.push(format!("#{k} 位移={:.0}px {:?} 置信={:.2}", gap.displace, gap.method, gap.confidence));
+                    report.push(format!(
+                        "#{k} 位移={:.0}px {:?} 置信={:.2}",
+                        gap.displace, gap.method, gap.confidence
+                    ));
                 }
             }
         } else {
-            report.push(format!("#{k} 位移={:.0}px {:?} 置信={:.2}", gap.displace, gap.method, gap.confidence));
+            report.push(format!(
+                "#{k} 位移={:.0}px {:?} 置信={:.2}",
+                gap.displace, gap.method, gap.confidence
+            ));
             sleep(Duration::from_millis(1700)).await; // 让有头看清红框
         }
         dx_refresh(&tab, i, &handle).await;
@@ -123,7 +147,11 @@ async fn dx_new_popup_suffix(tab: &Tab, before: &[u32]) -> Option<u32> {
     if let Some(s) = now.iter().copied().filter(|x| !before.contains(x)).max() {
         return Some(s);
     }
-    now.iter().copied().filter(|&x| x != 1).max().or_else(|| now.iter().copied().max())
+    now.iter()
+        .copied()
+        .filter(|&x| x != 1)
+        .max()
+        .or_else(|| now.iter().copied().max())
 }
 
 /// 换一张验证码:**只点本弹框自己**的刷新键 `#dx_captcha_basic_btn-refresh_{i}`(绝不重开弹窗),
@@ -132,7 +160,12 @@ async fn dx_refresh(tab: &Tab, i: u32, handle: &str) {
     let fp_js = format!(
         "(function(){{var c=document.querySelector('#dx_captcha_basic_bg_{i} canvas'); if(!c)return ''; try{{return c.toDataURL('image/png').slice(-64);}}catch(e){{return '';}}}})()"
     );
-    let before = tab.run_js(&fp_js).await.ok().and_then(|v| v.as_str().map(String::from)).unwrap_or_default();
+    let before = tab
+        .run_js(&fp_js)
+        .await
+        .ok()
+        .and_then(|v| v.as_str().map(String::from))
+        .unwrap_or_default();
     let clicked = tab
         .run_js(&format!(
             "(function(){{var b=document.querySelector('#dx_captcha_basic_btn-refresh_{i}'); if(b&&b.getBoundingClientRect().width>0){{b.click(); return true;}} return false;}})()"
@@ -144,13 +177,21 @@ async fn dx_refresh(tab: &Tab, i: u32, handle: &str) {
     if clicked {
         for _ in 0..16 {
             sleep(Duration::from_millis(300)).await;
-            let now = tab.run_js(&fp_js).await.ok().and_then(|v| v.as_str().map(String::from)).unwrap_or_default();
+            let now = tab
+                .run_js(&fp_js)
+                .await
+                .ok()
+                .and_then(|v| v.as_str().map(String::from))
+                .unwrap_or_default();
             if !now.is_empty() && now != before {
                 break;
             }
         }
     }
-    let _ = tab.wait().ele_displayed(handle, Some(Duration::from_secs(8))).await;
+    let _ = tab
+        .wait()
+        .ele_displayed(handle, Some(Duration::from_secs(8)))
+        .await;
 }
 
 /// 在**实时页面**画出算法落点(红框=检测到的缺口、绿框=home),供有头观看。

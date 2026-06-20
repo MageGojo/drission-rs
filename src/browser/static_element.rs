@@ -20,6 +20,7 @@
 //! let root = StaticElement::parse("<ul><li>a</li><li>b</li></ul>")?;
 //! ```
 
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use ego_tree::NodeId;
@@ -69,16 +70,17 @@ impl StaticElement {
 
     /// 元素可见文本(所有后代文本拼接,首尾去空白)。
     pub fn text(&self) -> Result<String> {
-        Ok(self.element()?.text().collect::<String>().trim().to_string())
+        Ok(self
+            .element()?
+            .text()
+            .collect::<String>()
+            .trim()
+            .to_string())
     }
 
     /// 读取属性;不存在返回 `None`。
     pub fn attr(&self, name: &str) -> Result<Option<String>> {
-        Ok(self
-            .element()?
-            .value()
-            .attr(name)
-            .map(|s| s.to_string()))
+        Ok(self.element()?.value().attr(name).map(|s| s.to_string()))
     }
 
     /// 全部属性(名, 值)。
@@ -126,6 +128,69 @@ impl StaticElement {
             })
             .collect())
     }
+
+    /// 把 `<table>` 抽成二维表(行 × 单元格文本)。
+    ///
+    /// 本元素**自身是 `<table>`** 则直接用;否则取其内第一个 `<table>`。逐 `<tr>` 取其 `<th>/<td>` 文本
+    /// (首尾去空白)。空行(无单元格)跳过。表头行也在内(作为第 0 行);要按表头映射用
+    /// [`table_records`](Self::table_records)。
+    pub fn table(&self) -> Result<Vec<Vec<String>>> {
+        let el = self.element()?;
+        let table = find_table(el)?;
+        let tr = parse_sel("tr")?;
+        let cell = parse_sel("th, td")?;
+        let mut rows = Vec::new();
+        for row in table.select(&tr) {
+            let cells: Vec<String> = row
+                .select(&cell)
+                .map(|c| normalize_space(&c.text().collect::<String>()))
+                .collect();
+            if !cells.is_empty() {
+                rows.push(cells);
+            }
+        }
+        Ok(rows)
+    }
+
+    /// 把 `<table>` 抽成**记录列表**:用第一行作表头,其余每行映射为 `表头→单元格` 的 map。
+    ///
+    /// 列数多于表头时多出的列用 `colN` 兜底;表为空返回空 `Vec`。
+    pub fn table_records(&self) -> Result<Vec<HashMap<String, String>>> {
+        let mut rows = self.table()?.into_iter();
+        let Some(headers) = rows.next() else {
+            return Ok(Vec::new());
+        };
+        let mut out = Vec::new();
+        for row in rows {
+            let mut rec = HashMap::new();
+            for (i, val) in row.into_iter().enumerate() {
+                let key = headers
+                    .get(i)
+                    .filter(|h| !h.is_empty())
+                    .cloned()
+                    .unwrap_or_else(|| format!("col{i}"));
+                rec.insert(key, val);
+            }
+            out.push(rec);
+        }
+        Ok(out)
+    }
+}
+
+/// 本元素是 `<table>` 则用自身,否则取其内第一个 `<table>`;都没有则报错。
+fn find_table<'a>(el: ElementRef<'a>) -> Result<ElementRef<'a>> {
+    if el.value().name().eq_ignore_ascii_case("table") {
+        return Ok(el);
+    }
+    let sel = parse_sel("table")?;
+    el.select(&sel)
+        .next()
+        .ok_or_else(|| Error::ElementNotFound("table".into()))
+}
+
+/// 解析一个固定 CSS 选择器(内部用,失败转 [`Error::Other`])。
+fn parse_sel(s: &str) -> Result<Selector> {
+    Selector::parse(s).map_err(|e| Error::Other(format!("非法选择器 {s:?}: {e:?}")))
 }
 
 /// 在 `root` 子树内按 [`StaticQuery`] 收集匹配元素的 NodeId(文档顺序)。
@@ -198,16 +263,29 @@ mod tests {
     #[test]
     fn css_and_tag() {
         let root = StaticElement::parse(HTML).unwrap();
-        assert_eq!(root.ele("#main").unwrap().attr("class").unwrap().as_deref(), Some("box wrap"));
+        assert_eq!(
+            root.ele("#main").unwrap().attr("class").unwrap().as_deref(),
+            Some("box wrap")
+        );
         assert_eq!(root.eles("tag:a").unwrap().len(), 2);
-        assert_eq!(root.ele("css:a.link").unwrap().attr("href").unwrap().as_deref(), Some("/a"));
+        assert_eq!(
+            root.ele("css:a.link")
+                .unwrap()
+                .attr("href")
+                .unwrap()
+                .as_deref(),
+            Some("/a")
+        );
     }
 
     #[test]
     fn attr_eq_and_present() {
         let root = StaticElement::parse(HTML).unwrap();
         assert_eq!(root.ele("@id:main").unwrap().tag().unwrap(), "div");
-        assert_eq!(root.ele("@data-x:1").unwrap().text().unwrap(), "hello world");
+        assert_eq!(
+            root.ele("@data-x:1").unwrap().text().unwrap(),
+            "hello world"
+        );
         assert_eq!(root.eles("@href").unwrap().len(), 2);
     }
 
@@ -232,5 +310,26 @@ mod tests {
         );
         // 不支持的轴仍报错
         assert!(root.ele("xpath://a/following-sibling::a").is_err());
+    }
+
+    const TABLE: &str = r#"<table>
+        <thead><tr><th>名称</th><th>价格</th></tr></thead>
+        <tbody>
+          <tr><td>苹果</td><td>3</td></tr>
+          <tr><td>香蕉</td><td>2</td></tr>
+        </tbody></table>"#;
+
+    #[test]
+    fn table_rows_and_records() {
+        let root = StaticElement::parse(TABLE).unwrap();
+        let rows = root.table().unwrap();
+        assert_eq!(rows.len(), 3); // 表头 + 2 行
+        assert_eq!(rows[0], vec!["名称", "价格"]);
+        assert_eq!(rows[1], vec!["苹果", "3"]);
+
+        let recs = root.table_records().unwrap();
+        assert_eq!(recs.len(), 2);
+        assert_eq!(recs[0].get("名称").map(String::as_str), Some("苹果"));
+        assert_eq!(recs[1].get("价格").map(String::as_str), Some("2"));
     }
 }

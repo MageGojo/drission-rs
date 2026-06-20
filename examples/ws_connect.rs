@@ -45,7 +45,8 @@ async fn main() -> drission::Result<()> {
     let server = BrowserServer::launch(BrowserOptions::new().headless(true)).await?;
     let endpoint = server.ws_endpoint().to_string();
     println!("[*] ws 端点: {endpoint}");
-    let endpoint_ok = endpoint.starts_with("ws://127.0.0.1:") && endpoint.rsplit('/').next().is_some_and(|t| !t.is_empty());
+    let endpoint_ok = endpoint.starts_with("ws://127.0.0.1:")
+        && endpoint.rsplit('/').next().is_some_and(|t| !t.is_empty());
 
     let page = "<!doctype html><meta charset=utf-8><title>WSOK</title><h1 id=x>hello-ws</h1>";
     let url = data_url_html(page);

@@ -158,9 +158,7 @@ pub async fn ensure_camoufox(binary_path: Option<&Path>) -> Result<PathBuf> {
 /// 查询 releases,返回第一个匹配 `-<os>.<arch>.zip` 的资产 (name, url)。
 async fn pick_asset(os: &str, arch: &str) -> Result<(String, String)> {
     let suffix = format!("-{os}.{arch}.zip");
-    let client = reqwest::Client::builder()
-        .user_agent(USER_AGENT)
-        .build()?;
+    let client = reqwest::Client::builder().user_agent(USER_AGENT).build()?;
     let releases: Vec<Release> = client
         .get(GITHUB_RELEASES_API)
         .send()
@@ -184,9 +182,7 @@ async fn pick_asset(os: &str, arch: &str) -> Result<(String, String)> {
 
 /// 流式下载到文件。
 async fn download(url: &str, dest: &Path) -> Result<()> {
-    let client = reqwest::Client::builder()
-        .user_agent(USER_AGENT)
-        .build()?;
+    let client = reqwest::Client::builder().user_agent(USER_AGENT).build()?;
     let resp = client.get(url).send().await?.error_for_status()?;
     let total = resp.content_length().unwrap_or(0);
 

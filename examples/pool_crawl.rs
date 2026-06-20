@@ -72,7 +72,8 @@ async fn main() -> drission::Result<()> {
                      ''+window.innerWidth])",
                 )
                 .await?;
-            let arr: Vec<String> = serde_json::from_str(sig.as_str().unwrap_or("[]")).unwrap_or_default();
+            let arr: Vec<String> =
+                serde_json::from_str(sig.as_str().unwrap_or("[]")).unwrap_or_default();
             let txt = tab.ele("#t").await?.text().await?;
             Ok::<(String, Vec<String>), drission::Error>((txt, arr))
         })
@@ -83,7 +84,10 @@ async fn main() -> drission::Result<()> {
     }
     let all_ok = results.len() == 6 && results.iter().all(|(_, r)| r.is_ok());
     let content_ok = results.iter().enumerate().all(|(idx, (i, r))| {
-        *i == idx as u32 && r.as_ref().map(|(t, _)| t == &format!("item-{i}")).unwrap_or(false)
+        *i == idx as u32
+            && r.as_ref()
+                .map(|(t, _)| t == &format!("item-{i}"))
+                .unwrap_or(false)
     });
     let sig_at = |k: usize| -> Vec<String> {
         results
@@ -95,9 +99,17 @@ async fn main() -> drission::Result<()> {
     let tzs = sig_at(1);
     let vws = sig_at(2);
     let distinct = |v: &[String]| -> usize { v.iter().collect::<HashSet<_>>().len() };
-    println!("    [diag] language: distinct={} {:?}", distinct(&langs), langs);
+    println!(
+        "    [diag] language: distinct={} {:?}",
+        distinct(&langs),
+        langs
+    );
     println!("    [diag] timezone: distinct={} {:?}", distinct(&tzs), tzs);
-    println!("    [diag] innerWidth: distinct={} {:?}", distinct(&vws), vws);
+    println!(
+        "    [diag] innerWidth: distinct={} {:?}",
+        distinct(&vws),
+        vws
+    );
     // 至少一个轻量指纹信号随 context 轮换(distinct >= 2)即证明 per-context 覆盖生效。
     let rotate_ok = distinct(&langs).max(distinct(&tzs)).max(distinct(&vws)) >= 2;
     println!(
@@ -123,8 +135,8 @@ async fn main() -> drission::Result<()> {
         })
         .await
     };
-    let b_ok = r_retry.as_ref().map(|n| *n == 2).unwrap_or(false)
-        && attempts.load(Ordering::SeqCst) == 2;
+    let b_ok =
+        r_retry.as_ref().map(|n| *n == 2).unwrap_or(false) && attempts.load(Ordering::SeqCst) == 2;
     println!(
         "[B] 重试: 结果={:?} 总尝试={} (ok={b_ok})",
         r_retry,
@@ -143,14 +155,24 @@ async fn main() -> drission::Result<()> {
 
     // 首跑:0..4 全部完成并落盘。
     let r1 = pool
-        .map_resumable((0..4).collect::<Vec<_>>(), |i| format!("k{i}"), &ckpt, crawl)
+        .map_resumable(
+            (0..4).collect::<Vec<_>>(),
+            |i| format!("k{i}"),
+            &ckpt,
+            crawl,
+        )
         .await;
     let first_ok = r1.len() == 4 && r1.iter().all(|(_, r)| r.is_ok());
     let done1 = ckpt.done_count().await;
 
     // 续跑:0..6,但 0..4 已完成 → 只补 4、5 两项。
     let r2 = pool
-        .map_resumable((0..6).collect::<Vec<_>>(), |i| format!("k{i}"), &ckpt, crawl)
+        .map_resumable(
+            (0..6).collect::<Vec<_>>(),
+            |i| format!("k{i}"),
+            &ckpt,
+            crawl,
+        )
         .await;
     let resume_ok = r2.len() == 2 && r2.iter().all(|(_, r)| r.is_ok());
     let done2 = ckpt.done_count().await;

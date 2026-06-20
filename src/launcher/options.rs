@@ -322,7 +322,10 @@ impl BrowserOptions {
             cfg.insert("screen.width".into(), json!(w));
             cfg.insert("screen.height".into(), json!(h));
             cfg.insert("screen.availWidth".into(), json!(w));
-            cfg.insert("screen.availHeight".into(), json!(h.saturating_sub(avail_top)));
+            cfg.insert(
+                "screen.availHeight".into(),
+                json!(h.saturating_sub(avail_top)),
+            );
             cfg.insert("screen.availTop".into(), json!(avail_top));
             cfg.insert("screen.availLeft".into(), json!(0));
             cfg.insert("screen.colorDepth".into(), json!(24));
@@ -339,14 +342,23 @@ impl BrowserOptions {
     pub fn collect_firefox_prefs(&self) -> Vec<(String, Value)> {
         let mut prefs: Vec<(String, Value)> = Vec::new();
         if self.block_webrtc {
-            prefs.push(("media.peerconnection.enabled".to_string(), Value::Bool(false)));
+            prefs.push((
+                "media.peerconnection.enabled".to_string(),
+                Value::Bool(false),
+            ));
         }
         // 下载:存到指定目录、不弹框、PDF 直接下载而非内嵌查看。
         if let Some(dir) = &self.download_path {
             prefs.push(("browser.download.folderList".into(), json!(2)));
-            prefs.push(("browser.download.dir".into(), json!(dir.display().to_string())));
+            prefs.push((
+                "browser.download.dir".into(),
+                json!(dir.display().to_string()),
+            ));
             prefs.push(("browser.download.useDownloadDir".into(), json!(true)));
-            prefs.push(("browser.download.manager.showWhenStarting".into(), json!(false)));
+            prefs.push((
+                "browser.download.manager.showWhenStarting".into(),
+                json!(false),
+            ));
             prefs.push(("browser.download.alwaysOpenPanel".into(), json!(false)));
             prefs.push(("pdfjs.disabled".into(), json!(true)));
             prefs.push((

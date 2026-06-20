@@ -45,7 +45,8 @@ async fn main() -> drission::Result<()> {
     while Instant::now() < deadline && hit.is_none() {
         tokio::time::sleep(Duration::from_millis(800)).await;
         for p in stream.drain_ready().await {
-            if p.url_has("aweme/detail") && p.query("aweme_id").as_deref() == Some(aweme_id.as_str())
+            if p.url_has("aweme/detail")
+                && p.query("aweme_id").as_deref() == Some(aweme_id.as_str())
             {
                 hit = Some(p);
                 break;
@@ -83,14 +84,20 @@ async fn main() -> drission::Result<()> {
         "a_bogus": pkt.query("a_bogus"),
         "browser_resp_bytes": pkt.response.body.chars().count(),
     });
-    std::fs::write(out.join("replay.json"), serde_json::to_string_pretty(&replay)?)?;
+    std::fs::write(
+        out.join("replay.json"),
+        serde_json::to_string_pretty(&replay)?,
+    )?;
 
     println!(
         "✅ 抓到 detail(浏览器内 {} 字),a_bogus = {}",
         pkt.response.body.chars().count(),
         pkt.query("a_bogus").unwrap_or_default()
     );
-    println!("   导出同会话 cookie {} 项 + UA → dump-env/replay.json", cookies.len());
+    println!(
+        "   导出同会话 cookie {} 项 + UA → dump-env/replay.json",
+        cookies.len()
+    );
     println!("   脱浏览器复现验证: python3 scripts/douyin_detail_test.py --replay");
     browser.quit().await?;
     Ok(())

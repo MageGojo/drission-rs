@@ -242,7 +242,11 @@ impl SessionPage {
             self.last_headers = resp
                 .headers()
                 .iter()
-                .filter_map(|(k, v)| v.to_str().ok().map(|s| (k.as_str().to_string(), s.to_string())))
+                .filter_map(|(k, v)| {
+                    v.to_str()
+                        .ok()
+                        .map(|s| (k.as_str().to_string(), s.to_string()))
+                })
                 .collect();
             self.last_body = resp.text().await.unwrap_or_default();
             return Ok(status.is_success());
@@ -393,10 +397,18 @@ impl CookieJar {
             name: c.name,
             value: c.value,
             domain: c.domain.trim_start_matches('.').to_ascii_lowercase(),
-            path: if c.path.is_empty() { "/".into() } else { c.path },
+            path: if c.path.is_empty() {
+                "/".into()
+            } else {
+                c.path
+            },
             secure: c.secure,
             http_only: c.http_only,
-            expires: if c.expires > 0.0 { Some(c.expires) } else { None },
+            expires: if c.expires > 0.0 {
+                Some(c.expires)
+            } else {
+                None
+            },
             host_only,
         });
     }
@@ -631,15 +643,24 @@ mod tests {
         let mut jar = CookieJar::default();
         jar.store("s=1; Secure", &url("https://x.com/"));
         assert!(jar.header_for(&url("http://x.com/")).is_none());
-        assert_eq!(jar.header_for(&url("https://x.com/")).as_deref(), Some("s=1"));
+        assert_eq!(
+            jar.header_for(&url("https://x.com/")).as_deref(),
+            Some("s=1")
+        );
     }
 
     #[test]
     fn domain_attr_includes_subdomains() {
         let mut jar = CookieJar::default();
         jar.store("t=2; Domain=x.com", &url("https://www.x.com/"));
-        assert_eq!(jar.header_for(&url("https://api.x.com/")).as_deref(), Some("t=2"));
-        assert_eq!(jar.header_for(&url("https://x.com/")).as_deref(), Some("t=2"));
+        assert_eq!(
+            jar.header_for(&url("https://api.x.com/")).as_deref(),
+            Some("t=2")
+        );
+        assert_eq!(
+            jar.header_for(&url("https://x.com/")).as_deref(),
+            Some("t=2")
+        );
     }
 
     #[test]
@@ -656,7 +677,10 @@ mod tests {
         let mut jar = CookieJar::default();
         jar.store("a=1; Path=/admin", &url("https://x.com/admin/x"));
         assert!(jar.header_for(&url("https://x.com/")).is_none());
-        assert_eq!(jar.header_for(&url("https://x.com/admin/y")).as_deref(), Some("a=1"));
+        assert_eq!(
+            jar.header_for(&url("https://x.com/admin/y")).as_deref(),
+            Some("a=1")
+        );
     }
 
     #[test]
@@ -676,6 +700,9 @@ mod tests {
         assert_eq!(params.len(), 1);
         assert_eq!(params[0].name, "u");
         // .x.com → 子域可发送。
-        assert_eq!(jar.header_for(&url("https://a.x.com/")).as_deref(), Some("u=1"));
+        assert_eq!(
+            jar.header_for(&url("https://a.x.com/")).as_deref(),
+            Some("u=1")
+        );
     }
 }

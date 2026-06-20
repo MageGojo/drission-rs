@@ -106,7 +106,11 @@ async fn run_mode(url: &str, headless: bool) -> Value {
     let t = Instant::now();
     let browser = match Browser::launch(BrowserOptions::new().headless(headless)).await {
         Ok(b) => {
-            push("launch", t, Ok("browser launched + Browser.enable ok".into()));
+            push(
+                "launch",
+                t,
+                Ok("browser launched + Browser.enable ok".into()),
+            );
             Some(b)
         }
         Err(e) => {
@@ -207,7 +211,11 @@ async fn main() {
         .unwrap_or_else(|| "https://example.com".to_string());
 
     println!("== drission-rs Windows 传输诊断 (win_diag) ==");
-    println!("  OS/ARCH : {}/{}", std::env::consts::OS, std::env::consts::ARCH);
+    println!(
+        "  OS/ARCH : {}/{}",
+        std::env::consts::OS,
+        std::env::consts::ARCH
+    );
     println!("  URL     : {url}");
     println!();
 
@@ -257,6 +265,10 @@ async fn main() {
     }
 
     println!();
-    println!("无头:{}    有头:{}", if hok { "✅" } else { "❌" }, if dok { "✅" } else { "❌" });
+    println!(
+        "无头:{}    有头:{}",
+        if hok { "✅" } else { "❌" },
+        if dok { "✅" } else { "❌" }
+    );
     println!("结果文件:{out}(请把这个文件整份发回核对)");
 }

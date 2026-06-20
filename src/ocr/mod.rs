@@ -65,14 +65,20 @@ impl Ocr {
         let runnable = self
             .model
             .clone()
-            .with_input_fact(0, InferenceFact::dt_shape(f32::datum_type(), tvec![1, 1, 64, w]))
+            .with_input_fact(
+                0,
+                InferenceFact::dt_shape(f32::datum_type(), tvec![1, 1, 64, w]),
+            )
             .map_err(terr)?
             .into_optimized()
             .map_err(terr)?
             .into_runnable()
             .map_err(terr)?;
-        let input = tract_ndarray::Array4::<f32>::from_shape_vec((1, 1, 64, w), data).map_err(terr)?;
-        let out = runnable.run(tvec![Tensor::from(input).into()]).map_err(terr)?;
+        let input =
+            tract_ndarray::Array4::<f32>::from_shape_vec((1, 1, 64, w), data).map_err(terr)?;
+        let out = runnable
+            .run(tvec![Tensor::from(input).into()])
+            .map_err(terr)?;
         let t = out[0].clone().into_tensor();
         let view = t.to_plain_array_view::<f32>().map_err(terr)?;
         Ok(ctc_decode(&view, &self.charset))
@@ -82,8 +88,13 @@ impl Ocr {
 /// 解析字符集 JSON(`{"charset":[...]}`)。
 fn parse_charset(s: &str) -> Result<Vec<String>> {
     let v: serde_json::Value = serde_json::from_str(s).map_err(terr)?;
-    let arr = v["charset"].as_array().ok_or_else(|| Error::msg("OCR: charset 缺失"))?;
-    Ok(arr.iter().map(|x| x.as_str().unwrap_or("").to_string()).collect())
+    let arr = v["charset"]
+        .as_array()
+        .ok_or_else(|| Error::msg("OCR: charset 缺失"))?;
+    Ok(arr
+        .iter()
+        .map(|x| x.as_str().unwrap_or("").to_string())
+        .collect())
 }
 
 /// 预处理:解码 → 灰度 → 等比缩放到高 64 → 归一化。返回 `([f32; 64*w] 行主序, w)`。
@@ -110,8 +121,13 @@ fn preprocess(bytes: &[u8]) -> Result<(Vec<f32>, usize)> {
 fn ctc_decode(view: &tract_ndarray::ArrayViewD<f32>, charset: &[String]) -> String {
     let shape = view.shape();
     let c = charset.len();
-    let cls_axis = shape.iter().position(|&d| d == c).unwrap_or(shape.len() - 1);
-    let t_axis = (0..shape.len()).find(|&a| a != cls_axis && shape[a] > 1).unwrap_or(0);
+    let cls_axis = shape
+        .iter()
+        .position(|&d| d == c)
+        .unwrap_or(shape.len() - 1);
+    let t_axis = (0..shape.len())
+        .find(|&a| a != cls_axis && shape[a] > 1)
+        .unwrap_or(0);
     let tn = shape[t_axis];
     let mut out = String::new();
     let mut prev = usize::MAX;
@@ -128,7 +144,10 @@ fn ctc_decode(view: &tract_ndarray::ArrayViewD<f32>, charset: &[String]) -> Stri
                 best = k;
             }
         }
-        if best != 0 && best != prev && let Some(ch) = charset.get(best) {
+        if best != 0
+            && best != prev
+            && let Some(ch) = charset.get(best)
+        {
             out.push_str(ch);
         }
         prev = best;
@@ -143,7 +162,10 @@ async fn ensure_model() -> Result<PathBuf> {
         if p.exists() {
             return Ok(p);
         }
-        return Err(Error::msg(format!("OCR: DRISSION_OCR_MODEL 路径不存在: {}", p.display())));
+        return Err(Error::msg(format!(
+            "OCR: DRISSION_OCR_MODEL 路径不存在: {}",
+            p.display()
+        )));
     }
     let dir = dirs::cache_dir()
         .unwrap_or_else(std::env::temp_dir)
@@ -152,14 +174,26 @@ async fn ensure_model() -> Result<PathBuf> {
     std::fs::create_dir_all(&dir).map_err(terr)?;
     let path = dir.join("ddddocr_common.onnx");
     // 已存且 > 1MB(避免半截下载)即复用。
-    if path.exists() && std::fs::metadata(&path).map(|m| m.len() > 1_000_000).unwrap_or(false) {
+    if path.exists()
+        && std::fs::metadata(&path)
+            .map(|m| m.len() > 1_000_000)
+            .unwrap_or(false)
+    {
         return Ok(path);
     }
     let url = std::env::var("DRISSION_OCR_MODEL_URL").unwrap_or_else(|_| MODEL_URL.to_string());
     tracing::info!(target: "drission::ocr", "下载 OCR 模型(~54MB,仅首次): {url}");
-    let bytes = reqwest::get(&url).await.map_err(terr)?.bytes().await.map_err(terr)?;
+    let bytes = reqwest::get(&url)
+        .await
+        .map_err(terr)?
+        .bytes()
+        .await
+        .map_err(terr)?;
     if bytes.len() < 1_000_000 {
-        return Err(Error::msg(format!("OCR: 模型下载异常({} bytes)", bytes.len())));
+        return Err(Error::msg(format!(
+            "OCR: 模型下载异常({} bytes)",
+            bytes.len()
+        )));
     }
     // 先写临时再 rename,避免并发/中断留半截。
     let tmp = path.with_extension("onnx.part");
@@ -212,7 +246,12 @@ mod tests {
     fn ctc_collapses_repeats_and_blanks() {
         // 构造 [T=5, C=4] 的 one-hot logits,charset=["",a,b,c]。
         // 序列:a a blank b b → 解码 "ab"。
-        let charset = vec!["".to_string(), "a".to_string(), "b".to_string(), "c".to_string()];
+        let charset = vec![
+            "".to_string(),
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+        ];
         let seq = [1usize, 1, 0, 2, 2];
         let mut arr = tract_ndarray::Array3::<f32>::zeros((seq.len(), 1, charset.len()));
         for (t, &k) in seq.iter().enumerate() {

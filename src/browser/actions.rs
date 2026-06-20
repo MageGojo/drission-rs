@@ -21,9 +21,9 @@ use std::time::Duration;
 use serde_json::json;
 use tokio::time::sleep;
 
+use crate::Result;
 use crate::browser::element::Element;
 use crate::browser::tab::Tab;
-use crate::Result;
 
 /// 鼠标键。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -54,13 +54,13 @@ impl MouseButton {
 
 /// 单个动作(在 [`Actions::perform`] 时按序执行)。
 enum Act {
-    MoveAbs(f64, f64, f64),                 // x, y, duration
-    MoveEle(Box<Element>, f64, f64, f64),   // 元素, 偏移x, 偏移y, duration
-    MoveBy(f64, f64, f64),                  // dx, dy, duration
+    MoveAbs(f64, f64, f64),               // x, y, duration
+    MoveEle(Box<Element>, f64, f64, f64), // 元素, 偏移x, 偏移y, duration
+    MoveBy(f64, f64, f64),                // dx, dy, duration
     Down(MouseButton),
     Up(MouseButton),
-    Click(MouseButton, u32),                // 按键, 连击次数(1/2)
-    Scroll(f64, f64),                       // dx, dy
+    Click(MouseButton, u32), // 按键, 连击次数(1/2)
+    Scroll(f64, f64),        // dx, dy
     KeyDown(String),
     KeyUp(String),
     Type(String),
@@ -258,8 +258,15 @@ impl Actions {
                     core.dispatch_mouse("mousemove", cur.0, cur.1, held).await?;
                     for n in 1..=count {
                         let down_buttons = held | b.bit();
-                        core.dispatch_mouse_ex("mousedown", cur.0, cur.1, b.id(), down_buttons, n as i64)
-                            .await?;
+                        core.dispatch_mouse_ex(
+                            "mousedown",
+                            cur.0,
+                            cur.1,
+                            b.id(),
+                            down_buttons,
+                            n as i64,
+                        )
+                        .await?;
                         sleep(Duration::from_millis(40)).await;
                         core.dispatch_mouse_ex("mouseup", cur.0, cur.1, b.id(), held, n as i64)
                             .await?;
@@ -275,15 +282,22 @@ impl Actions {
                     .await?;
                 }
                 Act::KeyDown(k) => {
-                    core.send_page("Page.dispatchKeyEvent", json!({ "type": "keydown", "key": k }))
-                        .await?;
+                    core.send_page(
+                        "Page.dispatchKeyEvent",
+                        json!({ "type": "keydown", "key": k }),
+                    )
+                    .await?;
                 }
                 Act::KeyUp(k) => {
-                    core.send_page("Page.dispatchKeyEvent", json!({ "type": "keyup", "key": k }))
-                        .await?;
+                    core.send_page(
+                        "Page.dispatchKeyEvent",
+                        json!({ "type": "keyup", "key": k }),
+                    )
+                    .await?;
                 }
                 Act::Type(t) => {
-                    core.send_page("Page.insertText", json!({ "text": t })).await?;
+                    core.send_page("Page.insertText", json!({ "text": t }))
+                        .await?;
                 }
                 Act::Wait(s) => {
                     sleep(Duration::from_secs_f64(s.max(0.0))).await;
@@ -295,7 +309,13 @@ impl Actions {
 }
 
 /// 从 `from` 缓动滑到 `to`,`duration` 秒;`held_buttons` 非 0 时为按住拖拽(`buttons` 带位)。
-async fn glide(tab: &Tab, from: (f64, f64), to: (f64, f64), duration: f64, held: i64) -> Result<()> {
+async fn glide(
+    tab: &Tab,
+    from: (f64, f64),
+    to: (f64, f64),
+    duration: f64,
+    held: i64,
+) -> Result<()> {
     let dx = to.0 - from.0;
     let dy = to.1 - from.1;
     let dist = (dx * dx + dy * dy).sqrt();
@@ -323,6 +343,8 @@ async fn glide(tab: &Tab, from: (f64, f64), to: (f64, f64), duration: f64, held:
         }
     }
     // 末步精确落点。
-    tab.core.dispatch_mouse("mousemove", to.0, to.1, held).await?;
+    tab.core
+        .dispatch_mouse("mousemove", to.0, to.1, held)
+        .await?;
     Ok(())
 }

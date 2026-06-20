@@ -36,12 +36,8 @@ async fn main() -> drission::Result<()> {
     let url = format!("file://{}", page_path.display());
 
     println!("[*] 启动 Camoufox(headless),下载目录={}", dl_dir.display());
-    let browser = Browser::launch(
-        BrowserOptions::new()
-            .headless(true)
-            .download_path(&dl_dir),
-    )
-    .await?;
+    let browser =
+        Browser::launch(BrowserOptions::new().headless(true).download_path(&dl_dir)).await?;
     let tab = browser.latest_tab().await?;
     tab.get(&url).await?;
     tab.wait().ele_displayed("#d1", None).await?;
@@ -78,7 +74,9 @@ async fn main() -> drission::Result<()> {
     );
 
     // 内容核对(data:text/plain,alpha-content → "alpha-content")。
-    let c1 = tokio::fs::read_to_string(&m1.path).await.unwrap_or_default();
+    let c1 = tokio::fs::read_to_string(&m1.path)
+        .await
+        .unwrap_or_default();
     let bytes1 = m1.downloaded_bytes().await;
     let content_ok = c1 == "alpha-content" && bytes1 == c1.len() as u64;
     println!("[3] 下载1 内容={c1:?} 字节={bytes1} (ok={content_ok})");
@@ -86,7 +84,11 @@ async fn main() -> drission::Result<()> {
     // 任务列表快照。
     let missions = dl.missions().await;
     let list_ok = missions.len() == 2 && missions.iter().all(|m| m.succeeded());
-    println!("[4] missions 数={} 全部成功={} (ok={list_ok})", missions.len(), list_ok);
+    println!(
+        "[4] missions 数={} 全部成功={} (ok={list_ok})",
+        missions.len(),
+        list_ok
+    );
 
     // 自定义重命名(把下载2 移走)。
     let renamed = base.join("renamed-beta.txt");

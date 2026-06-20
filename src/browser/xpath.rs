@@ -78,7 +78,9 @@ fn parse_path(s: &str) -> Result<Vec<Step>> {
             }
         }
         if name.is_empty() {
-            return Err(Error::Other(format!("XPath 解析失败:步缺少节点测试 @ {s:?}")));
+            return Err(Error::Other(format!(
+                "XPath 解析失败:步缺少节点测试 @ {s:?}"
+            )));
         }
         // 显式轴(`axis::node`)与父轴(`..`)暂不支持。
         if name.contains("::") || name == ".." {
@@ -116,7 +118,10 @@ fn parse_path(s: &str) -> Result<Vec<Step>> {
                 pending_desc = false;
             }
         } else {
-            return Err(Error::Other(format!("XPath 解析失败:非法字符 {:?} @ {s:?}", chars[i])));
+            return Err(Error::Other(format!(
+                "XPath 解析失败:非法字符 {:?} @ {s:?}",
+                chars[i]
+            )));
         }
     }
     Ok(steps)
@@ -324,7 +329,10 @@ impl Parser {
             self.pos += 1;
             Ok(())
         } else {
-            Err(Error::Other(format!("XPath 谓词:期望 {t:?},实际 {:?}", self.peek())))
+            Err(Error::Other(format!(
+                "XPath 谓词:期望 {t:?},实际 {:?}",
+                self.peek()
+            )))
         }
     }
     fn is_kw(&self, kw: &str) -> bool {
@@ -422,7 +430,9 @@ impl Parser {
         match self.next() {
             Some(Tok::At) => match self.next() {
                 Some(Tok::Ident(name)) => Ok(Operand::Attr(name)),
-                other => Err(Error::Other(format!("XPath 谓词:@ 后需属性名,实际 {other:?}"))),
+                other => Err(Error::Other(format!(
+                    "XPath 谓词:@ 后需属性名,实际 {other:?}"
+                ))),
             },
             Some(Tok::Str(s)) => Ok(Operand::Str(s)),
             Some(Tok::Num(v)) => Ok(Operand::Num(v)),
@@ -622,11 +632,7 @@ mod tests {
             .filter_map(|id| doc.tree.get(id))
             .filter_map(|nd| {
                 let el = nd.value().as_element()?;
-                Some(format!(
-                    "{}#{}",
-                    el.name(),
-                    el.attr("id").unwrap_or("")
-                ))
+                Some(format!("{}#{}", el.name(), el.attr("id").unwrap_or("")))
             })
             .collect()
     }
@@ -662,13 +668,19 @@ mod tests {
     fn contains_and_text() {
         assert_eq!(ids(H, r#"//a[contains(@href,"x")]"#), vec!["a#"]);
         assert_eq!(ids(H, r#"//*[contains(text(),"关于")]"#), vec!["a#"]);
-        assert_eq!(ids(H, r#"//a[contains(normalize-space(.),"关于")]"#), vec!["a#"]);
+        assert_eq!(
+            ids(H, r#"//a[contains(normalize-space(.),"关于")]"#),
+            vec!["a#"]
+        );
     }
 
     #[test]
     fn and_or_not() {
         assert_eq!(ids(H, r#"//input[@type="text" or @type="file"]"#).len(), 2);
-        assert_eq!(ids(H, r#"//input[@type="file" and @id="i2"]"#), vec!["input#i2"]);
+        assert_eq!(
+            ids(H, r#"//input[@type="file" and @id="i2"]"#),
+            vec!["input#i2"]
+        );
         assert_eq!(ids(H, r#"//input[not(@type="file")]"#), vec!["input#i1"]);
     }
 

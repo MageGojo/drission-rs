@@ -117,7 +117,11 @@ impl Element {
     /// 元素可见文本(`innerText`)。
     pub async fn text(&self) -> Result<String> {
         let v = self
-            .call("node => node.innerText ?? node.textContent ?? ''", vec![], true)
+            .call(
+                "node => node.innerText ?? node.textContent ?? ''",
+                vec![],
+                true,
+            )
             .await?;
         Ok(v.as_str().unwrap_or_default().to_string())
     }
@@ -143,7 +147,11 @@ impl Element {
     /// 标签名(小写)。
     pub async fn tag(&self) -> Result<String> {
         let v = self
-            .call("node => node.tagName ? node.tagName.toLowerCase() : ''", vec![], true)
+            .call(
+                "node => node.tagName ? node.tagName.toLowerCase() : ''",
+                vec![],
+                true,
+            )
             .await?;
         Ok(v.as_str().unwrap_or_default().to_string())
     }
@@ -288,12 +296,8 @@ impl Element {
 
     /// 读取 JS 属性(如 `checked`/`value`/`href`;返回原始 JSON 值)。与 [`attr`](Self::attr)(HTML 特性)不同。
     pub async fn property(&self, name: &str) -> Result<Value> {
-        self.call(
-            "(node, n) => node[n]",
-            vec![json!({ "value": name })],
-            true,
-        )
-        .await
+        self.call("(node, n) => node[n]", vec![json!({ "value": name })], true)
+            .await
     }
 
     /// 从 DOM 移除本元素(对应 DP `ele.remove()`)。
@@ -318,13 +322,17 @@ impl Element {
 
     /// 该元素的 outer HTML。
     pub async fn html(&self) -> Result<String> {
-        let v = self.call("node => node.outerHTML ?? ''", vec![], true).await?;
+        let v = self
+            .call("node => node.outerHTML ?? ''", vec![], true)
+            .await?;
         Ok(v.as_str().unwrap_or_default().to_string())
     }
 
     /// 该元素的 inner HTML。
     pub async fn inner_html(&self) -> Result<String> {
-        let v = self.call("node => node.innerHTML ?? ''", vec![], true).await?;
+        let v = self
+            .call("node => node.innerHTML ?? ''", vec![], true)
+            .await?;
         Ok(v.as_str().unwrap_or_default().to_string())
     }
 
@@ -371,6 +379,16 @@ impl Element {
         let w = r.get(2).and_then(Value::as_f64).unwrap_or(0.0).max(1.0);
         let h = r.get(3).and_then(Value::as_f64).unwrap_or(0.0).max(1.0);
         Ok(json!({ "x": x, "y": y, "width": w, "height": h }))
+    }
+
+    /// 把本元素(应是 `<table>` 或含表格)抽成二维表(行 × 单元格文本)。离线解析其 outer HTML。
+    pub async fn table(&self) -> Result<Vec<Vec<String>>> {
+        StaticElement::parse(&self.html().await?)?.table()
+    }
+
+    /// 把本元素的表格抽成**记录列表**(首行作表头)。离线解析其 outer HTML。
+    pub async fn table_records(&self) -> Result<Vec<HashMap<String, String>>> {
+        StaticElement::parse(&self.html().await?)?.table_records()
     }
 
     /// 解析本元素 outer HTML,取第一个匹配的**静态元素**(DP `ele.s_ele`)。
@@ -601,7 +619,8 @@ impl Element {
 
         for (ox, oy, delay) in steps {
             // 密集移动不等返回值,把节奏交给 sleep(贴近真人采样率)。
-            self.core.dispatch_mouse_fire("mousemove", x0 + ox, y0 + oy, 1)?;
+            self.core
+                .dispatch_mouse_fire("mousemove", x0 + ox, y0 + oy, 1)?;
             if delay > 0 {
                 sleep(Duration::from_millis(delay)).await;
             }
@@ -642,14 +661,20 @@ impl Element {
             // keydown / keyup 仅用于触发站点监听;失败忽略(插入不依赖它)。
             let _ = self
                 .core
-                .send_page("Page.dispatchKeyEvent", json!({ "type": "keydown", "key": s }))
+                .send_page(
+                    "Page.dispatchKeyEvent",
+                    json!({ "type": "keydown", "key": s }),
+                )
                 .await;
             self.core
                 .send_page("Page.insertText", json!({ "text": s }))
                 .await?;
             let _ = self
                 .core
-                .send_page("Page.dispatchKeyEvent", json!({ "type": "keyup", "key": s }))
+                .send_page(
+                    "Page.dispatchKeyEvent",
+                    json!({ "type": "keyup", "key": s }),
+                )
                 .await;
             let delay = 30 + (rng.next_u64() % 110);
             sleep(Duration::from_millis(delay)).await;
@@ -855,15 +880,21 @@ impl ElementWait {
 
     /// 等本元素变为**不可见**(隐藏)。
     pub async fn hidden(&self, timeout: Option<Duration>) -> Result<bool> {
-        self.poll(timeout, || async { Ok(!self.ele.is_displayed().await.unwrap_or(false)) })
-            .await
+        self.poll(timeout, || async {
+            Ok(!self.ele.is_displayed().await.unwrap_or(false))
+        })
+        .await
     }
 
     /// 等本元素从 DOM **移除**(`node.isConnected === false`)。
     pub async fn deleted(&self, timeout: Option<Duration>) -> Result<bool> {
         self.poll(timeout, || async {
             // 节点被移除后 isConnected=false;objectId 失效(异常)也视为已删除。
-            match self.ele.call("node => node.isConnected", vec![], true).await {
+            match self
+                .ele
+                .call("node => node.isConnected", vec![], true)
+                .await
+            {
                 Ok(v) => Ok(!v.as_bool().unwrap_or(false)),
                 Err(_) => Ok(true),
             }
@@ -1049,7 +1080,7 @@ mod tests {
         assert!(track.len() >= 45, "采样应密集,len={}", track.len());
         // 各点延时之和应大致等于设定时长(±迟疑额外量)。
         let total: u64 = track.iter().map(|p| p.2).sum();
-        assert!(total >= 700 && total <= 1100, "总时长≈0.8s,实得 {total}ms");
+        assert!((700..=1100).contains(&total), "总时长≈0.8s,实得 {total}ms");
         // 中段速度应快于两端(minimum-jerk 钟形):比较相邻位移增量。
         let xs: Vec<f64> = track.iter().map(|p| p.0).collect();
         let mid = xs.len() / 2;

@@ -41,7 +41,10 @@ fn b64(s: &str) -> Vec<u8> {
 #[tokio::main]
 async fn main() -> drission::Result<()> {
     let headless = std::env::var("HL").map(|v| v != "0").unwrap_or(true);
-    let n: u32 = std::env::var("N").ok().and_then(|v| v.parse().ok()).unwrap_or(12);
+    let n: u32 = std::env::var("N")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(12);
     let out = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/ocr-diag");
     std::fs::create_dir_all(&out).ok();
 
@@ -53,7 +56,12 @@ async fn main() -> drission::Result<()> {
     sleep(Duration::from_secs(3)).await;
 
     // 等验证码 img 出现。
-    if tab.wait().ele_displayed(XP, Some(Duration::from_secs(10))).await.is_err() {
+    if tab
+        .wait()
+        .ele_displayed(XP, Some(Duration::from_secs(10)))
+        .await
+        .is_err()
+    {
         println!("[!] 验证码 img 未出现(xpath 可能变了)");
         browser.quit().await?;
         return Ok(());
@@ -80,11 +88,20 @@ async fn main() -> drission::Result<()> {
         if let Some(idx) = src.find("base64,") {
             let bytes = b64(&src[idx + 7..]);
             std::fs::write(out.join(format!("cap_{k:02}.png")), &bytes).ok();
-            println!("[*] #{k:02} 原图 {} bytes  src 前缀 {}", bytes.len(), &src[..src.len().min(40)]);
+            println!(
+                "[*] #{k:02} 原图 {} bytes  src 前缀 {}",
+                bytes.len(),
+                &src[..src.len().min(40)]
+            );
         } else {
             // 退回截图(若不是 data:URL)。
-            let _ = img.get_screenshot(out.join(format!("cap_{k:02}.png"))).await;
-            println!("[*] #{k:02} 截图(非 data:URL)  src 前缀 {}", &src[..src.len().min(40)]);
+            let _ = img
+                .get_screenshot(out.join(format!("cap_{k:02}.png")))
+                .await;
+            println!(
+                "[*] #{k:02} 截图(非 data:URL)  src 前缀 {}",
+                &src[..src.len().min(40)]
+            );
         }
         // 刷新:点验证码(在 button 里,通常点击即换一张)。检测是否误触发导航。
         let url_before = tab.url().await.unwrap_or_default();

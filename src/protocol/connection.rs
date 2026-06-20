@@ -143,7 +143,9 @@ impl Connection {
         let json = msg.to_json_bytes()?;
         if self.inner.cmd_tx.send(json).is_err() {
             self.inner.pending.lock().await.remove(&id);
-            return Err(Error::Transport("命令写通道已关闭(子进程可能已退出)".into()));
+            return Err(Error::Transport(
+                "命令写通道已关闭(子进程可能已退出)".into(),
+            ));
         }
 
         match tokio::time::timeout(timeout, rx).await {

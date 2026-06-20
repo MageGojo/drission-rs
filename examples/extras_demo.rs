@@ -27,7 +27,14 @@ async fn main() {
     for (n, ok, d) in &checks {
         println!("  [{}] {n}: {d}", if *ok { "OK" } else { "!!" });
     }
-    println!("\n{}", if all { "ALL CHECKS PASSED ✅" } else { "SOME CHECKS FAILED ❌" });
+    println!(
+        "\n{}",
+        if all {
+            "ALL CHECKS PASSED ✅"
+        } else {
+            "SOME CHECKS FAILED ❌"
+        }
+    );
     if !all {
         std::process::exit(1);
     }
@@ -38,8 +45,11 @@ async fn run(checks: &mut Vec<(String, bool, String)>) -> drission::Result<()> {
     let tab = browser.latest_tab().await?;
 
     // ── A. 逐字符拟人输入 ────────────────────────────────────────────────
-    tab.get("data:text/html,<input id=q style='width:300px'>").await?;
-    tab.wait().ele_displayed("#q", Some(std::time::Duration::from_secs(5))).await?;
+    tab.get("data:text/html,<input id=q style='width:300px'>")
+        .await?;
+    tab.wait()
+        .ele_displayed("#q", Some(std::time::Duration::from_secs(5)))
+        .await?;
     let q = tab.ele("#q").await?;
     let typed = "hello drission 自动化";
     q.input_human(typed).await?;
@@ -51,7 +61,9 @@ async fn run(checks: &mut Vec<(String, bool, String)>) -> drission::Result<()> {
     let site = "https://example.com";
     tab.get(site).await?;
     // 等真实页面就绪(避免首读落到旧 about:blank 上下文 → localStorage 报 insecure)。
-    tab.wait().ele_displayed("h1", Some(std::time::Duration::from_secs(8))).await?;
+    tab.wait()
+        .ele_displayed("h1", Some(std::time::Duration::from_secs(8)))
+        .await?;
     // 在该源写 localStorage + 一个 cookie。
     tab.run_js("localStorage.setItem('drission_k','v1'); sessionStorage.setItem('s_k','s1'); true")
         .await?;
@@ -73,21 +85,36 @@ async fn run(checks: &mut Vec<(String, bool, String)>) -> drission::Result<()> {
         .to_string();
     tab.save_storage_state(&state_file).await?;
     let saved = tab.storage_state().await?;
-    let has_origin = saved
-        .origins
-        .iter()
-        .any(|o| o.local_storage.iter().any(|(k, v)| k == "drission_k" && v == "v1"));
-    checks.push(("storage_export".into(), has_origin && !saved.cookies.is_empty(), format!("cookies={} origins={}", saved.cookies.len(), saved.origins.len())));
+    let has_origin = saved.origins.iter().any(|o| {
+        o.local_storage
+            .iter()
+            .any(|(k, v)| k == "drission_k" && v == "v1")
+    });
+    checks.push((
+        "storage_export".into(),
+        has_origin && !saved.cookies.is_empty(),
+        format!(
+            "cookies={} origins={}",
+            saved.cookies.len(),
+            saved.origins.len()
+        ),
+    ));
 
     // 全新标签 = 独立 BrowserContext(无 cookie / 无 storage),模拟新会话。
     let tab2 = browser.new_tab(Some(site)).await?;
-    tab2.wait().ele_displayed("h1", Some(std::time::Duration::from_secs(8))).await?;
+    tab2.wait()
+        .ele_displayed("h1", Some(std::time::Duration::from_secs(8)))
+        .await?;
     let before = tab2
         .run_js("localStorage.getItem('drission_k')")
         .await?
         .as_str()
         .map(|s| s.to_string());
-    checks.push(("fresh_context_empty".into(), before.is_none(), format!("localStorage(before)={before:?}")));
+    checks.push((
+        "fresh_context_empty".into(),
+        before.is_none(),
+        format!("localStorage(before)={before:?}"),
+    ));
 
     // 导入登录态:cookie 全量 + 当前源 storage。
     tab2.load_storage_state(&state_file).await?;
@@ -97,10 +124,20 @@ async fn run(checks: &mut Vec<(String, bool, String)>) -> drission::Result<()> {
         .as_str()
         .unwrap_or_default()
         .to_string();
-    checks.push(("storage_restored".into(), after == "v1", format!("localStorage(after)={after:?}")));
+    checks.push((
+        "storage_restored".into(),
+        after == "v1",
+        format!("localStorage(after)={after:?}"),
+    ));
     let ck = tab2.cookies().await?;
-    let cookie_ok = ck.iter().any(|c| c.name == "drission_login" && c.value == "token-123");
-    checks.push(("cookie_restored".into(), cookie_ok, format!("{} cookies in new context", ck.len())));
+    let cookie_ok = ck
+        .iter()
+        .any(|c| c.name == "drission_login" && c.value == "token-123");
+    checks.push((
+        "cookie_restored".into(),
+        cookie_ok,
+        format!("{} cookies in new context", ck.len()),
+    ));
 
     let _ = std::fs::remove_file(&state_file);
     browser.quit().await?;

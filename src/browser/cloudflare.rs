@@ -151,7 +151,10 @@ impl Tab {
             let cy = y + h / 2.0;
             (cx, cy)
         });
-        Ok(CfState { challenge, checkbox })
+        Ok(CfState {
+            challenge,
+            checkbox,
+        })
     }
 }
 

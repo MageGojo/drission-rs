@@ -378,10 +378,7 @@ async fn resolve_text(conn: &Connection, session: &str, params: &Value) -> Optio
         )
         .await
         .ok()?;
-    extract_runtime_result(r)
-        .ok()?
-        .as_str()
-        .map(str::to_string)
+    extract_runtime_result(r).ok()?.as_str().map(str::to_string)
 }
 
 /// 把事件里的 RemoteObject 削成 `CallFunctionArgument`(只保留 objectId / unserializableValue / value)。
@@ -403,11 +400,23 @@ mod tests {
 
     #[test]
     fn primitive_text_variants() {
-        assert_eq!(primitive_text(&json!({ "value": "hello", "type": "string" })), "hello");
-        assert_eq!(primitive_text(&json!({ "value": 42, "type": "number" })), "42");
+        assert_eq!(
+            primitive_text(&json!({ "value": "hello", "type": "string" })),
+            "hello"
+        );
+        assert_eq!(
+            primitive_text(&json!({ "value": 42, "type": "number" })),
+            "42"
+        );
         assert_eq!(primitive_text(&json!({ "value": true })), "true");
-        assert_eq!(primitive_text(&json!({ "value": null, "subtype": "null" })), "null");
-        assert_eq!(primitive_text(&json!({ "unserializableValue": "NaN" })), "NaN");
+        assert_eq!(
+            primitive_text(&json!({ "value": null, "subtype": "null" })),
+            "null"
+        );
+        assert_eq!(
+            primitive_text(&json!({ "unserializableValue": "NaN" })),
+            "NaN"
+        );
         assert_eq!(primitive_text(&json!({})), "undefined");
     }
 
@@ -454,7 +463,12 @@ mod tests {
         assert!(!ConsoleFilter::new().level("log").matches(&d));
         assert!(ConsoleFilter::new().contains("boom").matches(&d));
         assert!(!ConsoleFilter::new().contains("nope").matches(&d));
-        assert!(ConsoleFilter::new().level("error").contains("boom").matches(&d));
+        assert!(
+            ConsoleFilter::new()
+                .level("error")
+                .contains("boom")
+                .matches(&d)
+        );
     }
 
     #[test]
@@ -471,7 +485,10 @@ mod tests {
         let body = d.body().unwrap();
         assert_eq!(body["a"], 1);
         assert_eq!(body["b"][1], 3);
-        let plain = ConsoleData { text: "not json".into(), ..d };
+        let plain = ConsoleData {
+            text: "not json".into(),
+            ..d
+        };
         assert!(plain.body().is_none());
     }
 }

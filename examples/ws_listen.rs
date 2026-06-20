@@ -77,7 +77,8 @@ async fn main() -> drission::Result<()> {
 
     // 关键:在建立连接之前 start。只抓 127.0.0.1 的连接。
     let ws = tab.websocket();
-    ws.start_with(WsFilter::new().url_contains("127.0.0.1")).await?;
+    ws.start_with(WsFilter::new().url_contains("127.0.0.1"))
+        .await?;
     let listening = ws.listening();
 
     // 导航到一个**自包含**的 data: 页:其内联脚本在一个稳定上下文里建立连接,onopen 后即发帧。
@@ -102,26 +103,51 @@ async fn main() -> drission::Result<()> {
         println!("    {} {} -> {body}", m.direction.as_str(), m.opcode_name());
     }
 
-    let text = |dir| msgs.iter().find(|m| m.direction == dir && m.is_text()).and_then(|m| m.text());
-    let bin = |dir| msgs.iter().any(|m| m.direction == dir && m.is_binary() && m.bytes() == [1u8, 2, 3, 4]);
+    let text = |dir| {
+        msgs.iter()
+            .find(|m| m.direction == dir && m.is_text())
+            .and_then(|m| m.text())
+    };
+    let bin = |dir| {
+        msgs.iter()
+            .any(|m| m.direction == dir && m.is_binary() && m.bytes() == [1u8, 2, 3, 4])
+    };
     let socks = ws.sockets().await;
     ws.stop().await?;
 
     // 逐项核对(任一失败则进程非 0 退出)。
     let checks = [
         ("start 后在监听", listening),
-        ("发出文本 hello-text", text(WsDirection::Sent).as_deref() == Some("hello-text")),
-        ("收到文本 echo:hello-text", text(WsDirection::Received).as_deref() == Some("echo:hello-text")),
+        (
+            "发出文本 hello-text",
+            text(WsDirection::Sent).as_deref() == Some("hello-text"),
+        ),
+        (
+            "收到文本 echo:hello-text",
+            text(WsDirection::Received).as_deref() == Some("echo:hello-text"),
+        ),
         ("发出二进制 [1,2,3,4]", bin(WsDirection::Sent)),
         ("收到二进制 [1,2,3,4]", bin(WsDirection::Received)),
-        ("sockets() 含连接 URL", socks.iter().any(|s| s.url.contains(&format!("127.0.0.1:{port}")))),
+        (
+            "sockets() 含连接 URL",
+            socks
+                .iter()
+                .any(|s| s.url.contains(&format!("127.0.0.1:{port}"))),
+        ),
         ("stop 后不再监听", !ws.listening()),
     ];
     let pass = checks.iter().all(|&(_, ok)| ok);
     for (name, ok) in checks {
         println!("    [{}] {name}", if ok { "PASS" } else { "FAIL" });
     }
-    println!("\n==== {} ====", if pass { "ALL CHECKS PASSED" } else { "SOME CHECKS FAILED" });
+    println!(
+        "\n==== {} ====",
+        if pass {
+            "ALL CHECKS PASSED"
+        } else {
+            "SOME CHECKS FAILED"
+        }
+    );
 
     browser.quit().await?;
     pass.then_some(())
