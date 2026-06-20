@@ -70,13 +70,16 @@ println!("需移动 {:.0}px,置信 {:.2}", gap.displace, gap.confidence);
 
 ---
 
-## 🧰 其它能力(一笔带过)
+## 🧰 还支持
 
-反检测开箱即用(`navigator.webdriver=false`、canvas/webgl/audio 指纹、`block_webrtc`)、多标签并发、
-**每标签独立 cookie**、**XHR/Fetch 监听抓响应体**、**请求拦截改写**(fulfill / abort / resume)、
-WebSocket 帧监听、控制台监听、iframe / 对话框 / 文件上传、**自动过 Cloudflare 盾**、拟人输入与动作链、
-截图录像、**HTTP Session 双模 + cookie 互通**(省内存)、**`BrowserPool` 高并发池**(代理 / 指纹轮换 + 断点续抓)、
-**通用「吐环境」**(导出可 `node` 运行的补环境工程)、WS 接管已开浏览器。
+- **反检测过盾**:`navigator.webdriver=false`、canvas / webgl / audio 指纹定制、`block_webrtc`;**自动通过 Cloudflare 盾**(Turnstile 复选框可信点击)。
+- **元素与交互**:DrissionPage 风格定位(`@id:` / `css:` / `xpath:` / `text:`)、点击 / 输入 / 逐字符拟人输入、动作链、拖拽、下拉 / 单选 / 多选填表、文件上传、iframe、JS 对话框。
+- **网络**:XHR / Fetch **监听抓响应体**、**请求拦截改写**(fulfill / abort / resume)、WebSocket 帧监听、控制台监听。
+- **多标签与高并发**:每标签独立 cookie 隔离、`BrowserPool` 浏览器池(代理 / 指纹轮换 + 失败重试 + **断点续抓**)。
+- **Driver + Session 双模**:浏览器与纯 HTTP 会话双模、cookie 双向互通(省内存,旧机友好)。
+- **截图与录像**:元素 / 整页 / 区域截图,视口录像合成 mp4。
+- **吐环境(补环境)**:采集 canvas / webgl / audio 真实指纹 + 签名 sink 定位,一键导出可 `node` 运行的补环境工程。
+- **接管浏览器**:`BrowserServer` 暴露 WebSocket 端点,`Browser::connect` 接管已运行的浏览器。
 
 ---
 
