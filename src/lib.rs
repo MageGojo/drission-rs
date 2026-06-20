@@ -18,8 +18,9 @@
 //! - [`launcher`][]:启动选项、指纹配置、Camoufox 自动下载分发。
 //! - [`error`][]:统一错误类型。
 //!
-//! > 当前进度见 `docs/进度.md`。底层控制协议是 Firefox 的 **Juggler**(非 CDP),
-//! > 因为 Camoufox 只支持 Juggler。
+//! > 更新历史见 [`CHANGELOG.md`](https://github.com/MageGojo/drission-rs/blob/main/CHANGELOG.md);
+//! > 设计与 API 映射文档见 [`docs/`](https://github.com/MageGojo/drission-rs/tree/main/docs)。
+//! > 底层控制协议是 Firefox 的 **Juggler**(非 CDP),因为 Camoufox 只支持 Juggler。
 
 pub mod browser;
 /// Chromium(Chrome/Edge/Brave/Electron)后端,经 CDP。**可选**:`--features cdp` 开启;

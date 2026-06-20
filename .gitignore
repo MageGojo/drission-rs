@@ -1,6 +1,9 @@
 /target
 /dist
-/docs
+# 内部文档不入库:开发日志(进度.md)与历史需求快照(需求.md,已被实际进展覆盖);
+# 公开文档(设计 / 并发池 / API映射 / 长监听与滑动 / docs/README.md)随仓库发布。
+/docs/进度.md
+/docs/需求.md
 **/*.rs.bk
 .DS_Store
 *.log

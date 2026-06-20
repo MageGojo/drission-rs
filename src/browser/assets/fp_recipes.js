@@ -7,10 +7,35 @@
  *   __fpCanvas()        -> { supported, dataURL }                同步,固定 2D 绘制配方
  *   __fpWebGL()         -> { supported, parameters, unmaskedVendor, unmaskedRenderer, extensions }  同步
  *   __fpAudioAsync(cb)  -> cb({ supported, sampleRate, sum, slice })   异步,OfflineAudioContext 配方
+ *   __fpFonts()         -> { supported, detected, widths, hash }   同步,measureText 宽度法字体枚举
+ *   __fpCanvasPixels()  -> { supported, width, height, hash, data } 同步,getImageData 像素级 canvas
+ *   __fpRtc()           -> { supported, codecsHash, audioCodecs, videoCodecs } 同步,WebRTC 能力
+ *   __fpHash(str) / __fpHashBytes(arr) -> 8 位十六进制 FNV-1a(浏览器 / Node 同算)
  *
- * 这些函数只依赖 document.createElement('canvas') / OfflineAudioContext —— 在浏览器里走真实实现,
- * 在 Node 的补环境(env_template.js 注入的假 DOM)里走回放实现,二者返回值因此一致。
+ * 这些函数只依赖 document.createElement('canvas') / OfflineAudioContext / RTCPeerConnection —— 在浏览器里
+ * 走真实实现,在 Node 的补环境(env_template.js 注入的假 DOM)里走回放实现,二者返回值因此一致。
  */
+
+// 32 位 FNV-1a(>>>0 锁 32 位,浏览器与 Node 的 V8/SpiderMonkey 结果一致),输出 8 位十六进制。
+function __fpHash(str) {
+  str = String(str);
+  var h = 0x811c9dc5;
+  for (var i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i) & 0xff;
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return ("0000000" + h.toString(16)).slice(-8);
+}
+
+function __fpHashBytes(bytes) {
+  var h = 0x811c9dc5;
+  var n = bytes ? bytes.length : 0;
+  for (var i = 0; i < n; i++) {
+    h ^= bytes[i] & 0xff;
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return ("0000000" + h.toString(16)).slice(-8);
+}
 
 function __fpCanvas() {
   try {
@@ -149,5 +174,124 @@ function __fpAudioAsync(cb) {
     }
   } catch (e) {
     fin({ supported: false, error: String(e && e.message) });
+  }
+}
+
+// 字体枚举:measureText 宽度法。对每个候选字体,用 `<candidate>,<generic>` 量同一串的宽度,
+// 与该 generic 基线不同即判定已安装。`widths` 按 ctx.font 串记录,供 Node 回放(env.js measureText 查表)
+// 复算出相同的 detected/hash。候选/串/字号在浏览器与 Node 完全一致,保证录制==回放。
+function __fpFonts() {
+  try {
+    var bases = ["monospace", "sans-serif", "serif"];
+    var probe = "mmmmmmmmmmlli水墨0Oo😀WiQ";
+    var size = "72px ";
+    var candidates = [
+      "Arial", "Arial Black", "Arial Narrow", "Arial Unicode MS", "Calibri", "Cambria",
+      "Comic Sans MS", "Consolas", "Courier", "Courier New", "Georgia", "Helvetica",
+      "Helvetica Neue", "Impact", "Lucida Console", "Lucida Grande", "Menlo", "Microsoft Sans Serif",
+      "Monaco", "MS Gothic", "MS PGothic", "MS Sans Serif", "Palatino", "Palatino Linotype",
+      "Segoe UI", "Tahoma", "Times", "Times New Roman", "Trebuchet MS", "Verdana", "Wingdings",
+      "PingFang SC", "Hiragino Sans GB", "STHeiti", "Songti SC", "Heiti SC", "Apple Color Emoji",
+      "Noto Sans CJK SC", "Source Han Sans", "WenQuanYi Micro Hei", "DejaVu Sans", "Liberation Sans",
+      "Ubuntu", "Roboto", "Microsoft YaHei", "SimSun", "SimHei", "KaiTi",
+    ];
+    var c = document.createElement("canvas");
+    var ctx = c.getContext("2d");
+    if (!ctx) return { supported: false };
+    var widths = {};
+    function measure(font) {
+      ctx.font = font;
+      var w = ctx.measureText(probe).width;
+      widths[font] = w;
+      return w;
+    }
+    var baseW = {};
+    for (var b = 0; b < bases.length; b++) baseW[bases[b]] = measure(size + bases[b]);
+    var detected = [];
+    for (var i = 0; i < candidates.length; i++) {
+      var present = false;
+      for (var b2 = 0; b2 < bases.length; b2++) {
+        var w = measure(size + "'" + candidates[i] + "'," + bases[b2]);
+        if (w !== baseW[bases[b2]]) present = true;
+      }
+      if (present) detected.push(candidates[i]);
+    }
+    return {
+      supported: true,
+      detected: detected,
+      widths: widths,
+      hash: __fpHash(JSON.stringify(detected) + "|" + JSON.stringify(widths)),
+    };
+  } catch (e) {
+    return { supported: false, error: String(e && e.message) };
+  }
+}
+
+// 像素级 canvas 指纹:固定 2D 绘制 -> getImageData 读字节 -> 字节哈希(很多指纹库读 getImageData 而非 toDataURL)。
+// 紧凑画布 96x32(12288 字节)控制 env.js 体积;`data` 为字节 base64,供 env.js 回放(尺寸匹配时原样返回)。
+function __fpCanvasPixels() {
+  try {
+    var W = 96, H = 32;
+    var c = document.createElement("canvas");
+    c.width = W;
+    c.height = H;
+    var ctx = c.getContext("2d");
+    if (!ctx) return { supported: false };
+    var g = ctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, "#f60");
+    g.addColorStop(0.5, "#069");
+    g.addColorStop(1, "#0c6");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    ctx.textBaseline = "top";
+    ctx.font = "14px 'Arial'";
+    ctx.fillStyle = "rgba(20,30,40,0.85)";
+    ctx.fillText("drission px🦊", 2, 2);
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.beginPath();
+    ctx.arc(70, 16, 12, 0, Math.PI * 1.7);
+    ctx.fill();
+    var im = ctx.getImageData(0, 0, W, H);
+    var bytes = im.data;
+    var hash = __fpHashBytes(bytes);
+    var bin = "";
+    for (var i = 0; i < bytes.length; i += 8192) {
+      bin += String.fromCharCode.apply(null, Array.prototype.slice.call(bytes, i, i + 8192));
+    }
+    var data = "";
+    try { data = (typeof btoa === "function" ? btoa(bin) : ""); } catch (e) { data = ""; }
+    return { supported: true, width: W, height: H, hash: hash, data: data };
+  } catch (e) {
+    return { supported: false, error: String(e && e.message) };
+  }
+}
+
+// WebRTC:RTCPeerConnection 是否可用 + 收发编解码能力概要。默认 block_webrtc=true 时 supported:false
+// (env.js 回放即"RTCPeerConnection 仍 undefined",正是要补的一致性)。可用时记录 codecs 供回放复算 hash。
+function __fpRtc() {
+  try {
+    var RPC = (typeof RTCPeerConnection !== "undefined" && RTCPeerConnection) ||
+      (typeof webkitRTCPeerConnection !== "undefined" && webkitRTCPeerConnection) ||
+      (typeof mozRTCPeerConnection !== "undefined" && mozRTCPeerConnection);
+    if (!RPC) return { supported: false, codecsHash: "", audioCodecs: [], videoCodecs: [] };
+    function caps(kind) {
+      var out = [];
+      try {
+        if (typeof RTCRtpReceiver !== "undefined" && RTCRtpReceiver.getCapabilities) {
+          var cp = RTCRtpReceiver.getCapabilities(kind);
+          if (cp && cp.codecs) for (var i = 0; i < cp.codecs.length; i++) out.push(cp.codecs[i].mimeType);
+        }
+      } catch (e) {}
+      return out;
+    }
+    var a = caps("audio"), v = caps("video");
+    return {
+      supported: true,
+      audioCodecs: a,
+      videoCodecs: v,
+      codecsHash: __fpHash(a.join(",") + "|" + v.join(",")),
+    };
+  } catch (e) {
+    return { supported: false, error: String(e && e.message), audioCodecs: [], videoCodecs: [] };
   }
 }

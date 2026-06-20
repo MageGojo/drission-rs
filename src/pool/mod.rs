@@ -7,7 +7,8 @@
 //! - **健康自愈**:worker 连接断/进程退时惰性重建。
 //! - **断点续抓**:配合 [`Checkpoint`] 的 [`map_resumable`](BrowserPool::map_resumable)。
 //!
-//! 不破坏单浏览器 API:池是 [`Browser`]/[`Tab`] 之上的编排层。设计见 `docs/并发池.md`。
+//! 不破坏单浏览器 API:池是 [`Browser`]/[`Tab`] 之上的编排层。
+//! 设计见 [`docs/并发池.md`](https://github.com/MageGojo/drission-rs/blob/main/docs/并发池.md)。
 
 pub mod checkpoint;
 pub mod fingerprint;

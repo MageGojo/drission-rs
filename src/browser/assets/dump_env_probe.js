@@ -245,6 +245,24 @@
             ? { brands: navigator.userAgentData.brands, mobile: navigator.userAgentData.mobile, platform: navigator.userAgentData.platform }
             : null;
         }, null),
+        // 插件 / MIME 列表(常被读做指纹)。回放在 env.js 里包成类数组(length/下标/namedItem)。
+        plugins: sc(function () {
+          var out = [], ps = navigator.plugins || [];
+          for (var i = 0; i < ps.length; i++) {
+            var p = ps[i], mts = [];
+            for (var j = 0; j < p.length; j++) { var m = p[j]; mts.push({ type: m.type, suffixes: m.suffixes, description: m.description }); }
+            out.push({ name: p.name, filename: p.filename, description: p.description, length: p.length, mimeTypes: mts });
+          }
+          return out;
+        }, []),
+        mimeTypes: sc(function () {
+          var out = [], ms = navigator.mimeTypes || [];
+          for (var i = 0; i < ms.length; i++) {
+            var m = ms[i];
+            out.push({ type: m.type, suffixes: m.suffixes, description: m.description, enabledPlugin: (m.enabledPlugin && m.enabledPlugin.name) || null });
+          }
+          return out;
+        }, []),
       },
       screen: {
         width: sc(function () { return screen.width; }, 0),
@@ -283,6 +301,9 @@
         canvas: sc(function () { return __fpCanvas(); }, { supported: false }),
         webgl: sc(function () { return __fpWebGL(); }, { supported: false }),
         audio: D.audioFp || { supported: false, pending: true },
+        fonts: sc(function () { return __fpFonts(); }, { supported: false }),
+        canvasPixels: sc(function () { return __fpCanvasPixels(); }, { supported: false }),
+        rtc: sc(function () { return __fpRtc(); }, { supported: false }),
       },
     };
     D.seed = seed;

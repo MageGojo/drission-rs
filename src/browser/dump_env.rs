@@ -582,8 +582,30 @@ fn gen_snapshot_js(seed: &Value) -> String {
             items.push(format!("  \"{key}\": g(function () {{ return {expr}; }})"));
         }
     }
+    if supported("fonts") {
+        items.push("  \"fonts.hash\": g(function () { return __F.hash; })".into());
+        items.push("  \"fonts.count\": g(function () { return (__F.detected || []).length; })".into());
+    }
+    if supported("canvasPixels") {
+        items.push("  \"canvasPixels.hash\": g(function () { return __P.hash; })".into());
+    }
+    // rtc.supported 始终比对(默认 block_webrtc 下两侧都 false 也是有效一致性);
+    // navigator.plugins / mimeTypes 经 env.js 类数组重建,实时读出计数/首项名比对。
+    items.push("  \"rtc.supported\": g(function () { return !!__R.supported; })".into());
+    items.push(
+        "  \"navigator.pluginsCount\": g(function () { return navigator.plugins ? navigator.plugins.length : 0; })"
+            .into(),
+    );
+    items.push(
+        "  \"navigator.plugins0\": g(function () { return (navigator.plugins && navigator.plugins[0]) ? navigator.plugins[0].name : null; })"
+            .into(),
+    );
+    items.push(
+        "  \"navigator.mimeTypesCount\": g(function () { return navigator.mimeTypes ? navigator.mimeTypes.length : 0; })"
+            .into(),
+    );
     format!(
-        "{recipes}\nfunction g(f) {{ try {{ var v = f(); return v === undefined ? null : v; }} catch (e) {{ return \"<ERR:\" + (e && e.message) + \">\"; }} }}\nvar __C = (function () {{ try {{ return __fpCanvas(); }} catch (e) {{ return {{}}; }} }})();\nvar __W = (function () {{ try {{ return __fpWebGL(); }} catch (e) {{ return {{}}; }} }})();\nreturn {{\n{items}\n}};\n",
+        "{recipes}\nfunction g(f) {{ try {{ var v = f(); return v === undefined ? null : v; }} catch (e) {{ return \"<ERR:\" + (e && e.message) + \">\"; }} }}\nvar __C = (function () {{ try {{ return __fpCanvas(); }} catch (e) {{ return {{}}; }} }})();\nvar __W = (function () {{ try {{ return __fpWebGL(); }} catch (e) {{ return {{}}; }} }})();\nvar __F = (function () {{ try {{ return __fpFonts(); }} catch (e) {{ return {{}}; }} }})();\nvar __P = (function () {{ try {{ return __fpCanvasPixels(); }} catch (e) {{ return {{}}; }} }})();\nvar __R = (function () {{ try {{ return __fpRtc(); }} catch (e) {{ return {{}}; }} }})();\nreturn {{\n{items}\n}};\n",
         recipes = FP_RECIPES,
         items = items.join(",\n")
     )

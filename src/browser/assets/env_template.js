@@ -6,10 +6,11 @@
 //   vm.runInContext(签名脚本源码, sandbox); // 然后调用其签名函数
 // 用法二(直接挂当前全局,尽力用 defineProperty 覆盖 Node 内置 navigator):require('./env.js')
 //
-// 回放范围:navigator / screen / location / window 度量 / document(cookie + createElement) /
-// localStorage / sessionStorage / canvas 2D(toDataURL 回放录制值)/ WebGL(getParameter/getExtension/
-// getSupportedExtensions 回放)/ AudioContext·OfflineAudioContext(渲染缓冲回放录制切片)。
-// 注意:getImageData 像素级 canvas 指纹、罕见 webgl 调用等高强度点可能仍需按目标站点按需补全。
+// 回放范围:navigator(含 plugins / mimeTypes 类数组)/ screen / location / window 度量 /
+// document(cookie + createElement)/ localStorage / sessionStorage / canvas 2D(toDataURL 录制值 +
+// measureText 字体宽度 + getImageData 像素字节回放)/ WebGL(getParameter/getExtension/getSupportedExtensions)/
+// AudioContext·OfflineAudioContext(渲染缓冲录制切片)/ WebRTC(supported 时 RTCPeerConnection + getCapabilities 回放)。
+// 注意:罕见 webgl 调用等高强度点可能仍需按目标站点按需补全。
 var __SEED__ = __SEED_JSON__;
 
 (function () {
@@ -51,14 +52,38 @@ var __SEED__ = __SEED_JSON__;
     }
   }
 
+  // 录制的字体宽度(measureText 回放查表)与像素字节(getImageData 回放还原),供 makeCtx2D 闭包用。
+  var __fonts = ((__SEED__.fingerprint && __SEED__.fingerprint.fonts) || {}).widths || {};
+  var __cpix = (__SEED__.fingerprint && __SEED__.fingerprint.canvasPixels) || null;
+  var __cpixBytes; // 懒解码:undefined=未尝试 / null=无 / Uint8ClampedArray
+  function pixelBytes() {
+    if (__cpixBytes !== undefined) return __cpixBytes;
+    __cpixBytes = null;
+    try {
+      if (__cpix && __cpix.data) {
+        var bin = b64.atob(__cpix.data);
+        var arr = new Uint8ClampedArray(bin.length);
+        for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+        __cpixBytes = arr;
+      }
+    } catch (e) {}
+    return __cpixBytes;
+  }
+
   function makeCtx2D() {
     var noop = function () {};
     var ctx = {
       canvas: null,
+      font: "10px sans-serif",
       save: noop, restore: noop, beginPath: noop, closePath: noop,
       fillRect: noop, strokeRect: noop, clearRect: noop,
       fillText: noop, strokeText: noop,
-      measureText: function (t) { return { width: String(t == null ? "" : t).length * 7 }; },
+      // 回放录制宽度(按 ctx.font 串查表);未录制的字体串回退旧估算。
+      measureText: function (t) {
+        var f = this.font;
+        if (f !== undefined && Object.prototype.hasOwnProperty.call(__fonts, f)) return { width: __fonts[f] };
+        return { width: String(t == null ? "" : t).length * 7 };
+      },
       arc: noop, arcTo: noop, ellipse: noop, rect: noop, roundRect: noop,
       moveTo: noop, lineTo: noop, bezierCurveTo: noop, quadraticCurveTo: noop,
       fill: noop, stroke: noop, clip: noop,
@@ -67,8 +92,13 @@ var __SEED__ = __SEED_JSON__;
       createLinearGradient: function () { return { addColorStop: noop }; },
       createRadialGradient: function () { return { addColorStop: noop }; },
       createPattern: function () { return null; },
+      // 回放录制像素(尺寸与录制一致时原样返回字节);否则回退全 0(其它绘制/尺寸不影响)。
       getImageData: function (x, y, w, h) {
         var n = (w * h * 4) | 0;
+        var pb = pixelBytes();
+        if (pb && __cpix && w === __cpix.width && h === __cpix.height && pb.length === n) {
+          return { data: pb, width: w, height: h };
+        }
         return { data: new Uint8ClampedArray(n > 0 ? n : 4), width: w, height: h };
       },
       isPointInPath: function () { return false; },
@@ -226,6 +256,70 @@ var __SEED__ = __SEED_JSON__;
     };
   }
 
+  // 类数组(PluginArray / MimeTypeArray 回放):length + 下标 + item/namedItem/refresh。
+  function arrayLike(items, nameKey) {
+    var o = {};
+    for (var i = 0; i < items.length; i++) o[i] = items[i];
+    o.length = items.length;
+    o.item = function (i) { return this[i] === undefined ? null : this[i]; };
+    o.namedItem = function (n) { for (var i = 0; i < this.length; i++) { if (this[i] && this[i][nameKey] === n) return this[i]; } return null; };
+    o.refresh = function () {};
+    return o;
+  }
+
+  // navigator.plugins / navigator.mimeTypes 回放为类数组并交叉链接 enabledPlugin。
+  function installNavigatorPlugins(nav) {
+    if (!nav || typeof nav !== "object") return;
+    var rawP = Array.isArray(nav.plugins) ? nav.plugins : null;
+    var rawM = Array.isArray(nav.mimeTypes) ? nav.mimeTypes : null;
+    if (!rawP && !rawM) return;
+    var pluginObjs = (rawP || []).map(function (p) {
+      var mimes = (p.mimeTypes || []).map(function (m) { return { type: m.type, suffixes: m.suffixes, description: m.description, enabledPlugin: null }; });
+      var po = arrayLike(mimes, "type");
+      po.name = p.name; po.filename = p.filename; po.description = p.description;
+      return po;
+    });
+    var mimeObjs = (rawM || []).map(function (m) { return { type: m.type, suffixes: m.suffixes, description: m.description, enabledPlugin: null }; });
+    for (var pi = 0; pi < pluginObjs.length; pi++) {
+      var pl = pluginObjs[pi];
+      for (var mi = 0; mi < pl.length; mi++) {
+        pl[mi].enabledPlugin = pl;
+        var t = pl[mi].type;
+        for (var mj = 0; mj < mimeObjs.length; mj++) if (mimeObjs[mj].type === t && !mimeObjs[mj].enabledPlugin) mimeObjs[mj].enabledPlugin = pl;
+      }
+    }
+    try { defprop(nav, "plugins", arrayLike(pluginObjs, "name")); } catch (e) {}
+    try { defprop(nav, "mimeTypes", arrayLike(mimeObjs, "type")); } catch (e) {}
+  }
+
+  // WebRTC 回放:supported 才装最小 RTCPeerConnection + RTCRtp*.getCapabilities(回放录制 codecs);
+  // 否则不定义,保持 undefined —— 与默认 block_webrtc 浏览器侧一致(__fpRtc 两侧都 supported:false)。
+  function installWebRtc(g) {
+    var rtc = (__SEED__.fingerprint && __SEED__.fingerprint.rtc) || {};
+    if (!rtc.supported) return;
+    var RTC = function RTCPeerConnection() { this.localDescription = null; this.remoteDescription = null; this.iceConnectionState = "new"; this.connectionState = "new"; };
+    RTC.prototype.createDataChannel = function () { return { close: function () {} }; };
+    RTC.prototype.createOffer = function () { return Promise.resolve({ type: "offer", sdp: "" }); };
+    RTC.prototype.createAnswer = function () { return Promise.resolve({ type: "answer", sdp: "" }); };
+    RTC.prototype.setLocalDescription = function () { return Promise.resolve(); };
+    RTC.prototype.setRemoteDescription = function () { return Promise.resolve(); };
+    RTC.prototype.addIceCandidate = function () { return Promise.resolve(); };
+    RTC.prototype.addEventListener = function () {};
+    RTC.prototype.removeEventListener = function () {};
+    RTC.prototype.getStats = function () { return Promise.resolve(typeof Map !== "undefined" ? new Map() : {}); };
+    RTC.prototype.close = function () {};
+    g.RTCPeerConnection = RTC;
+    g.webkitRTCPeerConnection = RTC;
+    function caps(kind) {
+      var list = (kind === "video" ? rtc.videoCodecs : rtc.audioCodecs) || [];
+      return { codecs: list.map(function (m) { return { mimeType: m }; }), headerExtensions: [] };
+    }
+    var Recv = function RTCRtpReceiver() {}; Recv.getCapabilities = caps;
+    var Send = function RTCRtpSender() {}; Send.getCapabilities = caps;
+    g.RTCRtpReceiver = Recv;
+    g.RTCRtpSender = Send;
+  }
+
   function installDocument(g) {
     var sd = __SEED__.document || {};
     var doc = g.document && typeof g.document === "object" ? g.document : {};
@@ -256,6 +350,7 @@ var __SEED__ = __SEED_JSON__;
     g.window = g; g.self = g; g.globalThis = g; g.top = g; g.parent = g; g.frames = g;
 
     try { defprop(g, "navigator", __SEED__.navigator); } catch (e) { try { g.navigator = __SEED__.navigator; } catch (e2) {} }
+    try { installNavigatorPlugins(g.navigator); } catch (e) {}
     try { defprop(g, "screen", __SEED__.screen); } catch (e) { g.screen = __SEED__.screen; }
     g.location = __SEED__.location || {};
 
@@ -275,6 +370,8 @@ var __SEED__ = __SEED_JSON__;
     g.webkitOfflineAudioContext = g.OfflineAudioContext;
     g.AudioContext = makeOnlineAudioCtx();
     g.webkitAudioContext = g.AudioContext;
+
+    installWebRtc(g);
 
     // 让 instanceof / 原型探测不致崩溃(stub 构造器)。
     ["HTMLCanvasElement", "HTMLElement", "Element", "Node", "WebGLRenderingContext", "WebGL2RenderingContext", "CanvasRenderingContext2D"].forEach(function (n) {
