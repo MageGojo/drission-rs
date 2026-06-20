@@ -7,8 +7,8 @@
 //! 设环境变量 `DUMP_PROXY=1` 开【诊断模式】:Proxy 追踪算法实际读取的环境路径(access.json),
 //! 据此额外吐**只含关键字段**的精简补环境 `env.accessed.js`(注意:对抖音强检测会干扰签名)。
 //!
-//! 运行:`cargo run --example douyin_dump_env [-- <短链/视频URL> <数量>]`
-//!      `DUMP_PROXY=1 cargo run --example douyin_dump_env`  # 诊断模式(只吐关键环境)
+//! 运行:`cargo run --example douyin_dump_env --no-default-features --features camoufox [-- <短链/视频URL> <数量>]`
+//!      `DUMP_PROXY=1 cargo run --example douyin_dump_env --no-default-features --features camoufox`  # 诊断模式(只吐关键环境)
 
 use std::collections::{HashSet, VecDeque};
 use std::time::Duration;

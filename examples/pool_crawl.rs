@@ -14,7 +14,7 @@
 //! 注:**健康自愈**(worker 进程死后惰性重建)在真实失败时触发,离线难以确定性复现,故此处不单测,
 //! 仅由 `run` 的重试路径间接覆盖。代理轮换的纯逻辑见 `cargo test --lib pool::`。
 //!
-//! 运行:`cargo run --example pool_crawl`
+//! 运行:`cargo run --example pool_crawl --no-default-features --features camoufox`
 //! 末行打印 `ALL CHECKS PASSED` / `SOME CHECKS FAILED`,关键校验失败则进程非 0 退出。
 
 use std::collections::HashSet;

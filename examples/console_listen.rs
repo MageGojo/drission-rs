@@ -4,7 +4,7 @@
 //! `body()` JSON 解析、级别(warn→warning / error)、`messages()` 批量取、以及 drission 增强的
 //! 级别过滤 `start_with`。全程 `about:blank` + `run_js`,不依赖网络。
 //!
-//! 运行:`cargo run --example console_listen`
+//! 运行:`cargo run --example console_listen --no-default-features --features camoufox`
 //!
 //! 末尾打印 `ALL CHECKS PASSED` / `SOME CHECKS FAILED`,失败则进程非 0 退出。
 

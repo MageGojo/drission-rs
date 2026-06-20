@@ -10,7 +10,7 @@
 //! (红=算法落点、绿=home)验证算法通用性。**目标是缺口找得准 + 通用**,非过顶象(其轨迹/IP 行为
 //! 风控会把对齐正确的拖动也弹回,与缺口算法无关)。
 //!
-//! 运行:`HL=0 cargo run --example dx_slide`(有头);`N=张数`(默认 5)、`NODRAG=1` 只算不拖。
+//! 运行:`HL=0 cargo run --example dx_slide --no-default-features --features slider`(有头);`N=张数`(默认 5)、`NODRAG=1` 只算不拖。
 
 use std::time::Duration;
 

@@ -10,7 +10,7 @@
 //!
 //! 末行打印 ALL CHECKS PASSED(任一关键校验失败则进程非 0 退出)。
 //!
-//! 运行:`cargo run --example dump_env_fingerprint`
+//! 运行:`cargo run --example dump_env_fingerprint --no-default-features --features camoufox`
 
 use drission::prelude::*;
 use serde_json::Value;

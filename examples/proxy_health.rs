@@ -4,7 +4,7 @@
 //! 若设环境变量 `DRISSION_PROXY=socks5://user:pass@host:port`(或 http://...),则额外做一次**真实**
 //! 健康/地理探测并打印报告 + `next_coherent()` 给出的自洽覆盖(socks5 需库以 `socks` 特性编译,已默认开)。
 //!
-//! 运行:`cargo run --example proxy_health`
+//! 运行:`cargo run --example proxy_health --no-default-features --features camoufox`
 //! 末尾打印 `ALL CHECKS PASSED` / `SOME CHECKS FAILED`。
 
 use std::time::Duration;

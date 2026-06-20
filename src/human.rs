@@ -7,10 +7,11 @@
 //!   + 落点微停),产生密集 `mousemove/pointermove`,对冲"轨迹稀疏/机械"类行为风控(如易盾/极验点选)。
 //!
 //! ```no_run
-//! # async fn f(tab: &drission::cdp::ChromiumTab) -> drission::Result<()> {
+//! // 后端无关:任何实现了 `Humanize` 的 tab(CDP `ChromiumTab` / Camoufox `Tab`)都可用。
+//! # async fn f(tab: &(impl drission::prelude::Humanize + Sync)) -> drission::Result<()> {
 //! use drission::prelude::*;
 //! let view = tab.image_view("img.captcha-bg").await?;       // 显示 rect + 自然尺寸 + src
-//! let img = drission::human::fetch_image(&view.src).await?; // 取干净源图(无叠加 UI)
+//! let _img = drission::human::fetch_image(&view.src).await?; // 取干净源图(无叠加 UI)
 //! // …检测/识别得到图内像素点 pts_px: Vec<(u32,u32)> …
 //! # let pts_px: Vec<(u32,u32)> = vec![];
 //! let pts: Vec<(f64,f64)> = pts_px.iter().map(|&p| view.map_u32(p)).collect();
@@ -66,6 +67,14 @@ impl ImageView {
     /// 显示 rect 是否有效(宽 > 1)。
     pub fn is_valid(&self) -> bool {
         self.w > 1.0
+    }
+    /// 把页面坐标点**钳制到本视图显示 rect 内**(`[x, x+w]×[y, y+h]`)。点选用:即便映射/识别有偏差,
+    /// 也**绝不点到图外的叠加控件**(如验证码右上角的刷新/语音工具栏——点到会把验证码切成语音模式)。
+    pub fn clamp_point(&self, p: (f64, f64)) -> (f64, f64) {
+        (
+            p.0.clamp(self.x, self.x + self.w.max(0.0)),
+            p.1.clamp(self.y, self.y + self.h.max(0.0)),
+        )
     }
 }
 
@@ -154,6 +163,12 @@ return JSON.stringify({x:r.x,y:r.y,w:r.width,h:r.height,nw:e.naturalWidth||0,nh:
 pub trait Humanize {
     /// 底层:可信移动 / 按下 / 抬起 / 求值(各后端委托给固有方法)。
     async fn hm_move(&self, x: f64, y: f64) -> Result<()>;
+    /// **不等往返**的密集移动(拟人轨迹用)。默认回退到 `hm_move`(等往返),CDP/Camoufox 覆盖为
+    /// fire 快路径——这是轨迹"时间密度"的关键:等往返会把每点间隔抻到 ~20–40ms(行为风控破绽),
+    /// fire 由 `sleep` 控节奏可达 ~50–100Hz,逼近真人(见里程碑 32/61)。
+    async fn hm_move_fast(&self, x: f64, y: f64) -> Result<()> {
+        self.hm_move(x, y).await
+    }
     async fn hm_down(&self, x: f64, y: f64) -> Result<()>;
     async fn hm_up(&self, x: f64, y: f64) -> Result<()>;
     async fn hm_eval(&self, js: &str) -> Result<Value>;
@@ -202,7 +217,8 @@ pub trait Humanize {
         );
         for &p in points {
             for (x, y, d) in track_between(cur, p, &mut rng, opts) {
-                self.hm_move(x, y).await?;
+                // fire 快路径:不等往返,节奏交给 sleep → 密集采样(轨迹"时间密度"是过行为风控的关键)。
+                self.hm_move_fast(x, y).await?;
                 tokio::time::sleep(Duration::from_millis(d)).await;
             }
             tokio::time::sleep(Duration::from_millis(40 + (rng.f() * 90.0) as u64)).await;
@@ -236,6 +252,9 @@ impl Humanize for crate::browser::Tab {
     async fn hm_move(&self, x: f64, y: f64) -> Result<()> {
         self.mouse_move(x, y).await
     }
+    async fn hm_move_fast(&self, x: f64, y: f64) -> Result<()> {
+        self.mouse_move_fast(x, y)
+    }
     async fn hm_down(&self, x: f64, y: f64) -> Result<()> {
         self.mouse_down(x, y).await
     }
@@ -252,6 +271,9 @@ impl Humanize for crate::browser::Tab {
 impl Humanize for crate::cdp::ChromiumTab {
     async fn hm_move(&self, x: f64, y: f64) -> Result<()> {
         self.mouse_move(x, y).await
+    }
+    async fn hm_move_fast(&self, x: f64, y: f64) -> Result<()> {
+        self.mouse_move_fast(x, y)
     }
     async fn hm_down(&self, x: f64, y: f64) -> Result<()> {
         self.mouse_down(x, y).await
@@ -283,6 +305,23 @@ mod tests {
         assert_eq!(v.scale_y(), 0.5);
         // 图像像素 (200,100) → 页面 (100+100, 200+50)
         assert_eq!(v.map_u32((200, 100)), (200.0, 250.0));
+    }
+
+    #[test]
+    fn clamp_point_keeps_inside_rect() {
+        let v = ImageView {
+            x: 100.0,
+            y: 200.0,
+            w: 320.0,
+            h: 160.0,
+            natural_w: 640.0,
+            natural_h: 320.0,
+            src: String::new(),
+        };
+        // 越界点钳到最近的 rect 边角;rect = [100,420]×[200,360]。
+        assert_eq!(v.clamp_point((90.0, 190.0)), (100.0, 200.0)); // 左上越界 → 左上角
+        assert_eq!(v.clamp_point((999.0, 999.0)), (420.0, 360.0)); // 右下越界 → 右下角
+        assert_eq!(v.clamp_point((250.0, 280.0)), (250.0, 280.0)); // 内部不变
     }
 
     #[test]

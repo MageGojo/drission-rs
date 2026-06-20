@@ -5,12 +5,12 @@
 //! macOS/Linux 也能跑(走各自的 unix 管道实现),输出应一致。
 //!
 //! 运行(默认无头,适合服务器/无桌面环境):
-//!   cargo run --example win_smoke
+//!   cargo run --example win_smoke --no-default-features --features camoufox
 //! 指定网址 / 有头模式:
-//!   cargo run --example win_smoke -- https://example.com head
+//!   cargo run --example win_smoke --no-default-features --features camoufox -- https://example.com head
 //! 看底层日志(含 Camoufox 的 "Juggler listening to the pipe" 就绪行):
-//!   PowerShell:  $env:RUST_LOG="debug"; cargo run --example win_smoke
-//!   CMD:         set RUST_LOG=debug && cargo run --example win_smoke
+//!   PowerShell:  $env:RUST_LOG="debug"; cargo run --example win_smoke --no-default-features --features camoufox
+//!   CMD:         set RUST_LOG=debug && cargo run --example win_smoke --no-default-features --features camoufox
 
 use std::time::Duration;
 

@@ -5,7 +5,7 @@
 //! - **窗口句柄**:`tab.set().window().size(w,h)` 经 `Page.setViewportSize` 设尺寸,读 `innerWidth`
 //!   校验;`max()` 铺满可用屏幕。**注意**:Firefox/Juggler 不支持最小化/全屏/移动主窗口(见库文档)。
 //!
-//! 运行:`cargo run --example intercept_window`
+//! 运行:`cargo run --example intercept_window --no-default-features --features camoufox`
 //!
 //! 末尾打印 `ALL CHECKS PASSED` / `SOME CHECKS FAILED`,关键校验失败则进程非 0 退出。
 

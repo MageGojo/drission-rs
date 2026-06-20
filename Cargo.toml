@@ -1,6 +1,6 @@
 [package]
 name = "drission"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.85"
 authors = ["极数本源 (apizero.cn)"]
@@ -12,7 +12,18 @@ readme = "README.md"
 license-file = "LICENSE"
 keywords = ["captcha", "ddddocr", "anti-detect", "drissionpage", "browser-automation"]
 categories = ["web-programming", "api-bindings", "computer-vision"]
-exclude = ["/dist", "/docs", "/target"]
+# 发布到 crates.io 时排除:构建产物 / 内部文档 / 各类运行测试产物(样本/吐环境/自训脚手架),
+# 这些已在 .gitignore,这里再显式排除(双保险,确保 `cargo publish` 不打包)。
+exclude = [
+    "/dist",
+    "/docs",
+    "/target",
+    "/yidun_samples",
+    "/yidun-train",
+    "/dump-env",
+    "/dump-env-fp",
+    "/douyin-env",
+]
 
 # docs.rs:用全部 feature 构建,确保 ocr / slider / cdp 的 API 在文档站可见
 # (默认 docs.rs 只用 default features → 这些 feature-gated 类型会被隐藏)。
@@ -39,6 +50,9 @@ image = ["dep:image"]
 # 纯算签名运行器:内嵌 QuickJS(rquickjs),把吐出的 env.js 编进单个二进制。后端无关,默认关、按需开。
 signer = ["dep:rquickjs"]
 fontdue = ["dep:fontdue"]
+# Session(HTTP)模式的浏览器 TLS/JA3/JA4 + HTTP2 指纹伪装(wreq + BoringSSL)。默认关,按需开;
+# 因 SessionPage 当前在 camoufox 门下,故 imply camoufox(同 slider)。需 cmake + C 编译器(编 BoringSSL)。
+impersonate = ["camoufox", "dep:wreq", "dep:wreq-util"]
 
 [dependencies]
 async-trait = "0.1.89"
@@ -61,6 +75,10 @@ tokio = { version = "1.52.3", features = ["full"] }
 tokio-tungstenite = "0.29.0"
 tracing = "0.1.44"
 tract-onnx = { version = "0.23.3", optional = true }
+# 浏览器 TLS/JA3/JA4 + HTTP2 指纹 HTTP 客户端(`impersonate` feature 用),reqwest 硬分叉 + BoringSSL。
+wreq = { version = "5", optional = true }
+# wreq 的浏览器模拟档(Chrome/Firefox/Safari/Edge 各版本的 TLS+HTTP2 指纹配方)。
+wreq-util = { version = "2", optional = true }
 zip = "8.6.0"
 
 [dev-dependencies]
@@ -70,7 +88,15 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 # ── 示例 feature 门控 ──────────────────────────────────────────────────────────
 # 默认后端是纯 CDP;用 Camoufox `Browser`/`Page` 的示例必须声明 `required-features=["camoufox"]`,
 # 否则默认 `cargo build --examples` 会因 camoufox 模块未编译而失败。
-# 运行 Camoufox 示例:`cargo run --example quickstart --features camoufox`。
+# 运行各示例(头注释里也都写了对应命令,复制即用):
+#   cdp 示例:          cargo run --example cdp_demo                                   (默认即含 cdp)
+#   Camoufox 系示例:   cargo run --example quickstart --no-default-features --features camoufox
+#   滑块(slider):     cargo run --example geetest_slide --no-default-features --features slider
+#   Camoufox+OCR:      cargo run --example ocr_captcha --no-default-features --features camoufox,ocr
+#   cdp+OCR(点选):    cargo run --example yidun_click --features cdp,ocr
+#   Session TLS 指纹:  cargo run --example session_tls --features impersonate
+# ⚠️ Camoufox 系务必带 `--no-default-features`:默认 cdp 与 camoufox 并存时统一接口按「cdp 优先」解析,
+#    会与 camoufox 示例的类型冲突(编译失败或跑成 cdp 后端)。cdp 系反之(默认即可)。
 
 # Chromium/CDP 后端示例(默认即可)。
 [[example]]
@@ -89,6 +115,11 @@ required-features = ["cdp"]
 # 指纹探针:dump 全面指纹 JSON,有头/无头 diff 出无头破绽(反检测诊断工具)。
 [[example]]
 name = "cdp_fp"
+required-features = ["cdp"]
+
+# 每浏览器不同指纹:CdpFingerprint/CdpFingerprintPool 起 N 个浏览器各套一份指纹,dump 验证各异。
+[[example]]
+name = "cdp_fingerprint"
 required-features = ["cdp"]
 
 # 多任务下载管理 tab.downloads()(CDP 原生下载事件,真机端到端)。
@@ -276,6 +307,11 @@ required-features = ["camoufox"]
 [[example]]
 name = "session_mode"
 required-features = ["camoufox"]
+
+# Session 浏览器 TLS/JA3/JA4 指纹(wreq + BoringSSL),JA3 实测对比自验证。
+[[example]]
+name = "session_tls"
+required-features = ["impersonate"]
 
 [[example]]
 name = "web_page_scrape"

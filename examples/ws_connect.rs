@@ -10,7 +10,7 @@
 //! 4. **接管语义**:首个客户端断开后,远端浏览器仍在 → 可再次 connect 驱动。
 //! 5. 错误 token 应被拒。
 //!
-//! 运行:`cargo run --example ws_connect`
+//! 运行:`cargo run --example ws_connect --no-default-features --features camoufox`
 //! 末行打印 `ALL CHECKS PASSED` / `SOME CHECKS FAILED`,关键校验失败则进程非 0 退出。
 
 use std::time::Duration;

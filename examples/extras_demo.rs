@@ -5,7 +5,7 @@
 //!   导出到磁盘;在**另一个全新标签(独立 BrowserContext)**导航同源后导入,验证 cookie 与
 //!   localStorage 都被还原(= 跨会话复用登录态)。
 //!
-//! 运行:`cargo run --example extras_demo`   末行 ALL CHECKS PASSED / FAILED。
+//! 运行:`cargo run --example extras_demo --no-default-features --features camoufox`   末行 ALL CHECKS PASSED / FAILED。
 
 use drission::prelude::*;
 

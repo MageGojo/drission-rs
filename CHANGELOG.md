@@ -5,10 +5,30 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/),
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased]
+## [0.3.0] - 2026-06-21
 
 ### 新增 Added
 
+- **AI 编程技能文档 `docs/SKILL.md`(AI 必读)**:面向 AI 编程助手的**接口/feature/构建规则权威速查**,覆盖
+  从基础(Page/元素/网络)到**点选验证码点击全流程**的复制即用代码,并明确「Camoufox 系示例必须
+  `--no-default-features --features camoufox`」等铁律与易错点。README(中英)顶部声明:AI 基于本库开发须先遵循该 skill
+  (不支持 skill 机制可忽略)。所有代码片段按真实签名核验(`ClickWord::solve(&[String])`、`tab.human_click(&[(f64,f64)])`、
+  `tab.image_view`/`fetch_image`、`apply_pointer_stealth` 仅 camoufox 等)。
+- **示例运行命令全部修正(复制即用)**:v0.2 默认后端翻为 cdp 后,~45 个 camoufox/slider/ocr 示例头注释的运行命令
+  过时(漏 feature 或漏 `--no-default-features`)。逐个改为正确命令(camoufox 系 `--no-default-features --features camoufox`、
+  滑块 `--features slider`、camoufox+ocr `camoufox,ocr`),并修正 `examples/README.md` 与 `Cargo.toml` 顶部注释;
+  五组 feature 组合全部实测 `cargo build --examples` 通过。
+- **Session 浏览器 TLS / JA3 / JA4 + HTTP2 指纹伪装**(新增可选 `--features impersonate`):给 Session(HTTP)
+  模式套**真实浏览器的 TLS 握手指纹**,让"浏览器过盾 → cookie 灌进 Session → 纯 HTTP 接力"的双模不再被现代
+  WAF(Akamai / Cloudflare / DataDome)凭 Rust 默认 TLS 指纹一眼拦下——这是**网络层的"补环境"**。
+  `SessionOptions::new().profile(BrowserProfile::Chrome)`(另有 `Firefox`/`Safari`/`Edge`;`None`=默认不伪装)。
+  底层基于 `wreq` + `wreq-util`(reqwest 硬分叉 + BoringSSL,内置 100+ 浏览器模拟档),抽象为 enum 后端
+  (纯 reqwest / wreq),**重定向/cookie 循环单写一份**、非破坏。开启 profile 时 UA + 默认头由模拟档驱动(避免与
+  TLS 指纹打架)。**默认关、零成本**(默认构建不引 BoringSSL;`impersonate` imply `camoufox`,需 `cmake` + `nasm`)。
+  示例 `session_tls` 真机自验证:同进程 `None` vs `Chrome` 打 `tls.peet.ws`,**JA3/JA4/Akamai 指纹均改变**
+  (`t13d1011h2…`→`t13d1516h2…`、UA Firefox→Chrome137),ALL CHECKS PASSED。**Windows 支持**:`x86_64-pc-windows-gnu`
+  交叉编译已实测(BoringSSL+mingw+nasm,bindgen 喂 sysroot,产出真 `PE32+ .exe`),封装 `scripts/win-cross-build.sh`;
+  原生 Windows 走 MSVC(VS Build Tools + nasm)或 mingw。设计见 `docs/TLS指纹.md`。
 - **CDP 修饰组合键 / 热键**(`tab.key_combo(&[Keys::CONTROL, "a"])` / `ele.shortcut(...)`):CDP 原生
   `modifiers` 位掩码下发,页面读得到 `e.ctrlKey`/`metaKey` 等为 `true`(真组合键);对常见编辑快捷键
   (Ctrl/Cmd + A/C/X/V/Z/Y)额外带 CDP `commands`(selectAll/copy…),**无头下也真正执行编辑动作**

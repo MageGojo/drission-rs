@@ -6,7 +6,7 @@
 //! - **录像**:`Imgs` 模式后台逐帧存图(动画页→多帧);`FrugalImgs` 省流模式(静态页→去重只剩 1 帧)。
 //!
 //! 全程离线:用写到项目 `target/` 下的本地 HTML(`file://`),不依赖外网。
-//! 运行:`cargo run --example screencast`
+//! 运行:`cargo run --example screencast --no-default-features --features camoufox`
 //!
 //! 末尾打印 `ALL CHECKS PASSED` / `SOME CHECKS FAILED`,关键校验不过则进程非 0 退出。
 

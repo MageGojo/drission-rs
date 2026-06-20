@@ -7,8 +7,8 @@
 //! (日志里出现 `Juggler listening` 但首个命令 `连接已关闭` → 管道被提前关闭)。
 //!
 //! 运行:
-//!   cargo run --example win_diag                 # 默认 https://example.com,先无头后有头
-//!   cargo run --example win_diag -- https://example.com
+//!   cargo run --example win_diag --no-default-features --features camoufox            # 默认 https://example.com,先无头后有头
+//!   cargo run --example win_diag --no-default-features --features camoufox -- https://example.com
 //!   PowerShell 想另看实时日志:`$env:RUST_LOG="camoufox=debug,drission=debug"`(可选)
 //!
 //! 跑完把 `drission_win_diag.json` 发回即可。

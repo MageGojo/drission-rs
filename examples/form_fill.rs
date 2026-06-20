@@ -3,7 +3,7 @@
 //! 覆盖:文本框 `input`、下拉 `select_value`、单选/多选 `click`(真实鼠标)+ `is_checked` 校验、
 //! 文本域 `input`、多步"下一步/提交"按钮点击、读取并校验最终生成的 JSON。
 //!
-//! 运行:`cargo run --example form_fill`(默认 headless;`HL=0 cargo run --example form_fill` 看界面)
+//! 运行:`cargo run --example form_fill --no-default-features --features camoufox`(默认 headless;`HL=0 cargo run --example form_fill --no-default-features --features camoufox` 看界面)
 
 use std::time::Duration;
 

@@ -11,7 +11,7 @@
 //! - 收到二进制 `[1,2,3,4]`
 //! - `sockets()` 含该连接 URL;`stop()` 后不再监听。
 //!
-//! 运行:`cargo run --example ws_listen`
+//! 运行:`cargo run --example ws_listen --no-default-features --features camoufox`
 //! 末行打印 `ALL CHECKS PASSED` / `SOME CHECKS FAILED`,关键校验失败则进程非 0 退出。
 
 use std::time::Duration;

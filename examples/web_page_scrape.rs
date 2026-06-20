@@ -3,7 +3,7 @@
 //! 用**进程内极简 HTTP 服务**(localhost,完全离线)。每个响应带 `Set-Cookie: sid=web123` 并回显收到的
 //! Cookie;`/?page=N` 返回该页表格 + 指向下一页的 `#next`(到第 3 页无 next)。
 //!
-//! 运行:`cargo run --example web_page_scrape`
+//! 运行:`cargo run --example web_page_scrape --no-default-features --features camoufox`
 //! 末尾打印 `ALL CHECKS PASSED` / `SOME CHECKS FAILED`。
 
 use drission::prelude::*;

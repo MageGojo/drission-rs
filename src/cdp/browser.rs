@@ -27,6 +27,9 @@ pub struct ChromiumBrowser {
     headless: bool,
     /// 下载目录(`ChromiumOptions::download_path`):每个新标签 attach 时设下载行为并传给 `CdpCore`。
     download_dir: Option<PathBuf>,
+    /// 导航前注入脚本(`ChromiumOptions::init_scripts`):每个新标签 attach 时按序注入(深指纹伪装等),
+    /// 在内置反检测脚本之后。
+    init_scripts: Vec<String>,
     /// Windows:把 Chrome 绑入 KILL_ON_JOB_CLOSE 的 Job,quit/Drop 时级联杀掉渲染/GPU 等子进程
     /// (`kill_on_drop` 只杀主进程,会留孤儿)。仅自启动时为 `Some`;接管不接管生命周期。
     #[cfg(windows)]
@@ -224,6 +227,7 @@ impl ChromiumBrowser {
             stealth: opts.stealth,
             headless: opts.headless,
             download_dir: opts.download_path.clone(),
+            init_scripts: opts.init_scripts.clone(),
             #[cfg(windows)]
             job: std::sync::Mutex::new(job_guard),
         })
@@ -249,6 +253,7 @@ impl ChromiumBrowser {
             // 接管方未知是否无头,保守不注入屏幕补丁。
             headless: false,
             download_dir: opts.download_path.clone(),
+            init_scripts: opts.init_scripts.clone(),
             // 接管不接管对方生命周期,故不绑 Job。
             #[cfg(windows)]
             job: std::sync::Mutex::new(None),
@@ -409,6 +414,15 @@ impl ChromiumBrowser {
                     )
                     .await;
             }
+        }
+        // 用户/指纹注入脚本(深指纹伪装等):在内置反检测脚本之后按序注入,与反检测兼容。
+        for src in &self.init_scripts {
+            let _ = core
+                .send(
+                    "Page.addScriptToEvaluateOnNewDocument",
+                    json!({ "source": src }),
+                )
+                .await;
         }
         Ok(ChromiumTab::new(core))
     }

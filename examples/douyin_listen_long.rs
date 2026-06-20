@@ -7,7 +7,7 @@
 //! 这里只有 douyin 业务(从 related 取 id、开下一条直链);通用能力(取 query/转 JSON/批量取包)
 //! 都在库里:`packet.query()` / `packet.json()` / `stream.drain_ready()`。
 //!
-//! 运行:`cargo run --example douyin_listen_long [-- <短链/视频URL> <数量>]`
+//! 运行:`cargo run --example douyin_listen_long --no-default-features --features camoufox [-- <短链/视频URL> <数量>]`
 
 use std::collections::{HashSet, VecDeque};
 use std::time::Duration;

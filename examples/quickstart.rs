@@ -6,8 +6,8 @@
 //! 需要更底层(多标签 / 接管 / 并发池)时,仍可用 `Browser` + `Tab`(见其它示例);
 //! 需要 Driver/Session 双模见 `WebPage`,纯 HTTP 见 `SessionPage`。
 //!
-//! 运行:`cargo run --example quickstart`
-//! 调试日志:`RUST_LOG=debug cargo run --example quickstart`
+//! 运行:`cargo run --example quickstart --no-default-features --features camoufox`
+//! 调试日志:`RUST_LOG=debug cargo run --example quickstart --no-default-features --features camoufox`
 
 use drission::prelude::*;
 

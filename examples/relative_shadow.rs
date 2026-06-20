@@ -6,7 +6,7 @@
 //!   `nexts`/`prevs`/`siblings`;
 //! - shadow:`ele.shadow_root()` → `root.ele/eles/html`,以及 shadow 内 `xpath:` 应报错。
 //!
-//! 运行:`cargo run --example relative_shadow`
+//! 运行:`cargo run --example relative_shadow --no-default-features --features camoufox`
 //!
 //! 末尾打印 `ALL CHECKS PASSED` / `SOME CHECKS FAILED`,关键校验失败则进程非 0 退出。
 

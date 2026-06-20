@@ -4,7 +4,7 @@
 //! 对比底层写法:`tab.ele(sel).await?.input(text).await?`(两次 `.await?`)
 //! 捷径写法:    `page.input(sel, text).await?`(一次)。
 //!
-//! 运行:`cargo run --example form_input`
+//! 运行:`cargo run --example form_input --no-default-features --features camoufox`
 
 use drission::prelude::*;
 

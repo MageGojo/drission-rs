@@ -3,7 +3,7 @@
 //!
 //! 产物在 `target/geetest-diag/`:`bg.png` `fullbg.png` `slice.png` `before.png` `after.png`。
 //!
-//! 运行:`cargo run --example geetest_diag`(默认 headless;`HL=0` 看界面)
+//! 运行:`cargo run --example geetest_diag --no-default-features --features camoufox`(默认 headless;`HL=0` 看界面)
 
 use std::path::Path;
 use std::time::Duration;

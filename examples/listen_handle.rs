@@ -6,7 +6,7 @@
 //! 触发用 `fetch('data:...')`:hook 是 JS 层包裹 `fetch`/`XHR`,对 `data:` 同样生效,
 //! 因此本例**完全离线、确定性强**(真实跨域网络抓取见 `douyin_listen_long` 等示例)。
 //!
-//! 运行:`cargo run --example listen_handle`
+//! 运行:`cargo run --example listen_handle --no-default-features --features camoufox`
 //! 末行打印 `ALL CHECKS PASSED` / `SOME CHECKS FAILED`,关键校验失败则进程非 0 退出。
 
 use std::time::Duration;

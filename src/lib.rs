@@ -198,7 +198,7 @@ pub mod prelude {
     #[cfg(any(feature = "camoufox", feature = "cdp"))]
     pub use crate::pool::{Checkpoint, RetryPolicy, RotateStrategy};
     #[cfg(feature = "camoufox")]
-    pub use crate::session::{PostData, SessionOptions, SessionPage};
+    pub use crate::session::{BrowserProfile, PostData, SessionOptions, SessionPage};
     #[cfg(feature = "camoufox")]
     pub use crate::web_page::{PageMode, WebPage};
 

@@ -3,20 +3,31 @@
 > `drission` 自带 48+ 个端到端示例。**带 🔌 的完全离线**(进程内起 HTTP 服务 / `data:` / `file://` 页,
 > 不依赖外网,可直接当集成测试跑);**带 🌐 的需要联网**(访问真实站点)。
 >
-> **默认后端 = Chromium / CDP(Google Chrome)**:`cdp_demo` / `cdp_advanced` 默认即可跑。其余示例多数用
-> **Camoufox** 后端,需 `--features camoufox`(首次运行自动下载 Camoufox 到 `~/.cache/camoufox`,`fetch_browser` 可预热)。
+> **默认后端 = Chromium / CDP(Google Chrome)**:`cdp_demo` / `cdp_advanced` 等 cdp 示例默认即可跑。其余示例多数用
+> **Camoufox** 后端,需 **`--no-default-features --features camoufox`**(首次运行自动下载 Camoufox 到 `~/.cache/camoufox`,`fetch_browser` 可预热)。
 
 **通用运行方式**
 
 ```bash
-cargo run --example cdp_demo                          # 默认 = CDP / Google Chrome,无需 feature
-cargo run --example <名字> --features camoufox        # Camoufox 系示例(下表绝大多数)
-cargo run --example <名字> --features camoufox,ocr    # 再叠加 ocr / slider / signer 等
+# cdp 示例:默认即含 cdp,无需 feature
+cargo run --example cdp_demo
+# Camoufox 系示例(下表绝大多数):务必关掉默认 cdp,只开 camoufox
+cargo run --example <名字> --no-default-features --features camoufox
+# 滑块(slider 自带 camoufox)/ 再叠加 ocr
+cargo run --example <名字> --no-default-features --features slider
+cargo run --example <名字> --no-default-features --features camoufox,ocr
+# Session TLS 指纹 / 纯算签名(后端无关,可直接叠加)
+cargo run --example session_tls --features impersonate
+cargo build  --example env_signer --features signer
 ```
 
-`需要` 列:`· camoufox/ocr/slider/signer/cdp` 表示必须加对应 `--features`(`slider` 会自动带入 `camoufox`);`🔌` 离线 / `🌐` 联网。
+> ⚠️ **为什么 Camoufox 系示例要 `--no-default-features`**:默认 `cdp` 与 `camoufox` 同时开启时,统一接口(`Browser`/`Tab`/`Page`…)
+> 按「**cdp 优先**」解析,会与 Camoufox 示例期望的类型冲突(轻则跑成 cdp 后端、重则编译报错)。关掉默认 cdp、只留 camoufox,
+> 示例才会用 Camoufox 后端并正确编译。cdp 示例反之(默认即可)。
 
-## 大道至简:`Page` 一行起步(对标 DrissionPage `ChromiumPage`,需 `--features camoufox`)
+`需要` 列:`· camoufox/ocr/slider/signer/cdp` 表示必须加对应 `--features`(camoufox 系记得配 `--no-default-features`;`slider` 会自动带入 `camoufox`);`🔌` 离线 / `🌐` 联网。
+
+## 大道至简:`Page` 一行起步(对标 DrissionPage `ChromiumPage`,需 `--no-default-features --features camoufox`)
 
 日常脚本推荐用 `Page` 门面——开浏览器 + 驱动当前标签合一,像写 Python:
 

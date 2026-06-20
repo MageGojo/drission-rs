@@ -1,7 +1,7 @@
 //! 抗检测基本面验证:`navigator.webdriver` 应为 false,并到 bot.sannysoft.com
 //! 统计 passed/failed 数量。Camoufox 专为反指纹检测设计,headless 也被打补丁伪装。
 //!
-//! 运行:`cargo run --example anti_detect`
+//! 运行:`cargo run --example anti_detect --no-default-features --features camoufox`
 
 use drission::prelude::*;
 

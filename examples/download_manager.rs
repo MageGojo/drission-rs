@@ -3,7 +3,7 @@
 //! 本地 `file://` 页放两个 `<a download href="data:...">`,点击触发**两次下载**;用下载句柄收集、
 //! 等待完成、读任务列表、自定义重命名、读已下载字节数。
 //!
-//! 运行:`cargo run --example download_manager`
+//! 运行:`cargo run --example download_manager --no-default-features --features camoufox`
 //!
 //! 末尾打印 `ALL CHECKS PASSED` / `SOME CHECKS FAILED`,关键校验失败则进程非 0 退出。
 

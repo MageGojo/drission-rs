@@ -414,6 +414,13 @@ fn box_iou(a: &BBox, b: &BBox) -> f32 {
     inter / (aa + ab - inter)
 }
 
+/// 框**中心**是否落在矩形 `region`(原图像素,用 [`BBox`] 表示边界)内。
+/// 用于 [`ClickWord::solve_excluding`] 排除工具栏等非文字区域的检测框。
+fn box_center_in(b: &BBox, region: &BBox) -> bool {
+    let (cx, cy) = b.center();
+    cx >= region.x1 && cx <= region.x2 && cy >= region.y1 && cy <= region.y2
+}
+
 async fn ensure_det_model() -> Result<PathBuf> {
     if let Ok(p) = std::env::var("DRISSION_DET_MODEL") {
         let p = PathBuf::from(p);
@@ -581,6 +588,19 @@ impl ClickWord {
     /// argmax 易误判)。`affinity` 让调用方可设阈值:置信度过低就**换图重试**而非乱点。框不足时只返回
     /// 已分到框的目标(`hits.len() < targets.len()`)。
     pub fn solve(&self, image: &[u8], targets: &[String]) -> Result<Vec<ClickHit>> {
+        self.solve_excluding(image, targets, &[])
+    }
+
+    /// 同 [`solve`](Self::solve),但**先丢弃中心落在 `exclude` 任一矩形(原图像素)内的检测框**,
+    /// 再做识别 / 全局指派。用于排除验证码图上的**非文字干扰区**——典型如易盾弹窗右上角的
+    /// 刷新 / 语音 / 反馈工具栏:截图回退路径会把这些图标拍进图里,Det 易把它们误检成字框,
+    /// 一旦被指派点击就会把验证码**切成语音模式**(用户实测踩坑)。`exclude` 为空时等价于 `solve`。
+    pub fn solve_excluding(
+        &self,
+        image: &[u8],
+        targets: &[String],
+        exclude: &[BBox],
+    ) -> Result<Vec<ClickHit>> {
         let chars: Vec<char> = targets
             .iter()
             .filter_map(|s| s.trim().chars().next())
@@ -590,7 +610,13 @@ impl ClickWord {
         }
         let img = image::load_from_memory(image).map_err(terr)?;
         let (iw, ih) = (img.width(), img.height());
-        let boxes = self.det.detect(image)?;
+        // 丢弃中心落在排除区(工具栏带等)内的检测框 —— 从源头杜绝"点到语音/刷新开关"。
+        let boxes: Vec<BBox> = self
+            .det
+            .detect(image)?
+            .into_iter()
+            .filter(|b| !exclude.iter().any(|r| box_center_in(b, r)))
+            .collect();
         let mut aff: Vec<Vec<f32>> = Vec::with_capacity(boxes.len());
         let mut tpl: Vec<Vec<f32>> = Vec::with_capacity(boxes.len());
         for b in &boxes {
@@ -1214,6 +1240,21 @@ mod tests {
         // 同字不复用:两个 "体" 目标但只有一个框 → 只点一次。
         let targets3 = vec!["体".to_string(), "体".to_string()];
         assert_eq!(match_order(&items, &targets3), vec![(100, 100)]);
+    }
+
+    #[test]
+    fn box_center_in_excludes_toolbar_corner() {
+        // 右上角工具栏带:x∈[200,320]、y∈[0,40](原图像素)。
+        let band = BBox {
+            x1: 200,
+            y1: 0,
+            x2: 320,
+            y2: 40,
+            score: 0.0,
+        };
+        assert!(box_center_in(&bb(260, 20), &band)); // 工具栏图标(角内)→ 丢弃
+        assert!(!box_center_in(&bb(100, 90), &band)); // 图中部文字 → 保留
+        assert!(!box_center_in(&bb(260, 120), &band)); // 同列但在下方文字 → 保留
     }
 
     #[test]

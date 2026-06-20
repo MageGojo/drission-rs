@@ -1,7 +1,7 @@
 //! GeeTest **诊断探针**:不为过验证码,只为"取证"——看极验从我们 `tab.mouse_*` 的拖拽里
 //! 到底收到了哪些事件、关键属性长啥样,以此定位本库还缺什么(指针事件?movementX?screenX?)。
 //!
-//! 运行:`HL=0 cargo run --example geetest_probe`
+//! 运行:`HL=0 cargo run --example geetest_probe --no-default-features --features camoufox`
 
 use std::time::Duration;
 

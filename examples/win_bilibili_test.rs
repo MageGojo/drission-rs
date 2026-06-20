@@ -5,7 +5,9 @@
 //! 逻辑同 `examples/bilibili_listen_long.rs`,额外**把结果落盘成 JSON**(`drission_win_test_result.json`)
 //! 作为可核对的数据产物——跑完把这个文件发回即可判定是否成功。
 //!
-//! 运行:`win_bilibili_test.exe [视频URL] [数量]`(默认抓 3 个分集)
+//! 运行(原生 Windows 构建,或用 scripts/win-cross-build.sh 交叉后在 Win 上跑 .exe):
+//!   `cargo run --example win_bilibili_test --no-default-features --features camoufox` /  `win_bilibili_test.exe [视频URL] [数量]`
+//!   (默认抓 3 个分集)
 //!   PowerShell 看详细日志:`$env:RUST_LOG="debug"; .\win_bilibili_test.exe`
 
 use std::collections::HashSet;

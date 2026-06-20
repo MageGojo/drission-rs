@@ -4,7 +4,7 @@
 //! 实际拿到的就是我们伪造的 JSON,请求并不会真正发往服务器。
 //! 只拦截匹配 `"/api/"` 的请求,其余请求由库自动放行,页面照常加载。
 //!
-//! 运行:`cargo run --example intercept`
+//! 运行:`cargo run --example intercept --no-default-features --features camoufox`
 
 use std::time::Duration;
 

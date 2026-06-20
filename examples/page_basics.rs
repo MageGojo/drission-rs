@@ -5,7 +5,7 @@
 //! - **C** 句柄对象 `tab.wait.*` / `tab.scroll.*` / `tab.set.*`。
 //! - **D** 截图 `get_screenshot` + 页面尺寸 `size`/`page_size`/`rect`。
 //!
-//! 运行:`cargo run --example page_basics`
+//! 运行:`cargo run --example page_basics --no-default-features --features camoufox`
 //!
 //! 末尾会打印一行 `ALL CHECKS PASSED` / `SOME CHECKS FAILED`,关键校验不通过则进程以非 0 退出。
 

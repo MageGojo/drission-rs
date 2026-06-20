@@ -1,9 +1,9 @@
 //! 动作链 `tab.actions()` 端到端演示:**拖放**(移到源 → 按住 → 拖到目标 → 释放)。
 //!
 //! 用本地拖放页(指针式:mousedown 跟随 mousemove 移动方块,mouseup 判断是否落入目标框),
-//! 全程离线、确定性强。`HL=0 cargo run --example actions_drag` 可开窗口观看。
+//! 全程离线、确定性强。`HL=0 cargo run --example actions_drag --no-default-features --features camoufox` 可开窗口观看。
 //!
-//! 运行:`cargo run --example actions_drag`(默认 headless;`HL=0` 看界面)
+//! 运行:`cargo run --example actions_drag --no-default-features --features camoufox`(默认 headless;`HL=0` 看界面)
 //! 末行打印 `ALL CHECKS PASSED` / `SOME CHECKS FAILED`。
 
 use std::time::Duration;

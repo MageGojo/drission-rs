@@ -32,6 +32,10 @@ use crate::browser::{Cookie, CookieParam, StaticElement, Tab};
 use crate::launcher::Proxy;
 use crate::{Error, Result};
 
+mod http;
+use http::{HttpBackend, RawResponse};
+pub use http::BrowserProfile;
+
 /// 默认 UA(真实 Firefox;与 Driver 侧去 Camoufox 令牌后的形态一致)。
 const DEFAULT_UA: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0";
@@ -47,6 +51,9 @@ pub struct SessionOptions {
     pub ignore_https_errors: bool,
     /// 最大重定向跟随次数。
     pub max_redirects: usize,
+    /// 浏览器 TLS / JA3 / JA4 + HTTP2 指纹档(默认 [`BrowserProfile::None`] = 不伪装)。
+    /// 设为某浏览器家族需开 `--features impersonate` 才实际生效(否则 `warn` 回退纯 reqwest)。
+    pub profile: BrowserProfile,
 }
 
 impl Default for SessionOptions {
@@ -58,6 +65,7 @@ impl Default for SessionOptions {
             timeout: Duration::from_secs(30),
             ignore_https_errors: false,
             max_redirects: 10,
+            profile: BrowserProfile::None,
         }
     }
 }
@@ -90,6 +98,16 @@ impl SessionOptions {
         self.max_redirects = n;
         self
     }
+    /// 设置浏览器 TLS / JA3 / JA4 + HTTP2 指纹档(需 `--features impersonate` 生效)。
+    ///
+    /// ```
+    /// use drission::prelude::{SessionOptions, BrowserProfile};
+    /// let _ = SessionOptions::new().profile(BrowserProfile::Chrome);
+    /// ```
+    pub fn profile(mut self, profile: BrowserProfile) -> Self {
+        self.profile = profile;
+        self
+    }
 }
 
 /// POST 请求体。
@@ -104,7 +122,9 @@ pub enum PostData {
 
 /// 一个 HTTP 会话页(对标 DP `SessionPage`)。保存最近一次响应,并自管理 cookie。
 pub struct SessionPage {
-    client: reqwest::Client,
+    backend: HttpBackend,
+    /// 用户额外请求头(每个请求都附加;UA 由 plain 后端的 client 或 impersonate 模拟档提供)。
+    extra_headers: Vec<(String, String)>,
     jar: CookieJar,
     max_redirects: usize,
     last_url: String,
@@ -120,35 +140,15 @@ impl SessionPage {
     }
 
     /// 用指定选项创建。
+    ///
+    /// `opts.profile` 选了浏览器家族 + 开了 `impersonate` feature → 用 `wreq` 浏览器 TLS 指纹后端;
+    /// 否则用纯 `reqwest`(默认行为)。用户额外头每请求附加;重定向由本模块逐跳处理(带 cookie)。
     pub fn new(opts: SessionOptions) -> Result<Self> {
-        let mut default_headers = reqwest::header::HeaderMap::new();
-        for (k, v) in &opts.headers {
-            if let (Ok(name), Ok(val)) = (
-                reqwest::header::HeaderName::from_bytes(k.as_bytes()),
-                reqwest::header::HeaderValue::from_str(v),
-            ) {
-                default_headers.insert(name, val);
-            }
-        }
-        // 重定向自己处理(为了每跳都应用/抓取 cookie),故关掉 reqwest 内置跟随。
-        let mut builder = reqwest::Client::builder()
-            .user_agent(opts.user_agent.clone())
-            .timeout(opts.timeout)
-            .redirect(reqwest::redirect::Policy::none())
-            .default_headers(default_headers);
-        if opts.ignore_https_errors {
-            builder = builder.danger_accept_invalid_certs(true);
-        }
-        if let Some(p) = &opts.proxy {
-            let mut pr = reqwest::Proxy::all(&p.server)?;
-            if let (Some(u), Some(pw)) = (&p.username, &p.password) {
-                pr = pr.basic_auth(u, pw);
-            }
-            builder = builder.proxy(pr);
-        }
-        let client = builder.build()?;
+        let extra_headers = opts.headers.clone();
+        let backend = HttpBackend::build(&opts)?;
         Ok(Self {
-            client,
+            backend,
+            extra_headers,
             jar: CookieJar::default(),
             max_redirects: opts.max_redirects,
             last_url: String::new(),
@@ -160,96 +160,85 @@ impl SessionPage {
 
     /// GET 请求。成功(2xx)返回 `true`。
     pub async fn get(&mut self, url: &str) -> Result<bool> {
-        self.request(reqwest::Method::GET, url, None).await
+        self.request("GET", url, None).await
     }
 
     /// POST 请求(表单/JSON/原始体)。成功(2xx)返回 `true`。
     pub async fn post(&mut self, url: &str, data: PostData) -> Result<bool> {
-        self.request(reqwest::Method::POST, url, Some(data)).await
+        self.request("POST", url, Some(data)).await
     }
 
     /// 发请求并手动跟随重定向(每跳都带上匹配 cookie、抓取 Set-Cookie)。
-    async fn request(
-        &mut self,
-        method: reqwest::Method,
-        url: &str,
-        body: Option<PostData>,
-    ) -> Result<bool> {
+    ///
+    /// 后端无关:把"请求头列表 + 可选体"交给 [`HttpBackend::send_once`],拿回 [`RawResponse`]
+    /// 再走 cookie / 重定向逻辑——纯 reqwest 与 wreq 指纹后端共用这一条循环。
+    async fn request(&mut self, method: &str, url: &str, body: Option<PostData>) -> Result<bool> {
         let mut current =
             reqwest::Url::parse(url).map_err(|e| Error::Other(format!("非法 URL {url}: {e}")))?;
-        let mut method = method;
-        let mut body = body;
+        let mut method = method.to_string();
+        // 体预处理一次:(正文, 可选 Content-Type)。
+        let mut body: Option<(String, Option<String>)> = match body {
+            Some(PostData::Form(f)) => Some((
+                form_encode(&f),
+                Some("application/x-www-form-urlencoded".to_string()),
+            )),
+            Some(PostData::Json(j)) => Some((serde_json::to_string(&j)?, Some("application/json".to_string()))),
+            Some(PostData::Raw(s, ct)) => Some((s, ct)),
+            None => None,
+        };
         let mut hops = 0usize;
 
         loop {
-            let mut req = self.client.request(method.clone(), current.clone());
+            // 每跳构造请求头:用户额外头 + cookie + Content-Type。
+            let mut headers = self.extra_headers.clone();
             if let Some(cookie) = self.jar.header_for(&current) {
-                req = req.header(reqwest::header::COOKIE, cookie);
+                headers.push(("Cookie".to_string(), cookie));
             }
-            if let Some(b) = &body {
-                req = match b {
-                    PostData::Form(f) => req
-                        .header(
-                            reqwest::header::CONTENT_TYPE,
-                            "application/x-www-form-urlencoded",
-                        )
-                        .body(form_encode(f)),
-                    PostData::Json(j) => req.json(j),
-                    PostData::Raw(s, ct) => {
-                        let mut r = req.body(s.clone());
-                        if let Some(c) = ct {
-                            r = r.header(reqwest::header::CONTENT_TYPE, c.clone());
-                        }
-                        r
-                    }
-                };
+            if let Some((_, Some(ct))) = &body {
+                headers.push(("Content-Type".to_string(), ct.clone()));
             }
+            let body_str = body.as_ref().map(|(b, _)| b.as_str());
 
-            let resp = req.send().await?;
-            let status = resp.status();
+            let resp: RawResponse = self
+                .backend
+                .send_once(&method, current.as_str(), &headers, body_str)
+                .await?;
 
             // 收下本跳的 Set-Cookie(供后续跳与导出浏览器使用)。
-            for hv in resp.headers().get_all(reqwest::header::SET_COOKIE).iter() {
-                if let Ok(s) = hv.to_str() {
-                    self.jar.store(s, &current);
+            for (k, v) in &resp.headers {
+                if k.eq_ignore_ascii_case("set-cookie") {
+                    self.jar.store(v, &current);
                 }
             }
 
             // 重定向:解析 Location,继续下一跳。
-            if status.is_redirection()
+            let code = resp.status;
+            if (300..=399).contains(&code)
                 && hops < self.max_redirects
                 && let Some(loc) = resp
-                    .headers()
-                    .get(reqwest::header::LOCATION)
-                    .and_then(|v| v.to_str().ok())
+                    .headers
+                    .iter()
+                    .find(|(k, _)| k.eq_ignore_ascii_case("location"))
+                    .map(|(_, v)| v.clone())
             {
                 let next = current
-                    .join(loc)
+                    .join(&loc)
                     .map_err(|e| Error::Other(format!("非法重定向 Location {loc}: {e}")))?;
                 hops += 1;
                 current = next;
                 // 301/302/303 → 改 GET 丢体;307/308 保持方法与体。
-                let code = status.as_u16();
                 if code != 307 && code != 308 {
-                    method = reqwest::Method::GET;
+                    method = "GET".to_string();
                     body = None;
                 }
                 continue;
             }
 
-            self.last_status = status.as_u16();
+            self.last_status = code;
             self.last_url = current.to_string();
-            self.last_headers = resp
-                .headers()
-                .iter()
-                .filter_map(|(k, v)| {
-                    v.to_str()
-                        .ok()
-                        .map(|s| (k.as_str().to_string(), s.to_string()))
-                })
-                .collect();
-            self.last_body = resp.text().await.unwrap_or_default();
-            return Ok(status.is_success());
+            self.last_headers = resp.headers;
+            self.last_body = resp.body;
+            return Ok((200..=299).contains(&code));
         }
     }
 

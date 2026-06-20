@@ -4,7 +4,7 @@
 //! 目标:apizero 登录页的 4 位字母数字验证码。逐张换图识别打印(不登录,只验证识别)。
 //! **首次运行会下载 ~54MB 模型**到缓存(之后复用;`DRISSION_OCR_MODEL=本地.onnx` 可跳过)。
 //!
-//! 运行:`HL=0 N=8 cargo run --example ocr_captcha --features ocr`
+//! 运行:`HL=0 N=8 cargo run --example ocr_captcha --no-default-features --features camoufox,ocr`
 
 use std::time::Duration;
 

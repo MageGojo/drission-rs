@@ -66,7 +66,7 @@ let win = download_chrome_for("win64", "Stable").await?;
 
 // 3) ChromiumBrowser 便捷:
 let exe = ChromiumBrowser::download_chrome().await?;   // = ensure_chrome
-let browser = ChromiumBrowser::launch(true).await?;    // 找不到系统 Chrome 会自动下载
+let browser = ChromiumBrowser::launch(ChromiumOptions::new().headless(true)).await?; // 找不到系统 Chrome 会自动下载
 ```
 
 ### 解析优先级(`ensure_chrome`)
@@ -76,5 +76,5 @@ let browser = ChromiumBrowser::launch(true).await?;    // 找不到系统 Chrome
 3. 缓存 `~/.cache/drission/chrome/<platform>` 中已下载的 CfT;
 4. 从 Chrome for Testing 下载当前平台最新 Stable。
 
-> `launch(headless)` 现改为:先 `ensure_chrome()`(定位或下载)再启动 —— 默认开箱即用;
+> `launch(opts)` / `launch_default()` 先 `ensure_chrome()`(定位或下载)再启动 —— 默认开箱即用;
 > 只想定位、不想触发下载用 `find_chrome()`(仅 `locate`,不下载)。

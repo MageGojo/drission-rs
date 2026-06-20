@@ -1,6 +1,6 @@
 //! 元素几何/状态/属性 + 元素级 wait + 键盘(组合键/序列输入)端到端自验证(完全离线)。
 //!
-//! 运行:`cargo run --example ele_extras`
+//! 运行:`cargo run --example ele_extras --no-default-features --features camoufox`
 //! 末尾打印 `ALL CHECKS PASSED` / `SOME CHECKS FAILED`,关键校验失败则进程非 0 退出。
 
 use std::time::Duration;

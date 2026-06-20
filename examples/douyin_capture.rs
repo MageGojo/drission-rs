@@ -4,7 +4,7 @@
 //! 为什么要这样:a_bogus 是每个视频【现算】的签名(绑定 query+UA+cookie),不能拿别的视频的旧值套;
 //! 所以先用浏览器把目标视频的签名请求和同会话 cookie/UA 一起抓出来,才能脱浏览器复现。
 //!
-//! 运行:`cargo run --example douyin_capture -- "https://www.douyin.com/video/<aweme_id>"`
+//! 运行:`cargo run --example douyin_capture --no-default-features --features camoufox -- "https://www.douyin.com/video/<aweme_id>"`
 
 use std::time::{Duration, Instant};
 

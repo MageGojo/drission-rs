@@ -9,7 +9,7 @@
 //! - browserleaks.com   :WebGL/Canvas 取真值 + WebRTC 无 IP 泄漏
 //! - nowsecure.nl       :Cloudflare 盾(过 = 真实页)
 //!
-//! 运行:`cargo run --example stealth_check`(默认 headless;`HL=0` 看界面)
+//! 运行:`cargo run --example stealth_check --no-default-features --features camoufox`(默认 headless;`HL=0` 看界面)
 
 use std::time::Duration;
 

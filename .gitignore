@@ -15,6 +15,10 @@
 /yidun_*.png
 # 易盾点选样本采集产物(自训模型用的图片/CSV,体积大且属运行产物,不入库)
 /yidun_samples/
+# 自训模型脚手架(dddd_trainer 克隆 + venv + 标注工具/数据,纯开发产物,不入库)
+/yidun-train/
+# 录像 / 采集导出等运行产物(示例本应写 target/;根目录兜底)
+/*.mp4
 # 吐环境运行产物(含真实 cookie/webid/指纹 等,不入库)
 /dump-env/
 /dump-env-fp/

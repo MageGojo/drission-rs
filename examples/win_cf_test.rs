@@ -4,7 +4,9 @@
 //!
 //! 逻辑同 `examples/cf_check.rs`,额外把结果落盘成 JSON(`drission_win_test_result.json`)。
 //!
-//! 运行:`win_cf_test.exe [URL]`(默认 scrapingcourse 的 cloudflare-challenge 页)
+//! 运行(原生 Windows 构建,或用 scripts/win-cross-build.sh 交叉后在 Win 上跑 .exe):
+//!   `cargo run --example win_cf_test --no-default-features --features camoufox`  /  `win_cf_test.exe [URL]`
+//!   (默认 scrapingcourse 的 cloudflare-challenge 页)
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 

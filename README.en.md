@@ -22,6 +22,11 @@ distance / anti-detect browser / high-concurrency crawling*, this is it.
 > offline captcha solving (ddddocr OCR + image slider-gap distance), and switches to the Camoufox / Firefox anti-detect engine
 > with one flag** — no external solver, no network round-trip; a rare "**Rust DrissionPage**" with batteries-included captcha solving.
 
+> 🤖 **For AI coding assistants**: if you are an AI writing code **with this library**, read and strictly follow
+> [**`docs/SKILL.md`**](docs/SKILL.md) first — the authoritative cheat-sheet for this library's API / features / build rules,
+> covering everything from basics to **click-word captcha clicking**, so your code compiles and runs on the first try.
+> If your environment doesn't support the "skill" mechanism, you may ignore this mandate, but using it is strongly recommended.
+
 ---
 
 ## 📖 What is drission?
@@ -38,17 +43,17 @@ A single `tokio` async API gives you, at once:
 
 ---
 
-## 🆕 New in v0.2.0
+## 🆕 New in v0.3.0
 
-> Full history in [CHANGELOG.md](CHANGELOG.md). This release **switches the default backend to Google Chrome (CDP)** and adds stable Windows support.
+> Full history in [CHANGELOG.md](CHANGELOG.md). This release brings **full dual-protocol API parity**, Session TLS fingerprinting, per-browser fingerprints, and an AI coding skill doc.
 
-- **Drives Google Chrome (CDP) by default** — breaking change: `default = ["cdp"]`, out-of-the-box drive / attach to **Chrome / Edge / Brave / Chromium / Electron**. The Camoufox / Firefox anti-detect engine and all its high-level capabilities (`Page` / `WebPage` / `SessionPage` / pool / env-dump / shield bypass / slider…) are now enabled with **`--features camoufox`**.
-- **Stable Windows support + smart Chrome path detection (mirroring DrissionPage's `get_chrome_path`)**: `CHROME_BIN` / `DRISSION_CHROME` env vars → common install paths (Windows covers **user-level** `%LOCALAPPDATA%` and system-level `%PROGRAMFILES%` family) → **Windows registry** `App Paths\chrome.exe` (HKCU first, then HKLM) → `PATH` scan; always **prefers Google Chrome**, fixing detection for non-admin user installs / non-default drives.
-- **CDP launch helpers**: `ChromiumBrowser::launch_with(path, headless)` (specify the executable), `ChromiumBrowser::find_chrome()` and `cdp::chrome_path()` (diagnose "why was no browser found").
-- **`Page` one-liner facade** (Camoufox; mirrors DP `ChromiumPage`): `Page::new()` / `headless()` / `connect()`, owning all `Tab` methods via `Deref`; `tab.click/input/exists` shortcuts.
-- **Backend-agnostic shared modules**: `crate::keys` (`Keys` / `KeyInput`), `crate::net` (`DataPacket` / `ListenFilter` / `ResumeOptions`…), reused by both backends and always compiled.
+- **CDP backend at full parity with Camoufox (same code, swap a feature to switch backend)**: adds iframe / Shadow DOM / action chains / console & WebSocket listening / screenshot & screencast / upload / dialogs / **env-dump `dump_env`** / **concurrency pool `ChromiumPool`** / **modifier hotkeys** (headless really executes Ctrl+A/C/V edit commands) / **Windows process-tree cleanup (Job Object)**.
+- **Session browser TLS / JA3 / JA4 + HTTP2 fingerprint (`--features impersonate`)**: wear a **real browser handshake fingerprint** on the pure-HTTP dual mode (`wreq` + BoringSSL, `BrowserProfile::Chrome/Firefox/Safari/Edge`), so "pass the shield in the browser → continue over HTTP" isn't blocked by modern WAFs (Akamai / CF / DataDome) on the TLS fingerprint; Windows (incl. mingw cross-compile) verified to produce a real `.exe`.
+- **Per-browser fingerprints `CdpFingerprint` / `CdpFingerprintPool`** (mirroring Camoufox's fingerprint pool): spin up N browsers each wearing a **coherent fingerprint** (UA / platform / languages / timezone / screen / hardware / WebGL / canvas·audio noise); same-OS variants stay authentic (Turnstile-friendly), cross-OS personas fully spoof.
+- **🤖 AI coding skill [`docs/SKILL.md`](docs/SKILL.md) (AI must-read)**: an authoritative cheat-sheet for this library's API / features / build rules, from basics to **click-word captcha clicking**; the README top declares "AI developing with this library must follow this skill".
+- **All examples are copy-runnable**: after the default backend flipped to cdp, fixed ~45 Camoufox / slider / ocr example header run-commands (Camoufox-family needs `--no-default-features --features camoufox`).
 
-> Earlier `0.1.x` capabilities (CDP backend, Session / `WebPage` dual mode, data export, proxy-pool health, pure-script signing runner, Cloudflare bypass, Dingxiang gap algorithm, login-state persistence, Shadow DOM, download manager, CI infra) — see [CHANGELOG.md](CHANGELOG.md).
+> Earlier `0.1.x` / `0.2.x` capabilities (default CDP / Google Chrome drive & auto-download, stable Windows + Chrome path detection, captcha OCR, image slider, **click-word captcha real bypass**, Session / `WebPage` dual mode, pure-script signing runner, Cloudflare bypass, proxy-pool health, login-state persistence, Shadow DOM, download manager) — see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -117,7 +122,7 @@ println!("move {:.0}px, confidence {:.2}", gap.displace, gap.confidence);
   WebSocket frame listening, console listening.
 - **Multi-tab & high concurrency**: per-tab cookie isolation, `BrowserPool` (proxy / fingerprint rotation + retry +
   **resumable crawling from checkpoint**).
-- **Driver + Session dual mode**: browser and pure-HTTP session modes with two-way cookie sharing (memory-friendly).
+- **Driver + Session dual mode**: browser and pure-HTTP session modes with two-way cookie sharing (memory-friendly); Session can optionally wear a **browser TLS / JA3 / JA4 + HTTP2 fingerprint via `--features impersonate`** (`wreq` + BoringSSL), so "pass the shield in the browser → continue over HTTP" isn't blocked by modern WAFs on the TLS fingerprint.
 - **Screenshots & recording**: element / full-page / region screenshots, viewport recording muxed to mp4.
 - **Environment dumping ("env restore")**: collect real canvas / webgl / audio fingerprints + signature-sink
   location, export a `node`-runnable env-restore project in one click; with `signer`, compile it into a no-Node single binary.
@@ -148,10 +153,10 @@ println!("move {:.0}px, confidence {:.2}", gap.displace, gap.confidence);
 
 ```toml
 [dependencies]
-drission = "0.2"                                           # default = Chromium / CDP (Google Chrome)
+drission = "0.3"                                           # default = Chromium / CDP (Google Chrome)
 
 # Want the Camoufox anti-detect engine + all high-level capabilities? enable camoufox:
-# drission = { version = "0.2", features = ["camoufox", "ocr", "slider", "signer"] }
+# drission = { version = "0.3", features = ["camoufox", "ocr", "slider", "signer", "impersonate"] }
 ```
 
 | feature | capability | deps | default |
@@ -161,6 +166,7 @@ drission = "0.2"                                           # default = Chromium 
 | `ocr` | character captcha recognition (ddddocr + tract) | `image` + `tract-onnx` | off |
 | `slider` | image slider-gap recognition (GeeTest / Dingxiang) | pure JS + std, pulls in `camoufox` | off |
 | `signer` | pure-script signing runner (embedded QuickJS, no Node) | `rquickjs` | off |
+| `impersonate` | **Session browser TLS / JA3 / JA4 + HTTP2 fingerprint** (dual-mode WAF bypass) | `wreq` + BoringSSL (needs `cmake`+`nasm`; Windows see below), pulls in `camoufox` | off |
 
 ---
 
@@ -175,8 +181,8 @@ use drission::prelude::*;
 async fn main() -> drission::Result<()> {
     // Auto-locate Google Chrome (CHROME_BIN/DRISSION_CHROME → install paths → Windows registry → PATH).
     // To pin a browser: ChromiumBrowser::launch_with("C:\\...\\chrome.exe", true)
-    let browser = ChromiumBrowser::launch(true).await?;     // headless
-    let tab = browser.new_tab("https://example.com").await?;
+    let browser = ChromiumBrowser::launch(ChromiumOptions::new().headless(true)).await?; // headless; for headed use launch_default()
+    let tab = browser.new_tab(Some("https://example.com")).await?;
 
     println!("title = {:?}", tab.title().await?);
     println!("h1    = {:?}", tab.ele_text("h1").await?);
@@ -257,6 +263,7 @@ A: macOS (primary) · Linux · Windows (named-pipe transport working); Rust ≥ 
 
 ## 📚 Documentation
 
+- [🤖 **Coding SKILL (AI must-read)**](docs/SKILL.md) — authoritative API / feature / build cheat-sheet, basics → click-word captcha, copy-correct
 - [Docs overview `docs/`](docs/) — design · API mapping · pool · long-listen
 - [**DrissionPage → drission API mapping**](docs/API映射.md) — migrate from DP by swapping Python for Rust, near-zero cost
 - [Design doc](docs/设计.md) — layered architecture / Juggler / concurrency model / wiring

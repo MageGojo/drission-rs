@@ -2,7 +2,7 @@
 //!
 //! 能否过盾取决于目标站点的 CF 配置与本机网络;Camoufox 默认硬化 + `humanize` +
 //! 无 `webdriver` 痕迹 + `block_webrtc` 是过盾的基础设施。
-//! 运行:`cargo run --example cf_check`
+//! 运行:`cargo run --example cf_check --no-default-features --features camoufox`
 
 use std::time::Duration;
 

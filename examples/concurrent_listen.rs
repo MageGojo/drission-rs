@@ -3,7 +3,7 @@
 //! 2. **每标签独立 cookie**:各标签处于独立 BrowserContext,cookie 互不可见;
 //! 3. **XHR 监听**:抓取页面发出的 fetch/XHR 请求与响应体。
 //!
-//! 运行:`cargo run --example concurrent_listen`
+//! 运行:`cargo run --example concurrent_listen --no-default-features --features camoufox`
 
 use std::sync::Arc;
 

@@ -7,7 +7,7 @@
 //!    `load_cookies_from_tab` 灌进 Session,验证拿到;再 `save_cookies`/`load_cookies_file`
 //!    存盘读盘(复用登录态),并 `apply_cookies_to_tab` 回灌浏览器。
 //!
-//! 运行:`cargo run --example session_mode`
+//! 运行:`cargo run --example session_mode --no-default-features --features camoufox`
 //! 结果落 `drission_session_result.json`,末行打印 ALL CHECKS PASSED / FAILED。
 
 use drission::prelude::*;

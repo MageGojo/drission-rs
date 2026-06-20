@@ -2,7 +2,7 @@
 //! 读站点反馈判断**验证码是否识别通过**。不求登录成功(用假账号);只要反馈不是"验证码错误"
 //! (而是账号/密码错误)即说明 OCR 识别对了。需 `--features ocr`。
 //!
-//! 运行:`HL=0 N=5 cargo run --example apizero_login --features ocr`
+//! 运行:`HL=0 N=5 cargo run --example apizero_login --no-default-features --features camoufox,ocr`
 
 use std::time::Duration;
 

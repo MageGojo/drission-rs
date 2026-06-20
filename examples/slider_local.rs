@@ -4,7 +4,7 @@
 //! 覆盖:① img 图源读取 ② 拼图模板法(无 fullbg)③ 闭环拖动 + 把手:拼图比例标定(本例 0.9 非 1:1)
 //! ④ `SuccessCheck::Js` 自定义判定。完全离线(`file://` 本地页,写在项目目录下避开 macOS 沙箱)。
 //!
-//! 运行:`cargo run --example slider_local`(默认 headless;`HL=0` 看界面)。末行 ALL CHECKS PASSED。
+//! 运行:`cargo run --example slider_local --no-default-features --features slider`(默认 headless;`HL=0` 看界面)。末行 ALL CHECKS PASSED。
 
 use std::path::Path;
 use std::time::Duration;

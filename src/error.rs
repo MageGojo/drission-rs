@@ -19,6 +19,11 @@ pub enum Error {
     #[error("HTTP 请求错误: {0}")]
     Http(#[from] reqwest::Error),
 
+    /// 指纹 HTTP 客户端(`wreq`,`impersonate` feature)的请求错误。
+    #[cfg(feature = "impersonate")]
+    #[error("HTTP(指纹)请求错误: {0}")]
+    Impersonate(#[from] wreq::Error),
+
     #[error("解压错误: {0}")]
     Zip(#[from] zip::result::ZipError),
 

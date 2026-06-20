@@ -23,6 +23,10 @@
 > (capsolver / 2captcha)。**drission 默认开箱即用驱动 Google Chrome,并内置离线验证码识别(ddddocr OCR + 图片滑块缺口距离)、
 > 一行切换 Camoufox / Firefox 反检测内核**——无需联网打码,是「**Rust 版 DrissionPage**」里少有的自带打码方案。
 
+> 🤖 **给 AI 编程助手**:若你是 AI,要**基于本库写代码**,请先阅读并严格遵循 [**`docs/SKILL.md`**](docs/SKILL.md)
+> ——本库接口 / feature / 构建规则的**权威速查**,覆盖从最基础用法到**点选验证码点击**全流程,照它写即可一次编译通过、运行正确。
+> 若你的环境不支持 "skill" 机制,可忽略此强制条款,但仍强烈建议据此使用本库。
+
 ---
 
 ## 📖 这是什么(一句话看懂)
@@ -38,17 +42,17 @@
 
 ---
 
-## 🆕 最新版本 v0.2.0 新增
+## 🆕 最新版本 v0.3.0 新增
 
-> 完整记录见 [CHANGELOG.md](CHANGELOG.md)。本版**默认后端改为 Google Chrome(CDP)**、Windows 稳定支持。
+> 完整记录见 [CHANGELOG.md](CHANGELOG.md)。本版**双协议统一接口全面对齐**、新增 Session TLS 指纹、每浏览器指纹与 AI 编程技能文档。
 
-- **默认开箱驱动 Google Chrome(CDP)** —— 破坏性变更:`default = ["cdp"]`,开箱即用驱动 / 接管 **Chrome / Edge / Brave / Chromium / Electron**。Camoufox / Firefox 反检测内核及其全部高级能力(`Page` / `WebPage` / `SessionPage` / 池 / 吐环境 / 过盾 / 滑块…)改为 **`--features camoufox`** 一行开启。
-- **Windows 稳定支持 + Chrome 路径智能探测(对标 DrissionPage `get_chrome_path`)**:`CHROME_BIN` / `DRISSION_CHROME` 环境变量 → 常见安装路径(Windows 覆盖**用户级** `%LOCALAPPDATA%` 与系统级 `%PROGRAMFILES%` 系列)→ **Windows 注册表** `App Paths\chrome.exe`(HKCU 优先,再 HKLM)→ 系统 `PATH` 扫描;全程**优先 Google Chrome**,解决免管理员用户级安装 / 非默认盘探测不到的问题。
-- **CDP 启动便捷方法**:`ChromiumBrowser::launch_with(path, headless)`(指定可执行文件)、`ChromiumBrowser::find_chrome()` 与 `cdp::chrome_path()`(诊断“为何没找到浏览器”)。
-- **`Page` 一行起步门面**(Camoufox,对标 DP `ChromiumPage`):`Page::new()` / `headless()` / `connect()`,经 `Deref` 直接拥有全部 `Tab` 方法;`tab.click/input/exists` 高频捷径。
-- **后端无关共享模块**:`crate::keys`(`Keys` / `KeyInput`)、`crate::net`(`DataPacket` / `ListenFilter` / `ResumeOptions` 等),两后端复用、始终编译。
+- **CDP 后端全面对齐 Camoufox(同一份代码切 feature 即换后端)**:补齐 iframe / Shadow DOM / 动作链 / 控制台 / WebSocket 监听 / 截图录像 / 上传 / 对话框 / **吐环境 `dump_env`** / **高并发池 `ChromiumPool`** / **修饰组合键**(无头也真执行 Ctrl+A/C/V 编辑命令)/ **Windows 进程树兜底(Job Object)**。
+- **Session 浏览器 TLS / JA3 / JA4 + HTTP2 指纹伪装(`--features impersonate`)**:给纯 HTTP 双模套**真实浏览器握手指纹**(`wreq` + BoringSSL,`BrowserProfile::Chrome/Firefox/Safari/Edge`),让「浏览器过盾 → HTTP 接力」不再被现代 WAF(Akamai / CF / DataDome)凭 TLS 指纹拦下;Windows(含 mingw 交叉编译)已实测产出 `.exe`。
+- **每浏览器不同指纹 `CdpFingerprint` / `CdpFingerprintPool`**(对标 Camoufox 指纹池):并发起 N 个浏览器各套一份**连贯指纹**(UA / 平台 / 语言 / 时区 / 屏幕 / 硬件 / WebGL / canvas·audio 噪声),同 OS 变体保真(Turnstile 友好)、跨 OS persona 完整伪装。
+- **🤖 AI 编程技能 [`docs/SKILL.md`](docs/SKILL.md)(AI 必读)**:从基础到**点选验证码点击**全流程的接口 / feature / 构建规则权威速查;README 顶部声明「AI 基于本库开发须遵循此 skill」。
+- **示例全部可复制运行**:默认后端翻为 cdp 后,修正 ~45 个 Camoufox / slider / ocr 示例头注释的运行命令(Camoufox 系须 `--no-default-features --features camoufox`)。
 
-> 早期版本能力(`0.1.x`):CDP 后端、Session / `WebPage` 双模、采集导出、代理池健康、纯算签名运行器、Cloudflare 过盾、顶象缺口算法、登录态持久化、Shadow DOM、下载管理、工程化 CI —— 详见 [CHANGELOG.md](CHANGELOG.md)。
+> 早期版本能力(`0.1.x` / `0.2.x`):默认 CDP / Google Chrome 驱动与自动下载、Windows 稳定支持 + Chrome 路径探测、验证码 OCR、图片滑块、**点选验证码真过盾**、Session / `WebPage` 双模、纯算签名运行器、Cloudflare 过盾、代理池健康、登录态持久化、Shadow DOM、下载管理 —— 详见 [CHANGELOG.md](CHANGELOG.md)。
 
 ---
 
@@ -110,7 +114,7 @@ println!("需移动 {:.0}px,置信 {:.2}", gap.displace, gap.confidence);
 - **元素与交互**:DrissionPage 风格定位(`@id:` / `css:` / `xpath:` / `text:`)、点击 / 输入 / 逐字符拟人输入、动作链、拖拽、下拉 / 单选 / 多选填表、文件上传、iframe、JS 对话框。
 - **网络**:XHR / Fetch **监听抓响应体**、**请求拦截改写**(fulfill / abort / resume)、WebSocket 帧监听、控制台监听。
 - **多标签与高并发**:每标签独立 cookie 隔离、`BrowserPool` 浏览器池(代理 / 指纹轮换 + 失败重试 + **断点续抓**)。
-- **Driver + Session 双模**:浏览器与纯 HTTP 会话双模、cookie 双向互通(省内存,旧机友好)。
+- **Driver + Session 双模**:浏览器与纯 HTTP 会话双模、cookie 双向互通(省内存,旧机友好);Session 可选 **`--features impersonate` 套浏览器 TLS / JA3 / JA4 + HTTP2 指纹**(`wreq` + BoringSSL),让"浏览器过盾 → HTTP 接力"不被现代 WAF 凭 TLS 指纹拦下。
 - **截图与录像**:元素 / 整页 / 区域截图,视口录像合成 mp4。
 - **吐环境(补环境)**:采集 canvas / webgl / audio 真实指纹 + 签名 sink 定位,一键导出可 `node` 运行的补环境工程;配合 `signer` 可编成无 Node 单二进制纯算签名。
 - **接管浏览器**:`BrowserServer` 暴露 WebSocket 端点,`Browser::connect` 接管已运行的浏览器。
@@ -140,10 +144,10 @@ println!("需移动 {:.0}px,置信 {:.2}", gap.displace, gap.confidence);
 
 ```toml
 [dependencies]
-drission = "0.2"                                         # 默认 = Chromium / CDP(Google Chrome)
+drission = "0.3"                                         # 默认 = Chromium / CDP(Google Chrome)
 
 # 要 Camoufox 反检测内核 + 全部高级能力(吐环境 / 过盾 / 池 / 滑块…),开 camoufox:
-# drission = { version = "0.2", features = ["camoufox", "ocr", "slider", "signer"] }
+# drission = { version = "0.3", features = ["camoufox", "ocr", "slider", "signer", "impersonate"] }
 ```
 
 | feature | 能力 | 依赖 | 默认 |
@@ -153,6 +157,9 @@ drission = "0.2"                                         # 默认 = Chromium / C
 | `ocr` | 字符验证码识别(ddddocr + tract) | `image` + `tract-onnx` | 关 |
 | `slider` | 图片滑块缺口距离识别(极验 / 顶象) | 纯 JS + std,自动带入 `camoufox` | 关 |
 | `signer` | 纯算签名运行器(内嵌 QuickJS,无需 Node) | `rquickjs` | 关 |
+| `impersonate` | **Session 浏览器 TLS / JA3 / JA4 + HTTP2 指纹**(双模过 WAF) | `wreq` + BoringSSL(需 `cmake`+`nasm`;Windows 见下),自动带入 `camoufox` | 关 |
+
+> **`impersonate` 的 Windows 构建**:原生 Windows 走 **MSVC**(VS Build Tools + `nasm`,BoringSSL 一等公民)或 mingw(+`nasm`),`cargo build --features impersonate` 即可。从 macOS / Linux **交叉编译到 `x86_64-pc-windows-gnu` 已实测跑通**:`brew install mingw-w64 nasm cmake` 后用 `scripts/win-cross-build.sh build --features impersonate`(脚本自动给 BoringSSL 的 bindgen 喂 mingw sysroot,产出真 `.exe`)。
 
 ---
 
@@ -168,8 +175,8 @@ async fn main() -> drission::Result<()> {
     // 自动定位 Google Chrome(CHROME_BIN/DRISSION_CHROME → 安装路径 → Windows 注册表 → PATH);
     // 找不到则自动下载 Chrome for Testing 到 ~/.cache/drission/chrome/(对标 CloakBrowser)。
     // 要指定浏览器:ChromiumBrowser::launch_with("C:\\...\\chrome.exe", true)
-    let browser = ChromiumBrowser::launch(true).await?;     // headless
-    let tab = browser.new_tab("https://example.com").await?;
+    let browser = ChromiumBrowser::launch(ChromiumOptions::new().headless(true)).await?; // 无头;有头零配置用 launch_default()
+    let tab = browser.new_tab(Some("https://example.com")).await?;
 
     println!("title = {:?}", tab.title().await?);
     println!("h1    = {:?}", tab.ele_text("h1").await?);
@@ -252,6 +259,7 @@ A:macOS(主力)· Linux · Windows(命名管道传输已打通);Rust ≥ 1.85(ed
 
 ## 📚 文档
 
+- [🤖 **编程技能 SKILL(AI 必读)**](docs/SKILL.md) — 接口 / feature / 构建规则权威速查,基础 → 点选验证码全流程,照写即对
 - [文档总览 `docs/`](docs/) — 设计 · API 映射 · 并发池 · 长监听
 - [**DrissionPage → drission API 映射**](docs/API映射.md) — 从 DP 迁移,按表把 Python 写法换成 Rust,几乎零成本
 - [设计文档](docs/设计.md) — 分层架构 / Juggler 选型 / 并发模型 / 各能力接线

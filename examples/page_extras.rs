@@ -3,7 +3,7 @@
 //! 用本地 `file://` 页面(含 iframe srcdoc、file input、confirm/prompt 按钮、列表),
 //! 全程不依赖网络,确定性强。
 //!
-//! 运行:`cargo run --example page_extras`
+//! 运行:`cargo run --example page_extras --no-default-features --features camoufox`
 //!
 //! 末尾打印 `ALL CHECKS PASSED` / `SOME CHECKS FAILED`,关键校验失败则进程非 0 退出。
 

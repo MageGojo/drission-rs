@@ -1,7 +1,7 @@
 //! 监听测试:打开抖音视频短链,抓取 `aweme/v1/web/aweme/detail` 接口的响应(一次)。
 //!
 //! 用我们库的网络监听能力:页面 JS 自己带签名发出请求,我们只负责抓响应体。
-//! 运行:`cargo run --example douyin_listen`
+//! 运行:`cargo run --example douyin_listen --no-default-features --features camoufox`
 
 use drission::prelude::*;
 

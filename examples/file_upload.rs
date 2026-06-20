@@ -9,7 +9,7 @@
 //!
 //! 全程本地 `file://` 页,不依赖网络,确定性强。
 //!
-//! 运行:`cargo run --example file_upload`(默认 headless;`HL=0 cargo run --example file_upload` 看界面)
+//! 运行:`cargo run --example file_upload --no-default-features --features camoufox`(默认 headless;`HL=0 cargo run --example file_upload --no-default-features --features camoufox` 看界面)
 //!
 //! 末尾打印 `ALL CHECKS PASSED` / `SOME CHECKS FAILED`,关键校验失败则进程非 0 退出。
 

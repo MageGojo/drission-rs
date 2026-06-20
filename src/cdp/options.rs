@@ -37,6 +37,11 @@ pub struct ChromiumOptions {
     /// 下载目录。设置后浏览器允许下载并落盘到此目录(`Browser.setDownloadBehavior`),
     /// `tab.downloads()` 的 `start()` 即从此读取(对齐 camoufox `BrowserOptions::download_path`)。
     pub download_path: Option<PathBuf>,
+    /// **导航前注入脚本**(`Page.addScriptToEvaluateOnNewDocument`):每个新标签 attach 时按序注入,
+    /// 在页面脚本运行前最早期执行、覆盖后续导航与子帧。用于**深指纹伪装**(由 [`CdpFingerprint`]
+    /// (crate::cdp::CdpFingerprint) 生成:platform / 硬件 / 屏幕 / 语言 / canvas·webgl·audio 噪声)。
+    /// 在内置反检测脚本(`STEALTH_JS` 等)**之后**注入。默认空。
+    pub init_scripts: Vec<String>,
     /// 额外命令行参数。
     pub args: Vec<String>,
 }
@@ -56,6 +61,7 @@ impl Default for ChromiumOptions {
             timezone: None,
             proxy: None,
             download_path: None,
+            init_scripts: Vec::new(),
             args: Vec::new(),
         }
     }
@@ -130,6 +136,19 @@ impl ChromiumOptions {
     /// 追加一个命令行参数。
     pub fn add_arg(mut self, arg: impl Into<String>) -> Self {
         self.args.push(arg.into());
+        self
+    }
+
+    /// 追加一段导航前注入脚本(每个新标签 attach 时在页面脚本运行前最早期执行)。
+    /// 多次调用按序累积;深指纹伪装请优先用 [`CdpFingerprint`](crate::cdp::CdpFingerprint)。
+    pub fn add_init_script(mut self, js: impl Into<String>) -> Self {
+        self.init_scripts.push(js.into());
+        self
+    }
+
+    /// 设置导航前注入脚本列表(覆盖既有)。
+    pub fn init_scripts(mut self, scripts: Vec<String>) -> Self {
+        self.init_scripts = scripts;
         self
     }
 

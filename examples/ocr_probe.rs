@@ -1,6 +1,6 @@
 //! 数字验证码取样:打开 apizero 登录页,定位验证码 `<img>`(xpath),浏览器级截图抓 N 张样本,
 //! 记录其 `src` 形态(data: / URL)。供离线分析扭曲程度、定识别方案。
-//! 运行:`HL=0 N=12 cargo run --example ocr_probe`(默认无头 12 张)。
+//! 运行:`HL=0 N=12 cargo run --example ocr_probe --no-default-features --features camoufox`(默认无头 12 张)。
 
 use std::time::Duration;
 

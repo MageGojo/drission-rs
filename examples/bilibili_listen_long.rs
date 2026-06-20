@@ -9,7 +9,7 @@
 //! 这里只有 bilibili 业务(点哪个分集、读哪些参数);通用能力都在库里:`listen_xhr` 常驻 hook、
 //! `listen_stream`/`drain_ready` 后台不丢包批量取、`eles`+`click` 点元素、`packet.query()` 取参数。
 //!
-//! 运行:`cargo run --example bilibili_listen_long [-- <视频URL> <数量>]`
+//! 运行:`cargo run --example bilibili_listen_long --no-default-features --features camoufox [-- <视频URL> <数量>]`
 
 use std::collections::HashSet;
 use std::time::Duration;
