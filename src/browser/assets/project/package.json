@@ -1,0 +1,12 @@
+{
+  "name": "__PKG_NAME__",
+  "version": "1.0.0",
+  "private": true,
+  "description": "drission dump_env 导出的补环境工程:在 Node 里纯算还原浏览器签名(无需浏览器、零依赖)。",
+  "main": "index.js",
+  "scripts": {
+    "demo": "node demo.js",
+    "verify": "node verify.js"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>问卷与填表功能测试网页</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f5f7fa;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .survey-container {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+            width: 100%;
+            max-width: 550px;
+            padding: 30px;
+            box-sizing: border-box;
+        }
+        h2 {
+            color: #333;
+            margin-top: 0;
+            border-bottom: 2px solid #eaeaea;
+            padding-bottom: 10px;
+            font-size: 22px;
+        }
+        .progress-bar {
+            height: 6px;
+            background-color: #eef2f5;
+            border-radius: 3px;
+            margin-bottom: 25px;
+            overflow: hidden;
+        }
+        .progress {
+            height: 100%;
+            background-color: #007aff;
+            width: 25%;
+            transition: width 0.3s ease;
+        }
+        .step {
+            display: none;
+        }
+        .step.active {
+            display: block;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #444;
+        }
+        input[type="text"], select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+        input[type="text"]:focus, select:focus, textarea:focus {
+            border-color: #007aff;
+            outline: none;
+        }
+        .option-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .option-label {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .option-label:hover {
+            background-color: #f9f9f9;
+        }
+        .option-label input {
+            margin-right: 10px;
+        }
+        .btn-group {
+            margin-top: 30px;
+            display: flex;
+            justify-content: space-between;
+        }
+        button {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .btn-next {
+            background-color: #007aff;
+            color: white;
+            margin-left: auto;
+        }
+        .btn-prev {
+            background-color: #f0f0f2;
+            color: #333;
+        }
+        .btn-submit {
+            background-color: #34c759;
+            color: white;
+        }
+        #result-display {
+            white-space: pre-wrap;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #eee;
+            font-family: monospace;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="survey-container">
+    <h2 id="survey-title">问卷测试 (第 1 / 4 步)</h2>
+    
+    <div class="progress-bar">
+        <div class="progress" id="progress"></div>
+    </div>
+
+    <form id="test-form" onsubmit="return false;">
+        
+        <div class="step active" id="step-1">
+            <div class="form-group">
+                <label for="username">1. 测试用户姓名：</label>
+                <input type="text" id="username" name="username" placeholder="请输入任意文本...">
+            </div>
+            <div class="form-group">
+                <label for="job">2. 您的职业领域：</label>
+                <select id="job" name="job">
+                    <option value="">-- 请选择 --</option>
+                    <option value="qa">软件测试 (QA)</option>
+                    <option value="dev">研发人员 (Dev)</option>
+                    <option value="pm">产品经理 (PM)</option>
+                    <option value="other">其它</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="step" id="step-2">
+            <div class="form-group">
+                <label>3. 您通常使用什么工具进行自动化填表测试？(单选)</label>
+                <div class="option-group">
+                    <label class="option-label"><input type="radio" name="tool" value="Selenium"> Selenium</label>
+                    <label class="option-label"><input type="radio" name="tool" value="Playwright"> Playwright</label>
+                    <label class="option-label"><input type="radio" name="tool" value="Puppeteer"> Puppeteer</label>
+                    <label class="option-label"><input type="radio" name="tool" value="Manual"> 纯手动点击测试</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="step" id="step-3">
+            <div class="form-group">
+                <label>4. 自动化测试中你遇到过哪些难点？(多选)</label>
+                <div class="option-group">
+                    <label class="option-label"><input type="checkbox" name="painpoint" value="dynamic_id"> 动态元素 ID 难定位</label>
+                    <label class="option-label"><input type="checkbox" name="painpoint" value="shadow_dom"> Shadow DOM 穿透</label>
+                    <label class="option-label"><input type="checkbox" name="painpoint" value="verification_code"> 图形验证码拦截</label>
+                    <label class="option-label"><input type="checkbox" name="painpoint" value="iframe"> 嵌套 Iframe 切换麻烦</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="step" id="step-4">
+            <div class="form-group">
+                <label for="feedback">5. 请输入您的测试备注或反馈建议：</label>
+                <textarea id="feedback" name="feedback" rows="4" placeholder="在这里写下你的测试心得..."></style></textarea>
+            </div>
+            
+            <div id="summary-section" style="display:none;">
+                <h4 style="margin-bottom:5px; color:#34c759;">✓ 测试收集的数据如下：</h4>
+                <div id="result-display"></div>
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <button type="button" class="btn-prev" id="prev-btn" style="display: none;" onclick="navigateStep(-1)">上一步</button>
+            <button type="button" class="btn-next" id="next-btn" onclick="navigateStep(1)">下一步</button>
+        </div>
+
+    </form>
+</div>
+
+<script>
+    let currentStep = 1;
+    const totalSteps = 4;
+
+    function navigateStep(direction) {
+        // 隐藏当前步骤
+        document.getElementById(`step-${currentStep}`).classList.remove('active');
+        
+        // 计算下一步
+        currentStep += direction;
+        
+        // 显示新步骤
+        document.getElementById(`step-${currentStep}`).classList.add('active');
+        
+        // 更新标题和进度条
+        document.getElementById('survey-title').innerText = `问卷测试 (第 ${currentStep} / ${totalSteps} 步)`;
+        document.getElementById('progress').style.width = `${(currentStep / totalSteps) * 100}%`;
+        
+        // 控制“上一步”按钮显隐
+        if (currentStep === 1) {
+            document.getElementById('prev-btn').style.display = 'none';
+        } else {
+            document.getElementById('prev-btn').style.display = 'inline-block';
+        }
+        
+        // 控制“下一步”变“提交”按钮
+        const nextBtn = document.getElementById('next-btn');
+        if (currentStep === totalSteps) {
+            nextBtn.innerText = '提交表单';
+            nextBtn.className = 'btn-submit';
+            nextBtn.onclick = submitForm;
+        } else {
+            nextBtn.innerText = '下一步';
+            nextBtn.className = 'btn-next';
+            nextBtn.onclick = function() { navigateStep(1); };
+        }
+    }
+
+    function submitForm() {
+        const formData = new FormData(document.getElementById('test-form'));
+        
+        // 解析多选框的值
+        const painpoints = [];
+        document.querySelectorAll('input[name="painpoint"]:checked').forEach(cb => {
+            painpoints.push(cb.value);
+        });
+
+        // 组装展示数据
+        const result = {
+            "用户姓名": formData.get('username') || '未填写',
+            "职业领域": formData.get('job') || '未选择',
+            "单选工具": formData.get('tool') || '未选择',
+            "多选难点": painpoints.length > 0 ? painpoints : '未勾选',
+            "反馈备注": formData.get('feedback') || '未填写'
+        };
+
+        // 在页面上打印出来，方便测试人员查看抓取结果
+        document.getElementById('result-display').textContent = JSON.stringify(result, null, 4);
+        document.getElementById('summary-section').style.display = 'block';
+        
+        alert('表单提交成功！测试数据已生成在下方。');
+    }
+</script>
+
+</body>
+</html>

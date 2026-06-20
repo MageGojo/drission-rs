@@ -1,0 +1,79 @@
+[package]
+name = "drission"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["极数本源 (apizero.cn)"]
+description = "Rust 浏览器自动化库:反检测(Camoufox/Firefox)+ 内置验证码 OCR 与图片滑块缺口距离识别 + 高并发爬虫 / XHR 监听拦截 / 自动过盾,DrissionPage 风格 API。Browser automation in Rust with anti-detect, built-in captcha OCR and slider-gap solving, async high-concurrency crawling."
+documentation = "https://docs.rs/drission"
+homepage = "https://apizero.cn"
+repository = "https://github.com/MageGojo/drission-rs"
+readme = "README.md"
+license-file = "LICENSE"
+keywords = ["captcha", "ocr", "anti-detect", "automation", "scraper"]
+categories = ["web-programming", "api-bindings", "computer-vision"]
+exclude = ["/dist", "/docs", "/target"]
+
+[features]
+# 滑块/图片缺口距离识别(通用滑块 + 极验 + 顶象 ContentNcc)。纯 JS+std 零额外依赖,默认关、按需开。
+slider = []
+# 验证码 OCR(ddddocr 预训练模型 + 纯 Rust tract 推理)。可选,避免给不需要的用户引入重依赖。
+ocr = ["dep:image", "dep:tract-onnx"]
+tract-onnx = ["dep:tract-onnx"]
+image = ["dep:image"]
+
+[dependencies]
+async-trait = "0.1.89"
+bytes = "1.12.0"
+dirs = "6.0.0"
+ego-tree = "0.11"
+futures-util = "0.3.32"
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg"], optional = true }
+libc = "0.2.186"
+os_pipe = { version = "1.2.3", features = ["io_safety"] }
+reqwest = { version = "0.13.4", features = ["json", "stream"] }
+scraper = "0.27.0"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+thiserror = "2.0.18"
+tokio = { version = "1.52.3", features = ["full"] }
+tokio-tungstenite = "0.29.0"
+tracing = "0.1.44"
+tract-onnx = { version = "0.23.3", optional = true }
+zip = "8.6.0"
+
+[dev-dependencies]
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+
+# OCR 示例用到 feature-gated 的 tab.ocr_image,仅在 --features ocr 时编译。
+[[example]]
+name = "ocr_captcha"
+required-features = ["ocr"]
+
+[[example]]
+name = "apizero_login"
+required-features = ["ocr"]
+
+# 滑块/缺口识别示例需 --features slider。
+[[example]]
+name = "dx_slide"
+required-features = ["slider"]
+
+[[example]]
+name = "geetest_slide"
+required-features = ["slider"]
+
+[[example]]
+name = "slider_local"
+required-features = ["slider"]
+
+[target."cfg(unix)".dependencies]
+command-fds = { version = "0.3.3", features = ["tokio"] }
+
+[target."cfg(windows)".dependencies]
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Threading",
+] }

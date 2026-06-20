@@ -1,0 +1,12 @@
+/target
+/dist
+/docs
+**/*.rs.bk
+.DS_Store
+*.log
+# 吐环境运行产物(含真实 cookie/webid/指纹 等,不入库)
+/dump-env/
+/dump-env-fp/
+/douyin-env/
+# 含真实 cookie/签名的测试脚本(不入库)
+/scripts/douyin_detail_test.py

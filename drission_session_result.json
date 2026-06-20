@@ -1,0 +1,47 @@
+{
+  "all_passed": true,
+  "checks": [
+    {
+      "detail": "status=200 url=https://example.com/",
+      "name": "http_get",
+      "ok": true
+    },
+    {
+      "detail": "\"Example Domain\"",
+      "name": "http_title",
+      "ok": true
+    },
+    {
+      "detail": "Example Domain",
+      "name": "s_ele_h1",
+      "ok": true
+    },
+    {
+      "detail": "1 个链接",
+      "name": "s_eles_links",
+      "ok": true
+    },
+    {
+      "detail": "灌入会话",
+      "name": "cookie_browser_to_session",
+      "ok": true
+    },
+    {
+      "detail": "存盘读盘复用",
+      "name": "cookie_save_load_disk",
+      "ok": true
+    },
+    {
+      "detail": "回灌浏览器",
+      "name": "cookie_session_to_browser",
+      "ok": true
+    }
+  ],
+  "platform": {
+    "arch": "aarch64",
+    "os": "macos"
+  },
+  "test": "session_mode",
+  "tool": "drission-rs",
+  "url": "https://example.com"
+}
