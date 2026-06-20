@@ -2,7 +2,8 @@
 //
 //   node verify.js   或   npm run verify
 //
-// 通过标准:env 补出的 navigator/screen/location/canvas/webgl/audio 与 seed.json 录制值逐项一致。
+// 通过标准:env 补出的 navigator(含 plugins/mimeTypes)/screen/location/canvas(toDataURL+measureText 字体+
+// getImageData 像素)/webgl/audio/WebRTC 与 seed.json 录制值逐项一致。
 const fs = require("fs");
 const path = require("path");
 const { createEnv, run } = require("./index.js");
@@ -49,6 +50,50 @@ if (fp.webgl && fp.webgl.supported) {
   check("webgl.unmaskedVendor", run(sandbox, "(function(){var g=document.createElement('canvas').getContext('webgl');var e=g.getExtension('WEBGL_debug_renderer_info');return e?g.getParameter(e.UNMASKED_VENDOR_WEBGL):null;})()"), fp.webgl.unmaskedVendor);
   check("webgl.unmaskedRenderer", run(sandbox, "(function(){var g=document.createElement('canvas').getContext('webgl');var e=g.getExtension('WEBGL_debug_renderer_info');return e?g.getParameter(e.UNMASKED_RENDERER_WEBGL):null;})()"), fp.webgl.unmaskedRenderer);
   check("webgl.extCount", run(sandbox, "(document.createElement('canvas').getContext('webgl').getSupportedExtensions()||[]).length"), (fp.webgl.extensions || []).length);
+}
+
+// 字体枚举回放:env.js measureText 按 ctx.font 串返回录制宽度。
+if (fp.fonts && fp.fonts.supported && fp.fonts.widths) {
+  var keys = Object.keys(fp.fonts.widths);
+  var allOk = keys.length > 0;
+  for (var fi = 0; fi < keys.length; fi++) {
+    var k = keys[fi];
+    var w = run(sandbox, "(function(){var c=document.createElement('canvas').getContext('2d');c.font=" + JSON.stringify(k) + ";return c.measureText('x').width;})()");
+    if (w !== fp.fonts.widths[k]) { allOk = false; break; }
+  }
+  check("fonts.widths replay (" + keys.length + " 项)", allOk, true);
+}
+
+// 像素级 canvas 回放:env.js getImageData 还原录制字节(用校验和 + 长度比对)。
+if (fp.canvasPixels && fp.canvasPixels.supported && fp.canvasPixels.data) {
+  var cp = fp.canvasPixels;
+  var buf = Buffer.from(cp.data, "base64");
+  var wantSum = 0;
+  for (var bi = 0; bi < buf.length; bi++) wantSum = (wantSum + buf[bi]) >>> 0;
+  var got = run(sandbox, "(function(){var im=document.createElement('canvas').getContext('2d').getImageData(0,0," + cp.width + "," + cp.height + ");var s=0;for(var i=0;i<im.data.length;i++)s=(s+im.data[i])>>>0;return {len:im.data.length,sum:s};})()");
+  check("canvasPixels.byteLen", got.len, cp.width * cp.height * 4);
+  check("canvasPixels.checksum", got.sum, wantSum);
+}
+
+// WebRTC 回放:supported 决定 RTCPeerConnection 是否存在;可用时 getCapabilities 回放 codecs。
+if (fp.rtc) {
+  check("rtc.RTCPeerConnection defined", run(sandbox, "typeof RTCPeerConnection !== 'undefined'"), !!fp.rtc.supported);
+  if (fp.rtc.supported) {
+    check("rtc.audioCodecsCount", run(sandbox, "(RTCRtpReceiver.getCapabilities('audio').codecs||[]).length"), (fp.rtc.audioCodecs || []).length);
+    check("rtc.videoCodecsCount", run(sandbox, "(RTCRtpReceiver.getCapabilities('video').codecs||[]).length"), (fp.rtc.videoCodecs || []).length);
+  }
+}
+
+// navigator.plugins / mimeTypes 回放:类数组计数 + 首项名 + namedItem。
+if (Array.isArray(nav.plugins)) {
+  check("navigator.plugins.length", run(sandbox, "navigator.plugins ? navigator.plugins.length : -1"), nav.plugins.length);
+  if (nav.plugins.length) {
+    check("navigator.plugins[0].name", run(sandbox, "navigator.plugins[0] ? navigator.plugins[0].name : null"), nav.plugins[0].name);
+    check("navigator.plugins.namedItem", run(sandbox, "navigator.plugins.namedItem ? (navigator.plugins.namedItem(" + JSON.stringify(nav.plugins[0].name) + ") ? navigator.plugins.namedItem(" + JSON.stringify(nav.plugins[0].name) + ").name : null) : 'no-namedItem'"), nav.plugins[0].name);
+  }
+}
+if (Array.isArray(nav.mimeTypes)) {
+  check("navigator.mimeTypes.length", run(sandbox, "navigator.mimeTypes ? navigator.mimeTypes.length : -1"), nav.mimeTypes.length);
 }
 
 // audio 指纹回放(异步)

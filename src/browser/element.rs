@@ -13,10 +13,10 @@ use serde_json::{Value, json};
 use tokio::time::{Instant, sleep};
 
 use crate::browser::frame::Frame;
-use crate::browser::keys::KeyInput;
 use crate::browser::shadow::ShadowRoot;
 use crate::browser::static_element::StaticElement;
 use crate::browser::tab::{ImageFormat, TabCore, write_file};
+use crate::keys::KeyInput;
 use crate::locator::{self, Query};
 use crate::{Error, Result};
 

@@ -22,6 +22,8 @@ console.log("[env] navigator.platform  =", run(sandbox, "navigator && navigator.
 console.log("[env] screen              =", run(sandbox, "screen && (screen.width + 'x' + screen.height)"));
 console.log("[env] canvas.toDataURL len=", run(sandbox, "document.createElement('canvas').toDataURL().length"));
 console.log("[env] webgl vendor        =", run(sandbox, "(function(){var g=document.createElement('canvas').getContext('webgl');return g&&g.getParameter(37445);})()"));
+console.log("[env] navigator.plugins   =", run(sandbox, "navigator && navigator.plugins ? navigator.plugins.length : 0"), "项");
+console.log("[env] RTCPeerConnection   =", run(sandbox, "typeof RTCPeerConnection"));
 
 // —— 加载签名脚本(纯算还原) ——
 const signerDir = path.join(__dirname, "signer");

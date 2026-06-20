@@ -1,5 +1,7 @@
-//! CDP 后端 demo:启动/接管 Chrome → 新标签 → 导航 → run_js → 元素文本 → 截图。
-//! 运行:`HL=0 cargo run --example cdp_demo`(无头默认;`CHROME_BIN` 可指定浏览器)。
+//! CDP 后端 demo(**默认后端**,无需 feature):启动/接管 Google Chrome → 新标签 → 导航 → run_js → 元素文本 → 截图。
+//! 运行:`cargo run --example cdp_demo`(无头默认;`HL=0` 有头)。
+//! 浏览器自动探测(优先 Google Chrome):`CHROME_BIN`/`DRISSION_CHROME` 环境变量 → 安装路径
+//! (Windows 含用户级 `%LOCALAPPDATA%`)→ Windows 注册表 `App Paths` → 系统 `PATH`;找不到可设 `CHROME_BIN`。
 //! 接管已开 Chrome:先 `chrome --remote-debugging-port=9222`,再设 `CONNECT=http://127.0.0.1:9222`。
 
 use drission::prelude::*;

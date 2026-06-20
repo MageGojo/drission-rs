@@ -1,4 +1,4 @@
-//! [`ChromiumTab`]:CDP 后端的标签页对象,对标 Juggler 后端的 [`Tab`](crate::browser::Tab)。
+//! [`ChromiumTab`]:CDP 后端的标签页对象,对标 Camoufox 后端的 `Tab`。
 //!
 //! 高层能力:导航 / `run_js` / 标题·URL / **元素句柄查找**(`ele`/`eles`)/ 便捷点击输入 /
 //! 原生可信低层鼠标 / 键盘 / 截图 / **网络监听**([`listen`](Self::listen))/ **请求拦截**
@@ -10,11 +10,11 @@ use std::time::Duration;
 use serde_json::{Value, json};
 use tokio::time::{Instant, sleep, timeout_at};
 
-use crate::browser::keys::KeyInput;
 use crate::cdp::core::CdpCore;
 use crate::cdp::element::ChromiumElement;
 use crate::cdp::interceptor::CdpIntercept;
 use crate::cdp::listener::CdpListen;
+use crate::keys::KeyInput;
 use crate::locator::{self, Query};
 use crate::{Error, Result};
 
@@ -216,7 +216,7 @@ impl ChromiumTab {
             .await
     }
 
-    /// 敲一个键(普通字符或特殊键名,见 [`Keys`](crate::browser::Keys))。
+    /// 敲一个键(普通字符或特殊键名,见 [`Keys`](crate::keys::Keys))。
     pub async fn press_key(&self, key: &str) -> Result<()> {
         self.core.press_key(key).await
     }

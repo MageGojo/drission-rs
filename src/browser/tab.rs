@@ -1366,6 +1366,24 @@ impl Tab {
         }
     }
 
+    /// 便捷:**找到并点击**(= `ele(selector).await?.click().await`)。把最常见的「定位 + 点击」合一,
+    /// 少写一次 `.await?`。`ele` 自带超时内等待,故元素稍后才出现也能点到。
+    pub async fn click(&self, selector: &str) -> Result<()> {
+        self.ele(selector).await?.click().await
+    }
+
+    /// 便捷:**找到并输入**(= `ele(selector).await?.input(text).await`)。
+    /// 需要逐字符拟人输入用 `ele(selector).await?.input_human(text)`;输入前清空用 `ele().clear()`。
+    pub async fn input(&self, selector: &str, text: &str) -> Result<()> {
+        self.ele(selector).await?.input(text).await
+    }
+
+    /// 元素是否存在(**立即判定、不等待**)。要"等它出现"用 [`ele`](Self::ele) 或
+    /// [`wait().ele_displayed`](crate::browser::Wait);要静态 HTML 判定用 [`s_ele`](Self::s_ele)。
+    pub async fn exists(&self, selector: &str) -> Result<bool> {
+        Ok(self.find_once(selector).await?.is_some())
+    }
+
     /// 单次查找(不等待):命中返回 `Some(Element)`,否则 `None`。供 `ele` 与 [`Wait`] 复用。
     pub(crate) async fn find_once(&self, selector: &str) -> Result<Option<Element>> {
         let query = locator::parse(selector);

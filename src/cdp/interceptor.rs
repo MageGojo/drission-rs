@@ -1,5 +1,5 @@
-//! CDP 请求拦截 [`CdpIntercept`] + [`CdpInterceptedRequest`](对标 Juggler 后端的
-//! [`Intercept`](crate::browser::Intercept) / [`InterceptedRequest`](crate::browser::InterceptedRequest))。
+//! CDP 请求拦截 [`CdpIntercept`] + [`CdpInterceptedRequest`](对标 Camoufox 后端的
+//! `Intercept` / `InterceptedRequest`)。
 //!
 //! 走 CDP **`Fetch` 域**:`Fetch.enable` 后所有请求在 `Fetch.requestPaused` 暂停;库把**匹配过滤**
 //! 的请求投递给用户决策([`CdpInterceptedRequest`] 的 `resume`/`resume_with`/`fulfill`/`abort`),
@@ -15,9 +15,8 @@ use tokio::sync::mpsc;
 use tokio::task::AbortHandle;
 
 use crate::Result;
-use crate::browser::interceptor::ResumeOptions;
-use crate::browser::listener::ListenFilter;
 use crate::cdp::core::CdpCore;
+use crate::net::{ListenFilter, ResumeOptions};
 use crate::protocol::Connection;
 use crate::util::base64_encode;
 

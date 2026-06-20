@@ -1,8 +1,8 @@
-//! 吐环境深化 · canvas/webgl/audio 指纹补环境 + 一键导出工程(离线自验证)。
+//! 吐环境深化 · canvas/webgl/audio + 字体/像素 canvas/WebRTC/plugins 指纹补环境 + 一键导出工程(离线自验证)。
 //!
 //! 完全离线(`data:` 页,不出网):
 //!   1) `tab.dump_env()` 导航前注入探针(已含 Function.prototype.toString 防 hook 检测);
-//!   2) 采集**全量种子**——重点是 canvas / webgl / audioContext 指纹;
+//!   2) 采集**全量种子**——canvas / webgl / audioContext / **字体枚举 / 像素级 getImageData / WebRTC / plugins+mimeTypes** 指纹;
 //!   3) `export_project()` 一键导出**可直接 `node` 运行的补环境工程**(npm 包 + 纯算签名 demo);
 //!   4) 双重验证补环境忠实回放浏览器指纹:
 //!      - 库内 `verify`:浏览器真实环境 vs Node 补环境沙箱,逐字段(含 canvas/webgl/audio);
@@ -70,6 +70,31 @@ async fn main() -> drission::Result<()> {
         .pointer("/audio/supported")
         .and_then(Value::as_bool)
         .unwrap_or(false);
+    // 里程碑 47 新增指纹:字体枚举 / 像素 canvas / WebRTC / plugins+mimeTypes。
+    let fonts_ok = fp
+        .pointer("/fonts/supported")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let pixels_ok = fp
+        .pointer("/canvasPixels/supported")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let rtc_ok = fp
+        .pointer("/rtc/supported")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let plugins_n = dump
+        .seed
+        .pointer("/navigator/plugins")
+        .and_then(Value::as_array)
+        .map(Vec::len)
+        .unwrap_or(0);
+    let mimes_n = dump
+        .seed
+        .pointer("/navigator/mimeTypes")
+        .and_then(Value::as_array)
+        .map(Vec::len)
+        .unwrap_or(0);
     println!("==== 采集到的指纹 ====");
     println!(
         "  canvas : supported={canvas_ok}  dataURL.len={}",
@@ -100,9 +125,43 @@ async fn main() -> drission::Result<()> {
             .and_then(Value::as_f64)
             .unwrap_or(0.0),
     );
+    println!(
+        "  fonts  : supported={fonts_ok}  detected={}",
+        fp.pointer("/fonts/detected")
+            .and_then(Value::as_array)
+            .map(Vec::len)
+            .unwrap_or(0),
+    );
+    println!(
+        "  pixels : supported={pixels_ok}  {}x{}  hash={}",
+        fp.pointer("/canvasPixels/width")
+            .and_then(Value::as_u64)
+            .unwrap_or(0),
+        fp.pointer("/canvasPixels/height")
+            .and_then(Value::as_u64)
+            .unwrap_or(0),
+        fp.pointer("/canvasPixels/hash")
+            .and_then(Value::as_str)
+            .unwrap_or("-"),
+    );
+    println!(
+        "  rtc    : supported={rtc_ok}  audioCodecs={}  videoCodecs={}",
+        fp.pointer("/rtc/audioCodecs")
+            .and_then(Value::as_array)
+            .map(Vec::len)
+            .unwrap_or(0),
+        fp.pointer("/rtc/videoCodecs")
+            .and_then(Value::as_array)
+            .map(Vec::len)
+            .unwrap_or(0),
+    );
+    println!("  plugins: {plugins_n}  mimeTypes: {mimes_n}");
 
     // 至少要采到 canvas(headless 下 webgl/audio 视构建可能缺失,缺则跳过其校验但不算失败)。
     chk.ok("canvas 指纹已采集", canvas_ok);
+    // 字体枚举与像素 canvas 在 about:blank 同源下应可用(getImageData 不 taint)。
+    chk.ok("fonts 枚举已采集", fonts_ok);
+    chk.ok("canvasPixels(getImageData)指纹已采集", pixels_ok);
 
     // —— 一键导出补环境工程 ——
     let proj = std::env::current_dir()?.join("dump-env-fp");
@@ -162,6 +221,21 @@ async fn main() -> drission::Result<()> {
         if audio_ok {
             chk.ok("verify 覆盖 audio.sum", has_field("audio.sum"));
         }
+        if fonts_ok {
+            chk.ok("verify 覆盖 fonts.hash", has_field("fonts.hash"));
+        }
+        if pixels_ok {
+            chk.ok(
+                "verify 覆盖 canvasPixels.hash",
+                has_field("canvasPixels.hash"),
+            );
+        }
+        // rtc.supported / navigator.plugins* 始终参与比对(里程碑 47)。
+        chk.ok("verify 覆盖 rtc.supported", has_field("rtc.supported"));
+        chk.ok(
+            "verify 覆盖 navigator.pluginsCount",
+            has_field("navigator.pluginsCount"),
+        );
     }
 
     // —— 验证二:导出工程自带 node verify.js(env.js 回放 vs seed.json) ——

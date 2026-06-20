@@ -1,5 +1,4 @@
-//! [`ChromiumElement`]:CDP 后端的元素句柄(由 `objectId` 标识),对标 Juggler 后端的
-//! [`Element`](crate::browser::Element)。
+//! [`ChromiumElement`]:CDP 后端的元素句柄(由 `objectId` 标识),对标 Camoufox 后端的 `Element`。
 //!
 //! - 读写文本/属性走 `Runtime.callFunctionOn`(函数里 `this` 即本元素)。
 //! - **可信点击**走 `Input.dispatchMouseEvent`(`isTrusted=true`,优于 JS `.click()`):
@@ -17,8 +16,8 @@ use std::time::Duration;
 use serde_json::{Value, json};
 use tokio::time::sleep;
 
-use crate::browser::keys::KeyInput;
 use crate::cdp::core::{CdpCore, Xorshift, human_drag_track, seed_from_clock};
+use crate::keys::KeyInput;
 use crate::locator::{self, Query};
 use crate::{Error, Result};
 

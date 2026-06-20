@@ -63,8 +63,9 @@ async fn scrape_write_csv_roundtrip() {
     let _ = tokio::fs::remove_dir_all(&dir).await;
 }
 
+#[cfg(feature = "camoufox")]
 #[test]
 fn browser_options_builder_is_public() {
-    // 仅验证公开 builder 可链式构造(不启动浏览器)。
+    // 仅验证公开 builder 可链式构造(不启动浏览器)。Camoufox 后端专有。
     let _opts = BrowserOptions::new().headless(true);
 }

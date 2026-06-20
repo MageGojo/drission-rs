@@ -2,6 +2,10 @@
 //!
 //! 协议里多处用到 base64:请求拦截伪造响应体(编码)、`Page.screenshot` 返回的图片数据(解码)。
 //! 为避免引入第三方 base64 crate,这里手写标准 base64(`+/`,带 `=` 填充)。
+//!
+//! 这些函数被 cdp / camoufox 后端使用(ocr 的 base64 调用在 camoufox gate 内);两后端都不开时
+//! 它们闲置,此时允许 dead_code 以保持该退化配置编译干净。
+#![cfg_attr(not(any(feature = "cdp", feature = "camoufox")), allow(dead_code))]
 
 const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 

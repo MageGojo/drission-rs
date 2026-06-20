@@ -6,15 +6,17 @@
 //!
 //! - 模型(beta `common.onnx`,~54MB)**首次使用自动下载**到缓存目录(可用 `DRISSION_OCR_MODEL`
 //!   指定本地路径、`DRISSION_OCR_MODEL_URL` 换下载源);字符集 8210 字内置于库。
-//! - 核心:[`Ocr::new`](Ocr::new)(异步,确保模型就绪)→ [`Ocr::recognize`](Ocr::recognize)(同步,
-//!   传 PNG/JPEG 字节 → 文本)。便捷:[`Tab::ocr_image`](crate::browser::Tab::ocr_image)(定位元素 →
-//!   取图(`<img>` data:URL 直接解码,否则元素截图)→ 识别)。
+//! - 核心(后端无关):[`Ocr::new`](Ocr::new)(异步,确保模型就绪)→ [`Ocr::recognize`](Ocr::recognize)
+//!   (同步,传 PNG/JPEG 字节 → 文本)。
+//! - 便捷(**Camoufox 后端**,`--features camoufox`):`Tab::ocr_image`(定位元素 → 取图
+//!   (`<img>` data:URL 直接解码,否则元素截图)→ 识别)。
 //!
 //! ```no_run
-//! # use drission::prelude::*;
-//! # async fn f(tab: &Tab) -> drission::Result<()> {
-//! let code = tab.ocr_image("xpath://form//button/img").await?;   // 一步:定位+识别
-//! println!("验证码 = {code}");
+//! # async fn f() -> drission::Result<()> {
+//! use drission::ocr::Ocr;
+//! let ocr = Ocr::new().await?;                       // 首次会下载 ~54MB 模型到缓存
+//! let png = std::fs::read("captcha.png")?;
+//! println!("验证码 = {}", ocr.recognize(&png)?);
 //! # Ok(()) }
 //! ```
 //!
@@ -25,7 +27,9 @@ use std::path::{Path, PathBuf};
 
 use tract_onnx::prelude::*;
 
+#[cfg(feature = "camoufox")]
 use crate::browser::Tab;
+#[cfg(feature = "camoufox")]
 use crate::util::base64_decode;
 use crate::{Error, Result};
 
@@ -203,8 +207,11 @@ async fn ensure_model() -> Result<PathBuf> {
 }
 
 /// 进程内共享的默认 OCR 实例(懒加载,首次触发下载 + 建模)。
+#[cfg(feature = "camoufox")]
 static DEFAULT_OCR: tokio::sync::OnceCell<Ocr> = tokio::sync::OnceCell::const_new();
 
+/// `Tab::ocr_image` 便捷方法(需 Camoufox 后端的 [`Tab`])。
+#[cfg(feature = "camoufox")]
 impl Tab {
     /// **一步识别**页面里某元素的验证码图:定位 `selector`(`css:`/`xpath:` 前缀,同 [`Tab::ele`])→
     /// 取图(`<img>` 的 `data:` URL 直接解码,否则元素截图)→ ddddocr 模型识别 → 文本。

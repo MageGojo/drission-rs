@@ -17,7 +17,7 @@
 //! - fd4 = juggler 写 → resp 管道(子写父读)
 //!
 //! 进程生命周期由 [`WinChild`] 管理(`wait`/`kill`/`start_kill` 与 tokio `Child` 同名,
-//! 故 [`crate::browser`] / [`crate::launcher`] 的消费代码两平台一致)。
+//! 故 Camoufox 后端(`browser` / `launcher`)的消费代码两平台一致)。
 
 use std::collections::BTreeMap;
 use std::ffi::{OsStr, c_void};

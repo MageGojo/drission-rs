@@ -12,8 +12,10 @@
 //!   [`EnvScope::Accessed`] 据此从种子里**裁出关键字段**,生成精简 `env.accessed.js`(不冗余)。
 //!
 //! 深化能力(差异化护城河):
-//! - **canvas / webgl / audioContext 指纹补环境**:采集真实指纹种子,生成的 `env.js` 在 Node 侧
-//!   **回放**它们(`canvas.toDataURL` / `gl.getParameter` / `OfflineAudioContext` 渲染),`verify` 逐项验证。
+//! - **canvas / webgl / audioContext / 字体 / 像素 canvas / WebRTC / plugins 指纹补环境**:采集真实指纹种子,
+//!   生成的 `env.js` 在 Node 侧**回放**它们(`canvas.toDataURL`+`getImageData`+`measureText` 字体宽度 /
+//!   `gl.getParameter` / `OfflineAudioContext` 渲染 / `RTCRtpReceiver.getCapabilities` / `navigator.plugins·mimeTypes`),
+//!   `verify` 逐项验证。
 //! - **反 hook 检测**:探针 hook `Function.prototype.toString` 让 fetch/XHR 自报 `[native code]`,规避检测。
 //! - **签名 sink 通用化定位**:[`signers`](EnvDump::signers) 从调用栈自动定位「签名脚本」(任意站点通用)。
 //! - **一键导出**:[`export_project`](EnvDump::export_project) 吐出可直接 `node` 运行的补环境工程(npm 包 + 纯算签名 demo)。
@@ -584,7 +586,9 @@ fn gen_snapshot_js(seed: &Value) -> String {
     }
     if supported("fonts") {
         items.push("  \"fonts.hash\": g(function () { return __F.hash; })".into());
-        items.push("  \"fonts.count\": g(function () { return (__F.detected || []).length; })".into());
+        items.push(
+            "  \"fonts.count\": g(function () { return (__F.detected || []).length; })".into(),
+        );
     }
     if supported("canvasPixels") {
         items.push("  \"canvasPixels.hash\": g(function () { return __P.hash; })".into());
@@ -657,6 +661,51 @@ fn fill_recorded_fp(browser: &mut Value, seed: &Value) {
             .and_then(Value::as_f64)
     {
         obj.insert("audio.sum".into(), json!(round6(sum)));
+    }
+    // 字体枚举(measureText 宽度可能被 Camoufox 加噪)与像素 canvas(getImageData 也可能加噪):
+    // 比对「录制 vs Node 回放」,故浏览器侧取录制值。
+    if sup("fonts") {
+        let f = fp.and_then(|f| f.get("fonts"));
+        if let Some(h) = f.and_then(|f| f.get("hash")) {
+            obj.insert("fonts.hash".into(), h.clone());
+        }
+        let cnt = f
+            .and_then(|f| f.get("detected"))
+            .and_then(Value::as_array)
+            .map(Vec::len)
+            .unwrap_or(0);
+        obj.insert("fonts.count".into(), json!(cnt));
+    }
+    if sup("canvasPixels")
+        && let Some(h) = fp.and_then(|f| f.pointer("/canvasPixels/hash"))
+    {
+        obj.insert("canvasPixels.hash".into(), h.clone());
+    }
+    // rtc.supported(布尔)+ plugins/mimeTypes 计数/首项:用录制值(env.js 经重建回放,比对录制 vs 回放)。
+    let rtc_sup = fp
+        .and_then(|f| f.pointer("/rtc/supported"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    obj.insert("rtc.supported".into(), json!(rtc_sup));
+    if let Some(nav) = seed.get("navigator") {
+        let pcount = nav
+            .get("plugins")
+            .and_then(Value::as_array)
+            .map(Vec::len)
+            .unwrap_or(0);
+        obj.insert("navigator.pluginsCount".into(), json!(pcount));
+        obj.insert(
+            "navigator.plugins0".into(),
+            nav.pointer("/plugins/0/name")
+                .cloned()
+                .unwrap_or(Value::Null),
+        );
+        let mcount = nav
+            .get("mimeTypes")
+            .and_then(Value::as_array)
+            .map(Vec::len)
+            .unwrap_or(0);
+        obj.insert("navigator.mimeTypesCount".into(), json!(mcount));
     }
 }
 
@@ -775,6 +824,16 @@ mod tests {
         assert!(replaced.contains("function __fpCanvas()"));
         assert!(replaced.contains("function __fpWebGL()"));
         assert!(replaced.contains("function __fpAudioAsync("));
+        // 里程碑 47 新增配方与录制项。
+        assert!(replaced.contains("function __fpFonts()"));
+        assert!(replaced.contains("function __fpCanvasPixels()"));
+        assert!(replaced.contains("function __fpRtc()"));
+        assert!(replaced.contains("function __fpHash("));
+        assert!(replaced.contains("function __fpHashBytes("));
+        assert!(replaced.contains("canvasPixels: sc("));
+        assert!(replaced.contains("rtc: sc("));
+        assert!(replaced.contains("plugins: sc("));
+        assert!(replaced.contains("mimeTypes: sc("));
     }
 
     #[test]
@@ -790,6 +849,11 @@ mod tests {
         assert!(env.contains("\"userAgent\": \"UA\""));
         assert!(env.contains("function setup("));
         assert!(env.contains("module.exports"));
+        // 里程碑 47 回放函数已在模板里。
+        assert!(env.contains("function installWebRtc("));
+        assert!(env.contains("function installNavigatorPlugins("));
+        assert!(env.contains("function arrayLike("));
+        assert!(env.contains("function pixelBytes("));
     }
 
     #[test]
@@ -853,17 +917,37 @@ mod tests {
         let seed = json!({
             "navigator": { "userAgent": "UA" },
             "screen": { "width": 1920 },
-            "fingerprint": { "canvas": { "supported": true }, "webgl": { "supported": true }, "audio": { "supported": true } }
+            "fingerprint": {
+                "canvas": { "supported": true }, "webgl": { "supported": true }, "audio": { "supported": true },
+                "fonts": { "supported": true }, "canvasPixels": { "supported": true }, "rtc": { "supported": true }
+            }
         });
         let js = gen_snapshot_js(&seed);
         assert!(js.contains("function __fpCanvas()")); // 配方已内联
+        assert!(js.contains("function __fpFonts()"));
+        assert!(js.contains("function __fpCanvasPixels()"));
+        assert!(js.contains("function __fpRtc()"));
         assert!(js.contains("\"canvas.dataURL\""));
         assert!(js.contains("\"webgl.unmaskedVendor\""));
         assert!(js.contains("\"webgl.extCount\""));
-        // 不支持时不出现对应校验项。
+        // 里程碑 47 新增比对项。
+        assert!(js.contains("\"fonts.hash\""));
+        assert!(js.contains("\"fonts.count\""));
+        assert!(js.contains("\"canvasPixels.hash\""));
+        // rtc.supported / navigator.plugins* 始终比对。
+        assert!(js.contains("\"rtc.supported\""));
+        assert!(js.contains("\"navigator.pluginsCount\""));
+        assert!(js.contains("\"navigator.plugins0\""));
+        assert!(js.contains("\"navigator.mimeTypesCount\""));
+        // 不支持时不出现对应校验项(fonts/canvasPixels 受 supported 门控)。
         let seed2 = json!({ "navigator": { "userAgent": "UA" }, "fingerprint": { "canvas": { "supported": false } } });
         let js2 = gen_snapshot_js(&seed2);
         assert!(!js2.contains("\"canvas.dataURL\""));
+        assert!(!js2.contains("\"fonts.hash\""));
+        assert!(!js2.contains("\"canvasPixels.hash\""));
+        // 但 rtc.supported / pluginsCount 仍在(不门控)。
+        assert!(js2.contains("\"rtc.supported\""));
+        assert!(js2.contains("\"navigator.pluginsCount\""));
     }
 
     #[test]
@@ -883,6 +967,52 @@ mod tests {
         assert_eq!(browser["webgl.maxTextureSize"], json!(16384));
         assert_eq!(browser["webgl.extCount"], json!(2));
         assert_eq!(browser["audio.sum"], json!(round6(124.0434752751607)));
+    }
+
+    #[test]
+    fn fill_recorded_fp_fills_new_fingerprints() {
+        let seed = json!({
+            "navigator": {
+                "userAgent": "UA",
+                "plugins": [
+                    { "name": "PDF Viewer", "filename": "internal-pdf-viewer", "mimeTypes": [{ "type": "application/pdf" }] },
+                    { "name": "Chrome PDF Viewer", "filename": "internal-pdf-viewer", "mimeTypes": [] }
+                ],
+                "mimeTypes": [{ "type": "application/pdf" }, { "type": "text/pdf" }]
+            },
+            "fingerprint": {
+                "fonts": { "supported": true, "hash": "deadbeef", "detected": ["Arial", "Verdana", "Tahoma"] },
+                "canvasPixels": { "supported": true, "hash": "cafe1234", "width": 96, "height": 32 },
+                "rtc": { "supported": true, "codecsHash": "abcd0001" }
+            }
+        });
+        let mut browser = json!({
+            "fonts.hash": "LIVE", "fonts.count": 0, "canvasPixels.hash": "LIVE",
+            "rtc.supported": false, "navigator.pluginsCount": 0, "navigator.plugins0": null,
+            "navigator.mimeTypesCount": 0
+        });
+        fill_recorded_fp(&mut browser, &seed);
+        assert_eq!(browser["fonts.hash"], json!("deadbeef"));
+        assert_eq!(browser["fonts.count"], json!(3));
+        assert_eq!(browser["canvasPixels.hash"], json!("cafe1234"));
+        assert_eq!(browser["rtc.supported"], json!(true));
+        assert_eq!(browser["navigator.pluginsCount"], json!(2));
+        assert_eq!(browser["navigator.plugins0"], json!("PDF Viewer"));
+        assert_eq!(browser["navigator.mimeTypesCount"], json!(2));
+    }
+
+    #[test]
+    fn fill_recorded_fp_handles_missing_new_fingerprints() {
+        // 旧 dump(无 fonts/canvasPixels/rtc/plugins):rtc.supported 兜底 false,plugins 计数 0,不 panic。
+        let seed = json!({ "navigator": { "userAgent": "UA" }, "fingerprint": {} });
+        let mut browser = json!({ "rtc.supported": true });
+        fill_recorded_fp(&mut browser, &seed);
+        assert_eq!(browser["rtc.supported"], json!(false));
+        assert_eq!(browser["navigator.pluginsCount"], json!(0));
+        assert_eq!(browser["navigator.plugins0"], Value::Null);
+        // fonts/canvasPixels 未录制 → 不插入(保持原样无 key)。
+        assert!(browser.get("fonts.hash").is_none());
+        assert!(browser.get("canvasPixels.hash").is_none());
     }
 
     #[test]

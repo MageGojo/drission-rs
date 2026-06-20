@@ -1,7 +1,6 @@
 //! 采集导出助手:二维表 / 记录列表 → CSV / JSON。
 //!
-//! 配合表格提取([`StaticElement::table`](crate::browser::StaticElement::table) /
-//! [`Element::table`](crate::browser::Element::table))与翻页([`Tab::paginate`](crate::browser::Tab::paginate)),
+//! 配合 Camoufox 后端的表格提取(`StaticElement::table` / `Element::table`)与翻页(`Tab::paginate`),
 //! 把抓到的结构化数据落成文件。CSV 自己按 RFC 4180 转义(零额外依赖);JSON 走 `serde_json`。
 //!
 //! ```ignore

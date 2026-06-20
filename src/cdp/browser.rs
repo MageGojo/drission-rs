@@ -9,6 +9,7 @@ use serde_json::{Value, json};
 use tokio::time::sleep;
 
 use crate::cdp::core::CdpCore;
+use crate::cdp::locate;
 use crate::cdp::tab::ChromiumTab;
 use crate::protocol::Connection;
 use crate::{Error, Result};
@@ -21,15 +22,29 @@ pub struct ChromiumBrowser {
 }
 
 impl ChromiumBrowser {
-    /// 启动本机 Chrome/Edge(`headless=true` 无头),开 CDP 调试端口并连接。
-    /// 浏览器可执行文件:`CHROME_BIN` 环境变量优先,否则探测常见安装路径。
+    /// 启动本机浏览器(`headless=true` 无头),开 CDP 调试端口并连接。
+    ///
+    /// 浏览器**默认 Google Chrome**;自动探测可执行文件(见 [`locate::chrome_path`]):
+    /// `CHROME_BIN`/`DRISSION_CHROME` 环境变量 → 常见安装路径(Windows 含用户级 `%LOCALAPPDATA%`)
+    /// → Windows 注册表 `App Paths` → 系统 `PATH`。要指定具体浏览器用 [`Self::launch_with`]。
     pub async fn launch(headless: bool) -> Result<Self> {
-        let exe = chrome_path()?;
+        Self::launch_with(locate::chrome_path()?, headless).await
+    }
+
+    /// 定位本机 Chrome/Edge/Brave/Chromium 可执行文件(不启动)。便于诊断“为何没找到浏览器”。
+    pub fn find_chrome() -> Result<PathBuf> {
+        locate::chrome_path()
+    }
+
+    /// 用**指定的可执行文件**启动浏览器(`headless=true` 无头),开 CDP 调试端口并连接。
+    /// 当自动探测找不到、或要强制使用某个浏览器(Chrome/Edge/Brave/Chromium)时用它。
+    pub async fn launch_with(exe: impl AsRef<Path>, headless: bool) -> Result<Self> {
+        let exe = exe.as_ref();
         let dir =
             std::env::temp_dir().join(format!("drission-cdp-{}-{}", std::process::id(), now_ms()));
         std::fs::create_dir_all(&dir)
             .map_err(|e| Error::msg(format!("CDP: 建 user-data-dir 失败: {e}")))?;
-        let mut cmd = tokio::process::Command::new(&exe);
+        let mut cmd = tokio::process::Command::new(exe);
         cmd.arg("--remote-debugging-port=0")
             .arg(format!("--user-data-dir={}", dir.display()))
             .arg("--no-first-run")
@@ -135,47 +150,6 @@ fn now_ms() -> u128 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis())
         .unwrap_or(0)
-}
-
-/// 定位 Chrome/Edge/Brave/Chromium 可执行文件:`CHROME_BIN` 优先,否则按平台探测常见路径。
-fn chrome_path() -> Result<PathBuf> {
-    if let Ok(p) = std::env::var("CHROME_BIN") {
-        let pb = PathBuf::from(p);
-        if pb.exists() {
-            return Ok(pb);
-        }
-    }
-    let candidates: &[&str] = if cfg!(target_os = "macos") {
-        &[
-            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-            "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
-            "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
-            "/Applications/Chromium.app/Contents/MacOS/Chromium",
-        ]
-    } else if cfg!(target_os = "windows") {
-        &[
-            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-            r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-        ]
-    } else {
-        &[
-            "/usr/bin/google-chrome",
-            "/usr/bin/google-chrome-stable",
-            "/usr/bin/chromium",
-            "/usr/bin/chromium-browser",
-            "/usr/bin/microsoft-edge",
-        ]
-    };
-    for c in candidates {
-        let p = Path::new(c);
-        if p.exists() {
-            return Ok(p.to_path_buf());
-        }
-    }
-    Err(Error::msg(
-        "CDP: 未找到 Chrome/Edge,可设 CHROME_BIN 指定可执行文件路径",
-    ))
 }
 
 /// 轮询读取 `DevToolsActivePort` 文件首行的端口号(Chrome 启动调试服务后写入)。

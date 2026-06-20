@@ -2,6 +2,52 @@
 
 > 目标:让用过 DP 的人几乎零成本上手。Rust 版多了 `.await` 与 `Result`。
 
+## 选后端:默认 CDP/Chrome(最贴近 DP)还是 Camoufox 反检测
+
+DP 本身驱动 Chromium,所以与 DP 最对应的是 drission 的**默认 CDP 后端**(`ChromiumBrowser`,直接驱动 Google Chrome):
+
+| DrissionPage (Python) | drission · CDP 后端(默认,Google Chrome) |
+|---|---|
+| `from DrissionPage import Chromium` | `use drission::prelude::*;` |
+| `browser = Chromium()`(本机 Chrome) | `let browser = ChromiumBrowser::launch(false).await?;`(有头) |
+| 无头 | `ChromiumBrowser::launch(true).await?` |
+| `ChromiumOptions().set_browser_path(path)` | `ChromiumBrowser::launch_with(path, headless).await?`(指定浏览器) |
+| `browser = Chromium('127.0.0.1:9222')`(接管) | `ChromiumBrowser::connect("http://127.0.0.1:9222").await?` |
+| `tab = browser.new_tab(url)` | `let tab = browser.new_tab(url).await?;` |
+| `browser.quit()` | `browser.quit().await?;` |
+| (探测/诊断浏览器路径) | `ChromiumBrowser::find_chrome()?` / `drission::cdp::chrome_path()?` |
+
+> **浏览器路径探测对标 DP `get_chrome_path`**:`CHROME_BIN`/`DRISSION_CHROME` → 安装路径(Windows 含用户级
+> `%LOCALAPPDATA%`)→ Windows 注册表 `App Paths\chrome.exe` → 系统 `PATH`,**默认优先 Google Chrome**。
+
+需要 **Firefox 反检测内核**(过盾 / 吐环境 / 池 / 滑块 / Session 双模等全部高层能力)时,开 `--features camoufox`,
+用下面的 `Browser` / `Page` / `WebPage` / `SessionPage`(语法同样对标 DP,且默认即反检测)。
+
+## 大道至简:一行起步(`Page` ≈ DP `ChromiumPage`,需 `--features camoufox`)
+
+DP 里 `page = ChromiumPage()` 一行开浏览器并直接驱动。drission 的 [`Page`] 把「开浏览器 + 当前标签」
+合一,通过 `Deref` 拥有**全部 `Tab` 方法**,日常脚本首选:
+
+| DrissionPage (Python) | drission (Rust) |
+|---|---|
+| `page = ChromiumPage()`(有头) | `let page = Page::new().await?;` |
+| 无头 | `let page = Page::headless().await?;` |
+| 自定义选项 | `let page = Page::with(BrowserOptions::new().headless(true)).await?;` |
+| `page.get(url)` | `page.get(url).await?;` |
+| `page.ele('#x')` | `page.ele("#x").await?` |
+| `page.ele('#x').click()` | `page.click("#x").await?`(捷径)或 `page.ele("#x").await?.click().await?` |
+| `page.ele('#x').input('hi')` | `page.input("#x", "hi").await?`(捷径) |
+| 判断元素是否存在 | `page.exists("#x").await?`(立即判定,不等待) |
+| `page.title` / `page.url` / `page.html` | `page.title().await?` / `page.url().await?` / `page.html().await?` |
+| `page.run_js('...')` | `page.run_js("...").await?` |
+| `tab = page.new_tab(url)` | `let tab = page.new_tab(Some(url)).await?;` |
+| 接管已开浏览器 | `let page = Page::connect(ws).await?;` |
+| `page.quit()` | `page.quit().await?;` |
+| (更底层:多标签 / 接管 / 并发) | `page.browser()` 拿 `Browser`,或直接用 `Browser` + `Tab` |
+
+> `Page` 是**附加**门面,不替代 `Browser`/`Tab`——下面各表的 `tab.*` 方法在 `page` 上**同样可用**
+> (经 `Deref`)。需要 Driver/Session 双模见 `WebPage`,纯 HTTP 见 `SessionPage`。
+
 ## 启动与标签
 
 | DrissionPage (Python) | drission (Rust) |

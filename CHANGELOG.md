@@ -7,6 +7,39 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-20
+
+> 后端架构调整 + Windows 稳定支持 + **默认 Google Chrome**。
+> 含一处**破坏性变更**(默认后端改为 CDP/Chromium),故升次版本号。
+
+### 破坏性变更 Breaking
+
+- **默认后端改为 Chromium / CDP**(`default = ["cdp"]`):开箱即用驱动/接管 **Google Chrome**
+  (及 Edge / Brave / Chromium / Electron),最精简、无 Camoufox 重代码。
+  原 Camoufox / Firefox 反检测后端及其全部高层能力(`Page` / `WebPage` / `SessionPage` / `Pool` /
+  吐环境 / 过盾 / 滑块…)改为 **opt-in**:`--features camoufox`(`slider` 会自动带入)。
+  升级方式:依赖处显式开启即可,`drission = { version = "0.2", features = ["camoufox"] }`。
+
+### 新增 Added
+
+- **Windows Chrome 路径探测强化(对标 DrissionPage `get_chrome_path`)**:新增 `src/cdp/locate.rs`,
+  探测优先级 = `CHROME_BIN` / `DRISSION_CHROME` 环境变量 → 常见安装路径(Windows 覆盖**用户级**
+  `%LOCALAPPDATA%` 与系统级 `%PROGRAMFILES%` / `%PROGRAMFILES(X86)%` / `%PROGRAMW6432%`)→
+  **Windows 注册表** `App Paths\chrome.exe`(`HKEY_CURRENT_USER` 优先,再 `HKEY_LOCAL_MACHINE`)→
+  系统 `PATH` 扫描。全程**优先 Google Chrome**,解决“免管理员用户级安装 / 非默认盘”探测不到的问题。
+- **CDP 启动便捷方法**:`ChromiumBrowser::launch_with(path, headless)`(指定可执行文件)、
+  `ChromiumBrowser::find_chrome()` 与 `cdp::chrome_path()`(诊断“为何没找到浏览器”)。
+- **`Page` 一行起步门面**(Camoufox 后端,对标 DP `ChromiumPage`):`Page::new()` / `headless()` /
+  `connect()`,经 `Deref` 直接拥有全部 `Tab` 方法;`tab.click/input/exists` 高频捷径。
+- **后端无关共享模块**:`crate::keys`(`Keys` / `KeyInput`)、`crate::net`(`DataPacket` /
+  `RequestData` / `ResponseData` / `ListenFilter` / `ResumeOptions`),两后端复用、始终编译。
+
+### 变更 Changed
+
+- 后端 feature 真正 gate:不开 `camoufox` 则 `browser` / `launcher` / `page` / `web_page` /
+  `session` / `pool` 均不编译;纯 CDP 默认构建独立、不含 Camoufox 代码。
+- 文档与示例全面对齐新默认(示例按需 `required-features`,Camoufox 示例需 `--features camoufox`)。
+
 ## [0.1.1] - 2026-06-20
 
 > `0.1.0` 发布后累积的能力(后端、双模、采集、池化)与工程化基建。
@@ -58,6 +91,7 @@
 - **内置验证码 OCR**(ddddocr 模型 + tract 纯 Rust 推理)与**图片滑块缺口距离识别**(极验)。
 - 跨平台:macOS / Linux / Windows(命名管道传输)。
 
-[Unreleased]: https://github.com/MageGojo/drission-rs/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/MageGojo/drission-rs/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/MageGojo/drission-rs/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/MageGojo/drission-rs/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/MageGojo/drission-rs/releases/tag/v0.1.0

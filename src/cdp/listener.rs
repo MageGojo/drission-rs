@@ -1,5 +1,4 @@
-//! CDP 网络监听 [`CdpListen`](对标 DrissionPage 的 `tab.listen` 与 Juggler 后端的
-//! [`Listen`](crate::browser::Listen))。
+//! CDP 网络监听 [`CdpListen`](对标 DrissionPage 的 `tab.listen` 与 Camoufox 后端的 `Listen`)。
 //!
 //! 与 Juggler 后端用页面 `fetch/XHR` hook 不同,CDP 走**原生 `Network` 域事件**
 //! (`requestWillBeSent`/`responseReceived`/`loadingFinished`)聚合,响应体用
@@ -19,8 +18,8 @@ use tokio::task::AbortHandle;
 use tokio::time::{Instant, sleep};
 
 use crate::Result;
-use crate::browser::listener::{DataPacket, ListenFilter, RequestData, ResponseData};
 use crate::cdp::core::CdpCore;
+use crate::net::{DataPacket, ListenFilter, RequestData, ResponseData};
 use crate::protocol::Connection;
 
 /// 标签内共享的网络监听缓冲(后台任务写入、句柄读取)。

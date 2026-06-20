@@ -14,7 +14,7 @@
 //!   句柄经 **CRT `lpReserved2` 块**注入子进程 fd3/fd4(等价 libuv/Node 的做法,
 //!   Camoufox/Firefox 的 `wmain`/`LauncherProcessWin` 用 `_get_osfhandle(3/4)` 取用)。
 //!
-//! 上层([`crate::protocol::Connection::from_pipe`] / [`crate::browser::BrowserServer`])
+//! 上层([`crate::protocol::Connection::from_pipe`] / Camoufox 后端的 `BrowserServer`)
 //! 对 `writer`/`reader` 只要求 `AsyncWrite`/`AsyncRead`,故两平台的具体类型经下方别名统一。
 
 #[cfg(unix)]
@@ -54,7 +54,7 @@ use crate::{Error, Result};
 
 /// 连接到一个 **Juggler WebSocket 端点**(`ws://host:port/token`),返回已就绪的 ws 流。
 ///
-/// 端点必须讲**原始 Juggler 协议**(由 [`crate::browser::BrowserServer`] 暴露),
+/// 端点必须讲**原始 Juggler 协议**(由 Camoufox 后端的 `BrowserServer` 暴露),
 /// 而不是 Camoufox `python -m camoufox server` 那种 Playwright RPC 协议(二者不兼容)。
 pub async fn ws_connect(url: &str) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>> {
     let (ws, _resp) = connect_async(url)

@@ -7,20 +7,21 @@
 
 [English](README.en.md) · **简体中文**
 
-> **drission 是一个用 Rust 编写的高性能反检测浏览器自动化库**:默认驱动 [Camoufox](https://github.com/daijro/camoufox)(Firefox 反检测内核),
-> 可选 Chromium / CDP 后端,**内置字符验证码 OCR**(ddddocr 模型 · 纯 Rust 推理)与**图片滑块缺口距离识别**(极验 / 顶象),
-> 支持 XHR 监听 / 拦截、自动过 Cloudflare 盾、高并发浏览器池,API 语法对齐 [DrissionPage](https://github.com/g1879/DrissionPage),面向高并发爬虫与自动化。
+> **drission 是一个用 Rust 编写的高性能浏览器自动化库**:**默认开箱驱动 Google Chrome**(Chromium / CDP,
+> 也支持 Edge / Brave / Chromium / Electron),**一行开启** [Camoufox](https://github.com/daijro/camoufox)(Firefox 反检测内核)
+> 及其全部高级能力——**内置字符验证码 OCR**(ddddocr 模型 · 纯 Rust 推理)、**图片滑块缺口距离识别**(极验 / 顶象)、
+> 自动过 Cloudflare 盾、XHR 监听 / 拦截、高并发浏览器池。API 语法对齐 [DrissionPage](https://github.com/g1879/DrissionPage),面向高并发爬虫与自动化。
 >
-> *drission is a high-performance, anti-detect browser-automation library in Rust: Camoufox/Firefox by default (optional Chromium/CDP),
-> with **built-in captcha OCR** and **image slider-gap recognition**, async high-concurrency crawling, XHR listen/intercept and
-> Cloudflare bypass — with a DrissionPage-style API.*
+> *drission is a high-performance browser-automation library in Rust: drives **Google Chrome (CDP) by default**, with Camoufox/Firefox
+> anti-detect available via one feature flag — **built-in captcha OCR**, **image slider-gap recognition**, async high-concurrency
+> crawling, XHR listen/intercept and Cloudflare bypass — with a DrissionPage-style API.*
 
 本库由 **极数本源([apizero.cn](https://apizero.cn))** 出品与维护,是其自动化与数据采集技术栈的一部分。
-如果你在找「**Rust 验证码识别 / 滑块缺口距离 / 反检测浏览器 / 高并发爬虫**」的一站式方案,这里是答案。
+如果你在找「**Rust Chrome 自动化 / 验证码识别 / 滑块缺口距离 / 反检测浏览器 / 高并发爬虫**」的一站式方案,这里是答案。
 
-> **与众不同之处**:Rust 生态里的浏览器自动化库(如 `zendriver-rs`、`rust_drission`、`stygian-browser` 等)大多基于 Chromium / CDP,
-> 且验证码普遍依赖第三方打码服务(capsolver / 2captcha)。**drission 内置离线验证码识别(ddddocr OCR + 图片滑块缺口距离),
-> 并默认使用 Camoufox / Firefox 反检测内核**——开箱即用、无需联网打码,是「**Rust 版 DrissionPage**」里少有的自带打码方案。
+> **与众不同之处**:Rust 生态里的浏览器自动化库(如 `zendriver-rs`、`rust_drission`、`stygian-browser` 等)验证码普遍依赖第三方打码服务
+> (capsolver / 2captcha)。**drission 默认开箱即用驱动 Google Chrome,并内置离线验证码识别(ddddocr OCR + 图片滑块缺口距离)、
+> 一行切换 Camoufox / Firefox 反检测内核**——无需联网打码,是「**Rust 版 DrissionPage**」里少有的自带打码方案。
 
 ---
 
@@ -37,17 +38,17 @@
 
 ---
 
-## 🆕 最新版本 v0.1.1 新增
+## 🆕 最新版本 v0.2.0 新增
 
-> 完整记录见 [CHANGELOG.md](CHANGELOG.md);以下为 `0.1.0` 之后累积的**向后兼容新增**,故按补丁号递增。
+> 完整记录见 [CHANGELOG.md](CHANGELOG.md)。本版**默认后端改为 Google Chrome(CDP)**、Windows 稳定支持。
 
-- **CDP / Chromium 后端**(`--features cdp`):新增 `ChromiumBrowser` / `ChromiumTab` / `ChromiumElement`,可驱动或接管 **Chrome / Edge / Brave / Electron**,含原生可信点击、拟人输入、`Network` 监听与 `Fetch` 拦截,数据类型与 Camoufox 后端共用。
-- **Session(HTTP)双模 + `WebPage` 双模门面**:不开浏览器的纯 HTTP 会话,cookie 与浏览器双向互通,`change_mode` 自动同步登录态(对标 DrissionPage 的 Driver + Session,省内存、旧机友好)。
-- **数据采集导出**:`scrape` 模块(`records_to_csv` / `records_to_json` / `write_csv` / `write_json`)、表格提取(`Element::table`)、自动翻页(`Tab::paginate`)。
-- **代理池健康检查**:`ProxyHealth` / `ProxyGeo`,出口 IP 地理 ↔ 指纹自洽覆盖,住宅代理轮换。
-- **纯算签名运行器**(`--features signer`):内嵌 QuickJS,把「吐环境」导出的 `env.js` 编进单个二进制,**无需 Node / 浏览器**即可回放补环境并纯算签名。
-- **Cloudflare 自动过盾** `tab.pass_cloudflare()`、**顶象缺口通用算法** `GapMethod::ContentNcc`、**登录态持久化** `storageState`、**逐字符拟人输入** `ele.input_human`、**Shadow DOM**(`ShadowRoot`)、**下载管理** `tab.downloads()`、**请求拦截句柄** `tab.intercept()`。
-- **工程化基建**:多平台 CI(fmt / clippy / test / feature 矩阵 / 跨平台 check / docs.rs 构建)、离线集成测试、criterion 基准、`CHANGELOG` / `CONTRIBUTING` / `SECURITY`。
+- **默认开箱驱动 Google Chrome(CDP)** —— 破坏性变更:`default = ["cdp"]`,开箱即用驱动 / 接管 **Chrome / Edge / Brave / Chromium / Electron**。Camoufox / Firefox 反检测内核及其全部高级能力(`Page` / `WebPage` / `SessionPage` / 池 / 吐环境 / 过盾 / 滑块…)改为 **`--features camoufox`** 一行开启。
+- **Windows 稳定支持 + Chrome 路径智能探测(对标 DrissionPage `get_chrome_path`)**:`CHROME_BIN` / `DRISSION_CHROME` 环境变量 → 常见安装路径(Windows 覆盖**用户级** `%LOCALAPPDATA%` 与系统级 `%PROGRAMFILES%` 系列)→ **Windows 注册表** `App Paths\chrome.exe`(HKCU 优先,再 HKLM)→ 系统 `PATH` 扫描;全程**优先 Google Chrome**,解决免管理员用户级安装 / 非默认盘探测不到的问题。
+- **CDP 启动便捷方法**:`ChromiumBrowser::launch_with(path, headless)`(指定可执行文件)、`ChromiumBrowser::find_chrome()` 与 `cdp::chrome_path()`(诊断“为何没找到浏览器”)。
+- **`Page` 一行起步门面**(Camoufox,对标 DP `ChromiumPage`):`Page::new()` / `headless()` / `connect()`,经 `Deref` 直接拥有全部 `Tab` 方法;`tab.click/input/exists` 高频捷径。
+- **后端无关共享模块**:`crate::keys`(`Keys` / `KeyInput`)、`crate::net`(`DataPacket` / `ListenFilter` / `ResumeOptions` 等),两后端复用、始终编译。
+
+> 早期版本能力(`0.1.x`):CDP 后端、Session / `WebPage` 双模、采集导出、代理池健康、纯算签名运行器、Cloudflare 过盾、顶象缺口算法、登录态持久化、Shadow DOM、下载管理、工程化 CI —— 详见 [CHANGELOG.md](CHANGELOG.md)。
 
 ---
 
@@ -113,7 +114,7 @@ println!("需移动 {:.0}px,置信 {:.2}", gap.displace, gap.confidence);
 - **截图与录像**:元素 / 整页 / 区域截图,视口录像合成 mp4。
 - **吐环境(补环境)**:采集 canvas / webgl / audio 真实指纹 + 签名 sink 定位,一键导出可 `node` 运行的补环境工程;配合 `signer` 可编成无 Node 单二进制纯算签名。
 - **接管浏览器**:`BrowserServer` 暴露 WebSocket 端点,`Browser::connect` 接管已运行的浏览器。
-- **多后端**:默认 Camoufox / Juggler;`--features cdp` 起 Chromium / CDP 后端接管 Chrome / Edge / Brave / Electron。
+- **多后端**:**默认 Chromium / CDP**(驱动 / 接管 Chrome / Edge / Brave / Chromium / Electron);`--features camoufox` 起 Camoufox / Firefox(Juggler)反检测后端及其全部高级能力。
 
 ---
 
@@ -122,13 +123,14 @@ println!("需移动 {:.0}px,置信 {:.2}", gap.displace, gap.confidence);
 | 维度 | **drission**(Rust) | DrissionPage(Python) | Playwright / Selenium |
 |---|---|---|---|
 | 语言 / 运行时 | Rust · `tokio` 异步 · 可编单二进制 | Python | 多语言 |
-| 默认反检测 | ✅ Camoufox(Firefox 反检测内核) | ⚠️ 需自行加固 | ❌ 默认易被识别 |
+| 默认后端 | ✅ Google Chrome(CDP),一行切 Camoufox 反检测 | Chromium | 多浏览器 |
+| 内置反检测内核 | ✅ Camoufox(`--features camoufox`) | ⚠️ 需自行加固 | ❌ 默认易被识别 |
 | 内置验证码 OCR | ✅ 离线纯 Rust 推理 | ❌ | ❌ |
 | 滑块缺口距离识别 | ✅ 极验 / 顶象 | ❌ | ❌ |
 | 自动过 Cloudflare | ✅ `pass_cloudflare()` | ⚠️ 部分 | ❌ |
 | XHR 监听 / 抓响应体 | ✅ 内置 | ✅ | ⚠️ 需手写 |
 | 高并发池 + 断点续抓 | ✅ `BrowserPool` 内置 | ⚠️ 需自建 | ❌ |
-| 后端 | Camoufox + 可选 Chromium/CDP | Chromium | 多浏览器 |
+| 后端 | Chromium / CDP(默认)+ 可选 Camoufox | Chromium | 多浏览器 |
 
 > 一句话:**想要「DrissionPage 的顺手 + Rust 的性能 + 自带打码与反检测」,选 drission。**
 
@@ -138,37 +140,57 @@ println!("需移动 {:.0}px,置信 {:.2}", gap.displace, gap.confidence);
 
 ```toml
 [dependencies]
-drission = "0.1"
+drission = "0.2"                                         # 默认 = Chromium / CDP(Google Chrome)
 
-# 按需开启验证码 / 后端能力(默认关,保持核心精简):
-# drission = { version = "0.1", features = ["ocr", "slider", "cdp", "signer"] }
+# 要 Camoufox 反检测内核 + 全部高级能力(吐环境 / 过盾 / 池 / 滑块…),开 camoufox:
+# drission = { version = "0.2", features = ["camoufox", "ocr", "slider", "signer"] }
 ```
 
 | feature | 能力 | 依赖 | 默认 |
 |---|---|---|---|
-| `camoufox` | Camoufox / Firefox(Juggler)后端 | 核心,始终编译 | **开** |
+| `cdp` | Chromium / CDP 后端(Chrome / Edge / Brave / Chromium / Electron) | std,无额外重依赖 | **开** |
+| `camoufox` | Camoufox / Firefox(Juggler)反检测后端 + 全部高级能力 | std,自动下载 Camoufox | 关 |
 | `ocr` | 字符验证码识别(ddddocr + tract) | `image` + `tract-onnx` | 关 |
-| `slider` | 图片滑块缺口距离识别(极验 / 顶象) | 纯 JS + std,零额外依赖 | 关 |
-| `cdp` | Chromium 后端(Chrome / Edge / Brave / Electron) | std,无额外重依赖 | 关 |
+| `slider` | 图片滑块缺口距离识别(极验 / 顶象) | 纯 JS + std,自动带入 `camoufox` | 关 |
 | `signer` | 纯算签名运行器(内嵌 QuickJS,无需 Node) | `rquickjs` | 关 |
 
 ---
 
 ## 🚀 快速开始
 
+**默认后端 = Google Chrome(CDP)**,无需任何 feature,自动探测本机 Chrome(Windows 含注册表 / 用户级安装):
+
 ```rust
 use drission::prelude::*;
 
 #[tokio::main]
 async fn main() -> drission::Result<()> {
-    // 留空 binary_path 即自动下载分发 Camoufox 到 ~/.cache/camoufox
+    // 自动定位 Google Chrome(CHROME_BIN/DRISSION_CHROME → 安装路径 → Windows 注册表 → PATH)。
+    // 要指定浏览器:ChromiumBrowser::launch_with("C:\\...\\chrome.exe", true)
+    let browser = ChromiumBrowser::launch(true).await?;     // headless
+    let tab = browser.new_tab("https://example.com").await?;
+
+    println!("title = {:?}", tab.title().await?);
+    println!("h1    = {:?}", tab.ele_text("h1").await?);
+
+    browser.quit().await?;
+    Ok(())
+}
+```
+
+**Camoufox 反检测内核**(`--features camoufox`)—— 自动下载分发,带过盾 / 吐环境 / 池 / 滑块等全部高级能力:
+
+```rust
+use drission::prelude::*;
+
+#[tokio::main]
+async fn main() -> drission::Result<()> {
     let browser = Browser::launch(BrowserOptions::new().headless(true)).await?;
     let tab = browser.latest_tab().await?;
 
     tab.listen_start(&["api/data"]).await?;        // 先开监听
     tab.get("https://example.com").await?;          // 再访问
     tab.ele("@id:kw").await?.input("drission").await?;
-    tab.ele("#submit").await?.click().await?;
 
     let packet = tab.listen_wait().await?;          // 抓到目标 XHR(含响应体)
     println!("{}", packet.response.body);
@@ -178,26 +200,25 @@ async fn main() -> drission::Result<()> {
 }
 ```
 
-示例:
+示例(Camoufox 系示例需 `--features camoufox`):
 
 ```bash
-cargo run --example quickstart                          # 最小闭环
-cargo run --example pool_crawl                          # 高并发池 + 代理/指纹轮换 + 断点续抓
-cargo run --example ocr_captcha   --features ocr        # 验证码 OCR
-cargo run --example apizero_login --features ocr        # 端到端:填表 + OCR 验证码 + 登录
-cargo run --example geetest_slide --features slider     # 极验滑块
-cargo run --example dx_slide      --features slider      # 顶象滑块缺口识别(HL=0 看界面)
-cargo run --example cdp_demo      --features cdp         # Chromium / CDP 后端
-cargo run --example env_signer    --features signer      # 内嵌 QuickJS 纯算签名(无 Node)
+cargo run --example cdp_demo                                  # 默认 Chromium / CDP 后端(Google Chrome)
+cargo run --example quickstart    --features camoufox         # Camoufox 最小闭环
+cargo run --example pool_crawl    --features camoufox         # 高并发池 + 代理/指纹轮换 + 断点续抓
+cargo run --example ocr_captcha   --features camoufox,ocr     # 验证码 OCR
+cargo run --example geetest_slide --features slider           # 极验滑块(slider 自动带入 camoufox)
+cargo run --example dx_slide      --features slider           # 顶象滑块缺口识别(HL=0 看界面)
+cargo run --example env_signer    --features signer           # 内嵌 QuickJS 纯算签名(无 Node)
 ```
 
 ---
 
 ## 🖥️ 支持的平台与浏览器
 
-- **平台**:macOS(arm64,主力)· Linux · Windows(命名管道传输,已打通)。
-- **浏览器**:[Camoufox](https://github.com/daijro/camoufox)(Firefox 反检测分支),首次运行**自动下载分发**;可选 Chromium 后端(Chrome / Edge / Brave / Electron,`--features cdp`)。
-- **协议**:Firefox 的 **Juggler**(非 CDP)——Camoufox 仅支持 Juggler,本库自研 `tokio` 异步 Juggler 客户端;Chromium 后端走 **CDP**。
+- **平台**:macOS(arm64,主力)· Linux · **Windows(稳定支持)**——CDP 直接启动本机浏览器;Camoufox 后端用命名管道传输。
+- **浏览器**:**默认 Google Chrome**(及 Edge / Brave / Chromium / Electron,CDP);Chrome 路径智能探测(Windows 注册表 `App Paths` + 用户级 `%LOCALAPPDATA%` + `PATH`,对标 DrissionPage)。可选 [Camoufox](https://github.com/daijro/camoufox)(Firefox 反检测分支,`--features camoufox`,首次运行**自动下载分发**)。
+- **协议**:Chromium 后端走 **CDP**(Chrome DevTools Protocol);Camoufox 走 Firefox 的 **Juggler**(本库自研 `tokio` 异步 Juggler 客户端)。
 - **Rust**:≥ 1.85(edition 2024)。
 
 ---
@@ -210,8 +231,8 @@ A:API 语法刻意对齐 DrissionPage,从 Python DP 迁移几乎零成本(见 [A
 **Q:验证码识别要联网或调用打码平台吗?**
 A:不需要。字符 OCR 用 ddddocr 预训练模型 + 纯 Rust 推理**离线**完成;滑块缺口距离是本地图像算法。首次仅自动下载一次模型到缓存。
 
-**Q:只能用 Firefox 吗?支持 Chrome 吗?**
-A:默认后端是 Camoufox(Firefox 反检测分支);开启 `--features cdp` 后可用 **Chromium / CDP** 后端驱动或接管 Chrome / Edge / Brave / Electron。
+**Q:支持 Chrome 吗?默认用哪个浏览器?**
+A:**默认就是 Google Chrome**(Chromium / CDP 后端,开箱即用,也支持 Edge / Brave / Chromium / Electron)。本机 Chrome 路径自动探测(`CHROME_BIN` / `DRISSION_CHROME` → 安装路径 → **Windows 注册表 `App Paths`** → `PATH`,对标 DrissionPage),找不到可用 `ChromiumBrowser::launch_with(path, headless)` 指定。要 Firefox 反检测内核则开 `--features camoufox`。
 
 **Q:能过 Cloudflare 吗?**
 A:可以。`tab.pass_cloudflare()` 支持交互式 Turnstile 可信点击与非交互式自动放行。

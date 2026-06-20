@@ -2,16 +2,35 @@
 
 > `drission` 自带 48+ 个端到端示例。**带 🔌 的完全离线**(进程内起 HTTP 服务 / `data:` / `file://` 页,
 > 不依赖外网,可直接当集成测试跑);**带 🌐 的需要联网**(访问真实站点)。
-> 首次运行会自动下载 Camoufox 到 `~/.cache/camoufox`(`fetch_browser` 可预热)。
+>
+> **默认后端 = Chromium / CDP(Google Chrome)**:`cdp_demo` / `cdp_advanced` 默认即可跑。其余示例多数用
+> **Camoufox** 后端,需 `--features camoufox`(首次运行自动下载 Camoufox 到 `~/.cache/camoufox`,`fetch_browser` 可预热)。
 
 **通用运行方式**
 
 ```bash
-cargo run --example <名字>                       # 默认 feature
-cargo run --example <名字> --features <feature>  # 需要 ocr / slider / cdp / signer 时
+cargo run --example cdp_demo                          # 默认 = CDP / Google Chrome,无需 feature
+cargo run --example <名字> --features camoufox        # Camoufox 系示例(下表绝大多数)
+cargo run --example <名字> --features camoufox,ocr    # 再叠加 ocr / slider / signer 等
 ```
 
-`需要` 列里的 `· ocr/slider/cdp/signer` 表示必须加 `--features`;`🔌` 离线 / `🌐` 联网。
+`需要` 列:`· camoufox/ocr/slider/signer/cdp` 表示必须加对应 `--features`(`slider` 会自动带入 `camoufox`);`🔌` 离线 / `🌐` 联网。
+
+## 大道至简:`Page` 一行起步(对标 DrissionPage `ChromiumPage`,需 `--features camoufox`)
+
+日常脚本推荐用 `Page` 门面——开浏览器 + 驱动当前标签合一,像写 Python:
+
+```rust
+use drission::prelude::*;
+let page = Page::headless().await?;            // 或 Page::new()(有头)/ Page::with(opts)
+page.get("https://example.com").await?;
+println!("{}", page.title().await?);
+page.click("@id:more").await?;                 // 「找+点」一步;另有 page.input(sel, text)/page.exists(sel)
+page.quit().await?;
+```
+
+`page` 通过 `Deref` 拥有**全部 `Tab` 方法**(`ele`/`run_js`/`listen`/`actions`/`dump_env`…)。需要多标签 /
+接管 / 并发池等更底层控制时,仍可用 `Browser` + `Tab`(`Page` 是附加门面,不替代它们)。
 
 ---
 
@@ -19,7 +38,7 @@ cargo run --example <名字> --features <feature>  # 需要 ocr / slider / cdp /
 
 | 示例 | 说明 | 需要 |
 |---|---|---|
-| [quickstart](quickstart.rs) | 最小闭环:启动 → 开标签 → 访问 → 读标题/URL → 查元素读文本 → 退出 | 🌐 |
+| [quickstart](quickstart.rs) | 最小闭环(**`Page` 一行起步**):访问 → 读标题/URL → 查元素读文本 → 退出 | 🌐 |
 | [page_basics](page_basics.rs) | 页面基础能力(对标 DrissionPage)端到端自验证 | 🔌 |
 | [page_extras](page_extras.rs) | 进阶页面:iframe 内元素 / JS 对话框 / 文件上传 / 静态 XPath | 🔌 |
 
@@ -27,7 +46,7 @@ cargo run --example <名字> --features <feature>  # 需要 ocr / slider / cdp /
 
 | 示例 | 说明 | 需要 |
 |---|---|---|
-| [form_input](form_input.rs) | 注入输入框 + 按钮,输入文本后点击,读回结果 | 🔌 |
+| [form_input](form_input.rs) | 注入输入框 + 按钮,用 `page.input/click/exists` 捷径输入并点击,读回结果 | 🔌 |
 | [form_fill](form_fill.rs) | 自动填完 `examples/1.html` 的 4 步问卷并校验 | 🔌 |
 | [file_upload](file_upload.rs) | 文件上传三种写法端到端自验证 | 🔌 |
 | [ele_extras](ele_extras.rs) | 元素几何/状态/属性 + 元素级 wait + 键盘(组合键/序列) | 🔌 |
@@ -118,12 +137,12 @@ cargo run --example <名字> --features <feature>  # 需要 ocr / slider / cdp /
 | [ws_connect](ws_connect.rs) | WS 接管浏览器(`BrowserServer` + `Browser::connect`) | 🔌 |
 | [fetch_browser](fetch_browser.rs) | 预下载 / 校验本机 Camoufox 可执行文件 | 🌐 |
 
-## CDP / Chromium 后端(`--features cdp`)
+## CDP / Chromium 后端(**默认后端**,Google Chrome,无需 feature)
 
 | 示例 | 说明 | 需要 |
 |---|---|---|
-| [cdp_demo](cdp_demo.rs) | CDP 后端 demo:启动/接管 Chrome → 导航 → run_js → 元素文本 → 截图 | 🌐 · cdp |
-| [cdp_advanced](cdp_advanced.rs) | CDP 深化能力端到端自验证(进程内 HTTP 服务,Chrome 访问 localhost) | 🔌 · cdp |
+| [cdp_demo](cdp_demo.rs) | CDP 后端 demo:启动/接管 Google Chrome → 导航 → run_js → 元素文本 → 截图(默认浏览器,自动探测路径) | 🌐 |
+| [cdp_advanced](cdp_advanced.rs) | CDP 深化能力端到端自验证(进程内 HTTP 服务,Chrome 访问 localhost) | 🔌 |
 
 ## Windows 专项(在 Windows 上运行)
 

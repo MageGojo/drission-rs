@@ -122,9 +122,14 @@ fn main() {
         }
     }
 
-    println!("\n[自检] 补环境回放 vs 录制种子:{pass}/{} 字段一致", pass + fail);
+    println!(
+        "\n[自检] 补环境回放 vs 录制种子:{pass}/{} 字段一致",
+        pass + fail
+    );
     if fail == 0 {
-        println!("  ✅ 全部一致 —— 二进制里补出的环境忠实还原了浏览器(canvas/webgl/audio 指纹均回放正确)。");
+        println!(
+            "  ✅ 全部一致 —— 二进制里补出的环境忠实还原了浏览器(canvas/webgl/audio 指纹均回放正确)。"
+        );
     } else {
         println!("  ⚠ {fail} 个字段不一致:");
         for (f, got, want) in &bad {

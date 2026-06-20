@@ -1,6 +1,6 @@
 [package]
 name = "drission"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.85"
 authors = ["极数本源 (apizero.cn)"]
@@ -22,20 +22,21 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-# 后端选择(默认即"我们的版本":Camoufox/Firefox 的 Juggler 后端)。
-default = ["camoufox"]
-# Camoufox / Firefox(Juggler)后端 —— 本库核心,默认开、始终编译。
-camoufox = []
-# Chromium(Chrome / Edge / Brave / Electron,CDP)后端 —— 可选、实验性;开启后可 `ChromiumBrowser` 等。
+# 后端选择。默认 = 纯 Chromium/CDP(最精简,不含 Camoufox 代码);Camoufox 全 opt-in。
+default = ["cdp"]
+# Chromium(Chrome / Edge / Brave / Electron,CDP)后端 —— 默认后端。
 cdp = []
-# 滑块/图片缺口距离识别(通用滑块 + 极验 + 顶象 ContentNcc)。纯 JS+std 零额外依赖,默认关、按需开。
-slider = []
-# 验证码 OCR(ddddocr 预训练模型 + 纯 Rust tract 推理)。可选,避免给不需要的用户引入重依赖。
+# Camoufox / Firefox(Juggler)反检测后端 + 全部高层能力(Page/WebPage/Session/Pool/吐环境/过盾…)。
+# opt-in,真正 gate:不开 camoufox 则 browser/launcher/page/web_page/session/pool 都不编译。
+camoufox = []
+# 滑块/图片缺口距离识别(通用滑块 + 极验 + 顶象 ContentNcc)。基于 Camoufox Tab,故自动带入 camoufox。
+slider = ["camoufox"]
+# 验证码 OCR(ddddocr 预训练模型 + 纯 Rust tract 推理)。Ocr 识别器后端无关;
+# tab.ocr_image 便捷方法需 camoufox。可选,避免给不需要的用户引入重依赖。
 ocr = ["dep:image", "dep:tract-onnx"]
 tract-onnx = ["dep:tract-onnx"]
 image = ["dep:image"]
-# 纯算签名运行器:内嵌 QuickJS(rquickjs),把吐出的 env.js 编进单个二进制,
-# 无需 Node / 浏览器 / 任何安装即可回放补环境并纯算签名。默认关、按需开。
+# 纯算签名运行器:内嵌 QuickJS(rquickjs),把吐出的 env.js 编进单个二进制。后端无关,默认关、按需开。
 signer = ["dep:rquickjs"]
 
 [dependencies]
@@ -64,16 +65,26 @@ zip = "8.6.0"
 criterion = "0.7.0"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 
-# OCR 示例用到 feature-gated 的 tab.ocr_image,仅在 --features ocr 时编译。
+# ── 示例 feature 门控 ──────────────────────────────────────────────────────────
+# 默认后端是纯 CDP;用 Camoufox `Browser`/`Page` 的示例必须声明 `required-features=["camoufox"]`,
+# 否则默认 `cargo build --examples` 会因 camoufox 模块未编译而失败。
+# 运行 Camoufox 示例:`cargo run --example quickstart --features camoufox`。
+
+# Chromium/CDP 后端示例(默认即可)。
 [[example]]
-name = "ocr_captcha"
-required-features = ["ocr"]
+name = "cdp_demo"
+required-features = ["cdp"]
 
 [[example]]
-name = "apizero_login"
-required-features = ["ocr"]
+name = "cdp_advanced"
+required-features = ["cdp"]
 
-# 滑块/缺口识别示例需 --features slider。
+# 纯算签名运行器(QuickJS,不开浏览器)。
+[[example]]
+name = "env_signer"
+required-features = ["signer"]
+
+# 滑块/缺口识别示例(slider 自动带入 camoufox)。
 [[example]]
 name = "dx_slide"
 required-features = ["slider"]
@@ -86,19 +97,179 @@ required-features = ["slider"]
 name = "slider_local"
 required-features = ["slider"]
 
-# 纯算签名运行器示例:内嵌 QuickJS,把 env.js 编进二进制,无需 Node/浏览器。
+# OCR 示例:用 Camoufox 的 tab.ocr_image,需 camoufox + ocr。
 [[example]]
-name = "env_signer"
-required-features = ["signer"]
-
-# Chromium/CDP 后端示例需 --features cdp。
-[[example]]
-name = "cdp_demo"
-required-features = ["cdp"]
+name = "ocr_captcha"
+required-features = ["camoufox", "ocr"]
 
 [[example]]
-name = "cdp_advanced"
-required-features = ["cdp"]
+name = "apizero_login"
+required-features = ["camoufox", "ocr"]
+
+# Camoufox 后端示例(Browser/Page/Tab/Pool/Session/吐环境/过盾…),需 --features camoufox。
+[[example]]
+name = "quickstart"
+required-features = ["camoufox"]
+
+[[example]]
+name = "form_input"
+required-features = ["camoufox"]
+
+[[example]]
+name = "anti_detect"
+required-features = ["camoufox"]
+
+[[example]]
+name = "stealth_check"
+required-features = ["camoufox"]
+
+[[example]]
+name = "cf_check"
+required-features = ["camoufox"]
+
+[[example]]
+name = "exa_cf"
+required-features = ["camoufox"]
+
+[[example]]
+name = "fetch_browser"
+required-features = ["camoufox"]
+
+[[example]]
+name = "concurrent_listen"
+required-features = ["camoufox"]
+
+[[example]]
+name = "intercept"
+required-features = ["camoufox"]
+
+[[example]]
+name = "intercept_window"
+required-features = ["camoufox"]
+
+[[example]]
+name = "listen_handle"
+required-features = ["camoufox"]
+
+[[example]]
+name = "console_listen"
+required-features = ["camoufox"]
+
+[[example]]
+name = "ws_listen"
+required-features = ["camoufox"]
+
+[[example]]
+name = "ws_connect"
+required-features = ["camoufox"]
+
+[[example]]
+name = "page_basics"
+required-features = ["camoufox"]
+
+[[example]]
+name = "page_extras"
+required-features = ["camoufox"]
+
+[[example]]
+name = "extras_demo"
+required-features = ["camoufox"]
+
+[[example]]
+name = "relative_shadow"
+required-features = ["camoufox"]
+
+[[example]]
+name = "ele_extras"
+required-features = ["camoufox"]
+
+[[example]]
+name = "actions_drag"
+required-features = ["camoufox"]
+
+[[example]]
+name = "form_fill"
+required-features = ["camoufox"]
+
+[[example]]
+name = "file_upload"
+required-features = ["camoufox"]
+
+[[example]]
+name = "screencast"
+required-features = ["camoufox"]
+
+[[example]]
+name = "download_manager"
+required-features = ["camoufox"]
+
+[[example]]
+name = "proxy_health"
+required-features = ["camoufox"]
+
+[[example]]
+name = "pool_crawl"
+required-features = ["camoufox"]
+
+[[example]]
+name = "session_mode"
+required-features = ["camoufox"]
+
+[[example]]
+name = "web_page_scrape"
+required-features = ["camoufox"]
+
+[[example]]
+name = "dump_env_fingerprint"
+required-features = ["camoufox"]
+
+[[example]]
+name = "douyin_listen"
+required-features = ["camoufox"]
+
+[[example]]
+name = "douyin_listen_long"
+required-features = ["camoufox"]
+
+[[example]]
+name = "douyin_capture"
+required-features = ["camoufox"]
+
+[[example]]
+name = "douyin_dump_env"
+required-features = ["camoufox"]
+
+[[example]]
+name = "bilibili_listen_long"
+required-features = ["camoufox"]
+
+[[example]]
+name = "geetest_diag"
+required-features = ["camoufox"]
+
+[[example]]
+name = "geetest_probe"
+required-features = ["camoufox"]
+
+[[example]]
+name = "ocr_probe"
+required-features = ["camoufox"]
+
+[[example]]
+name = "win_smoke"
+required-features = ["camoufox"]
+
+[[example]]
+name = "win_diag"
+required-features = ["camoufox"]
+
+[[example]]
+name = "win_cf_test"
+required-features = ["camoufox"]
+
+[[example]]
+name = "win_bilibili_test"
+required-features = ["camoufox"]
 
 [target."cfg(unix)".dependencies]
 command-fds = { version = "0.3.3", features = ["tokio"] }
@@ -108,6 +279,7 @@ windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_Security",
     "Win32_Storage_FileSystem",
+    "Win32_System_Registry",
     "Win32_System_Threading",
 ] }
 

@@ -34,10 +34,12 @@ mod core;
 pub mod element;
 pub mod interceptor;
 pub mod listener;
+pub mod locate;
 mod tab;
 
 pub use browser::ChromiumBrowser;
 pub use element::{ChromiumElement, ElementRect as ChromiumElementRect};
 pub use interceptor::{CdpIntercept, CdpInterceptedRequest};
 pub use listener::CdpListen;
+pub use locate::chrome_path;
 pub use tab::ChromiumTab;

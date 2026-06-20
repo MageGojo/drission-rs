@@ -11,40 +11,14 @@ use serde_json::{Value, json};
 use tokio::sync::mpsc;
 
 use crate::Result;
-use crate::browser::listener::{ListenFilter, parse_headers};
+use crate::browser::listener::parse_headers;
+use crate::net::ListenFilter;
 use crate::protocol::Connection;
 use crate::util::base64_encode;
 
-/// 改写放行时可覆盖的字段(均为可选;`None` 表示保持原值)。
-#[derive(Debug, Clone, Default)]
-pub struct ResumeOptions {
-    pub url: Option<String>,
-    pub method: Option<String>,
-    pub headers: Option<Vec<(String, String)>>,
-    pub post_data: Option<String>,
-}
-
-impl ResumeOptions {
-    pub fn new() -> Self {
-        Self::default()
-    }
-    pub fn url(mut self, url: impl Into<String>) -> Self {
-        self.url = Some(url.into());
-        self
-    }
-    pub fn method(mut self, method: impl Into<String>) -> Self {
-        self.method = Some(method.into());
-        self
-    }
-    pub fn headers(mut self, headers: Vec<(String, String)>) -> Self {
-        self.headers = Some(headers);
-        self
-    }
-    pub fn post_data(mut self, post_data: impl Into<String>) -> Self {
-        self.post_data = Some(post_data.into());
-        self
-    }
-}
+/// 改写放行的可选覆盖字段 [`ResumeOptions`] 统一定义在 [`crate::net`];此处再导出,保持
+/// `browser::interceptor::ResumeOptions` 老路径可用。
+pub use crate::net::ResumeOptions;
 
 /// 一个被拦截、等待决策的请求。
 ///

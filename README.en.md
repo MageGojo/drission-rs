@@ -7,20 +7,20 @@
 
 **English** · [简体中文](README.md)
 
-> **drission is a high-performance, anti-detect browser-automation library written in Rust.** By default it drives the
-> [Camoufox](https://github.com/daijro/camoufox) anti-detect browser (optional Chromium / CDP backend), ships a
-> **built-in character-captcha OCR** (ddddocr model · pure-Rust inference) and **image slider-gap recognition**
-> (GeeTest / Dingxiang), supports XHR listen/intercept, automatic Cloudflare bypass and an async high-concurrency pool,
-> with an API aligned to [DrissionPage](https://github.com/g1879/DrissionPage).
+> **drission is a high-performance browser-automation library written in Rust.** It **drives Google Chrome by default**
+> (Chromium / CDP — also Edge / Brave / Chromium / Electron) and **enables the [Camoufox](https://github.com/daijro/camoufox)
+> anti-detect Firefox engine with one feature flag**, plus a **built-in character-captcha OCR** (ddddocr model · pure-Rust
+> inference), **image slider-gap recognition** (GeeTest / Dingxiang), automatic Cloudflare bypass, XHR listen/intercept and
+> an async high-concurrency pool, with an API aligned to [DrissionPage](https://github.com/g1879/DrissionPage).
 
 Made and maintained by **极数本源 ([apizero.cn](https://apizero.cn))** as part of its automation and
-data-collection stack. If you're looking for a one-stop Rust solution for *captcha OCR / slider-gap distance /
-anti-detect browser / high-concurrency crawling*, this is it.
+data-collection stack. If you're looking for a one-stop Rust solution for *Chrome automation / captcha OCR / slider-gap
+distance / anti-detect browser / high-concurrency crawling*, this is it.
 
-> **What sets it apart**: Rust browser-automation libraries (e.g. `zendriver-rs`, `rust_drission`, `stygian-browser`) are mostly
-> Chromium / CDP and rely on third-party captcha services (capsolver / 2captcha). **drission ships built-in offline captcha solving
-> (ddddocr OCR + image slider-gap distance) and defaults to the Camoufox / Firefox anti-detect engine** — no external solver, no
-> network round-trip; a rare "**Rust DrissionPage**" with batteries-included captcha solving.
+> **What sets it apart**: Rust browser-automation libraries (e.g. `zendriver-rs`, `rust_drission`, `stygian-browser`) usually
+> rely on third-party captcha services (capsolver / 2captcha). **drission drives Google Chrome out of the box, ships built-in
+> offline captcha solving (ddddocr OCR + image slider-gap distance), and switches to the Camoufox / Firefox anti-detect engine
+> with one flag** — no external solver, no network round-trip; a rare "**Rust DrissionPage**" with batteries-included captcha solving.
 
 ---
 
@@ -38,17 +38,17 @@ A single `tokio` async API gives you, at once:
 
 ---
 
-## 🆕 New in v0.1.1
+## 🆕 New in v0.2.0
 
-> Full history in [CHANGELOG.md](CHANGELOG.md). The following are **backward-compatible additions** accumulated after `0.1.0`:
+> Full history in [CHANGELOG.md](CHANGELOG.md). This release **switches the default backend to Google Chrome (CDP)** and adds stable Windows support.
 
-- **CDP / Chromium backend** (`--features cdp`): new `ChromiumBrowser` / `ChromiumTab` / `ChromiumElement` to drive or attach to **Chrome / Edge / Brave / Electron**, with native trusted clicks, human typing, `Network` listening and `Fetch` interception, sharing data types with the Camoufox backend.
-- **Session (HTTP) dual mode + `WebPage` facade**: a pure-HTTP session without a browser, with two-way cookie sharing and `change_mode` auto-syncing login state (the Driver + Session model of DrissionPage; memory-friendly).
-- **Data export**: a `scrape` module (`records_to_csv` / `records_to_json` / `write_csv` / `write_json`), table extraction (`Element::table`), pagination (`Tab::paginate`).
-- **Proxy-pool health checks**: `ProxyHealth` / `ProxyGeo`, exit-IP geo ↔ fingerprint consistency, residential proxy rotation.
-- **Pure-script signing runner** (`--features signer`): embeds QuickJS so the exported `env.js` is compiled into a single binary — **replay the restored env and sign with no Node / no browser**.
-- **Automatic Cloudflare bypass** `tab.pass_cloudflare()`, **generic Dingxiang gap algorithm** `GapMethod::ContentNcc`, **login-state persistence** `storageState`, **per-character human typing** `ele.input_human`, **Shadow DOM** (`ShadowRoot`), **download manager** `tab.downloads()`, **intercept handle** `tab.intercept()`.
-- **Engineering infra**: multi-platform CI (fmt / clippy / test / feature matrix / cross-platform check / docs.rs build), offline integration tests, criterion benches, `CHANGELOG` / `CONTRIBUTING` / `SECURITY`.
+- **Drives Google Chrome (CDP) by default** — breaking change: `default = ["cdp"]`, out-of-the-box drive / attach to **Chrome / Edge / Brave / Chromium / Electron**. The Camoufox / Firefox anti-detect engine and all its high-level capabilities (`Page` / `WebPage` / `SessionPage` / pool / env-dump / shield bypass / slider…) are now enabled with **`--features camoufox`**.
+- **Stable Windows support + smart Chrome path detection (mirroring DrissionPage's `get_chrome_path`)**: `CHROME_BIN` / `DRISSION_CHROME` env vars → common install paths (Windows covers **user-level** `%LOCALAPPDATA%` and system-level `%PROGRAMFILES%` family) → **Windows registry** `App Paths\chrome.exe` (HKCU first, then HKLM) → `PATH` scan; always **prefers Google Chrome**, fixing detection for non-admin user installs / non-default drives.
+- **CDP launch helpers**: `ChromiumBrowser::launch_with(path, headless)` (specify the executable), `ChromiumBrowser::find_chrome()` and `cdp::chrome_path()` (diagnose "why was no browser found").
+- **`Page` one-liner facade** (Camoufox; mirrors DP `ChromiumPage`): `Page::new()` / `headless()` / `connect()`, owning all `Tab` methods via `Deref`; `tab.click/input/exists` shortcuts.
+- **Backend-agnostic shared modules**: `crate::keys` (`Keys` / `KeyInput`), `crate::net` (`DataPacket` / `ListenFilter` / `ResumeOptions`…), reused by both backends and always compiled.
+
+> Earlier `0.1.x` capabilities (CDP backend, Session / `WebPage` dual mode, data export, proxy-pool health, pure-script signing runner, Cloudflare bypass, Dingxiang gap algorithm, login-state persistence, Shadow DOM, download manager, CI infra) — see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -122,7 +122,7 @@ println!("move {:.0}px, confidence {:.2}", gap.displace, gap.confidence);
 - **Environment dumping ("env restore")**: collect real canvas / webgl / audio fingerprints + signature-sink
   location, export a `node`-runnable env-restore project in one click; with `signer`, compile it into a no-Node single binary.
 - **Take over a browser**: `BrowserServer` exposes a WebSocket endpoint; `Browser::connect` attaches to a running browser.
-- **Multiple backends**: Camoufox / Juggler by default; `--features cdp` adds a Chromium / CDP backend for Chrome / Edge / Brave / Electron.
+- **Multiple backends**: **Chromium / CDP by default** (drive / attach Chrome / Edge / Brave / Chromium / Electron); `--features camoufox` adds the Camoufox / Firefox (Juggler) anti-detect backend with all high-level capabilities.
 
 ---
 
@@ -131,13 +131,14 @@ println!("move {:.0}px, confidence {:.2}", gap.displace, gap.confidence);
 | Dimension | **drission** (Rust) | DrissionPage (Python) | Playwright / Selenium |
 |---|---|---|---|
 | Language / runtime | Rust · `tokio` async · single binary | Python | multi-language |
-| Anti-detect by default | ✅ Camoufox (anti-detect Firefox) | ⚠️ DIY hardening | ❌ easily detected |
+| Default backend | ✅ Google Chrome (CDP), one flag to Camoufox | Chromium | many browsers |
+| Built-in anti-detect engine | ✅ Camoufox (`--features camoufox`) | ⚠️ DIY hardening | ❌ easily detected |
 | Built-in captcha OCR | ✅ offline, pure Rust | ❌ | ❌ |
 | Slider-gap recognition | ✅ GeeTest / Dingxiang | ❌ | ❌ |
 | Auto Cloudflare bypass | ✅ `pass_cloudflare()` | ⚠️ partial | ❌ |
 | XHR listen / body capture | ✅ built-in | ✅ | ⚠️ manual |
 | Concurrency pool + resume | ✅ `BrowserPool` built-in | ⚠️ DIY | ❌ |
-| Backends | Camoufox + optional Chromium/CDP | Chromium | many browsers |
+| Backends | Chromium / CDP (default) + optional Camoufox | Chromium | many browsers |
 
 > In short: **if you want "DrissionPage's ergonomics + Rust's performance + built-in solving & anti-detect", choose drission.**
 
@@ -147,37 +148,57 @@ println!("move {:.0}px, confidence {:.2}", gap.displace, gap.confidence);
 
 ```toml
 [dependencies]
-drission = "0.1"
+drission = "0.2"                                           # default = Chromium / CDP (Google Chrome)
 
-# Enable captcha / backend capabilities on demand (off by default to keep the core lean):
-# drission = { version = "0.1", features = ["ocr", "slider", "cdp", "signer"] }
+# Want the Camoufox anti-detect engine + all high-level capabilities? enable camoufox:
+# drission = { version = "0.2", features = ["camoufox", "ocr", "slider", "signer"] }
 ```
 
 | feature | capability | deps | default |
 |---|---|---|---|
-| `camoufox` | Camoufox / Firefox (Juggler) backend | core, always compiled | **on** |
+| `cdp` | Chromium / CDP backend (Chrome / Edge / Brave / Chromium / Electron) | std, no extra heavy deps | **on** |
+| `camoufox` | Camoufox / Firefox (Juggler) anti-detect backend + all high-level capabilities | std, auto-downloads Camoufox | off |
 | `ocr` | character captcha recognition (ddddocr + tract) | `image` + `tract-onnx` | off |
-| `slider` | image slider-gap recognition (GeeTest / Dingxiang) | pure JS + std, zero extra deps | off |
-| `cdp` | Chromium backend (Chrome / Edge / Brave / Electron) | std, no extra heavy deps | off |
+| `slider` | image slider-gap recognition (GeeTest / Dingxiang) | pure JS + std, pulls in `camoufox` | off |
 | `signer` | pure-script signing runner (embedded QuickJS, no Node) | `rquickjs` | off |
 
 ---
 
 ## 🚀 Quick start
 
+**Default backend = Google Chrome (CDP)** — no feature needed; auto-detects local Chrome (Windows includes registry / user-level installs):
+
 ```rust
 use drission::prelude::*;
 
 #[tokio::main]
 async fn main() -> drission::Result<()> {
-    // Leave binary_path empty to auto-download a Camoufox build to ~/.cache/camoufox
+    // Auto-locate Google Chrome (CHROME_BIN/DRISSION_CHROME → install paths → Windows registry → PATH).
+    // To pin a browser: ChromiumBrowser::launch_with("C:\\...\\chrome.exe", true)
+    let browser = ChromiumBrowser::launch(true).await?;     // headless
+    let tab = browser.new_tab("https://example.com").await?;
+
+    println!("title = {:?}", tab.title().await?);
+    println!("h1    = {:?}", tab.ele_text("h1").await?);
+
+    browser.quit().await?;
+    Ok(())
+}
+```
+
+**Camoufox anti-detect engine** (`--features camoufox`) — auto-downloaded, with shield bypass / env-dump / pool / slider and all high-level capabilities:
+
+```rust
+use drission::prelude::*;
+
+#[tokio::main]
+async fn main() -> drission::Result<()> {
     let browser = Browser::launch(BrowserOptions::new().headless(true)).await?;
     let tab = browser.latest_tab().await?;
 
     tab.listen_start(&["api/data"]).await?;        // start listening first
     tab.get("https://example.com").await?;          // then navigate
     tab.ele("@id:kw").await?.input("drission").await?;
-    tab.ele("#submit").await?.click().await?;
 
     let packet = tab.listen_wait().await?;          // capture the target XHR (with response body)
     println!("{}", packet.response.body);
@@ -187,17 +208,16 @@ async fn main() -> drission::Result<()> {
 }
 ```
 
-Examples:
+Examples (Camoufox-based examples need `--features camoufox`):
 
 ```bash
-cargo run --example quickstart                          # minimal end-to-end loop
-cargo run --example pool_crawl                          # high-concurrency pool + proxy/fingerprint rotation + resume
-cargo run --example ocr_captcha   --features ocr        # captcha OCR
-cargo run --example apizero_login --features ocr        # end-to-end: fill form + OCR captcha + login
-cargo run --example geetest_slide --features slider     # GeeTest slider
-cargo run --example dx_slide      --features slider      # Dingxiang slider-gap recognition (HL=0 to see the UI)
-cargo run --example cdp_demo      --features cdp         # Chromium / CDP backend
-cargo run --example env_signer    --features signer      # embedded-QuickJS pure-script signing (no Node)
+cargo run --example cdp_demo                                  # default Chromium / CDP backend (Google Chrome)
+cargo run --example quickstart    --features camoufox         # Camoufox minimal loop
+cargo run --example pool_crawl    --features camoufox         # high-concurrency pool + proxy/fingerprint rotation + resume
+cargo run --example ocr_captcha   --features camoufox,ocr     # captcha OCR
+cargo run --example geetest_slide --features slider           # GeeTest slider (slider pulls in camoufox)
+cargo run --example dx_slide      --features slider           # Dingxiang slider-gap recognition (HL=0 to see the UI)
+cargo run --example env_signer    --features signer           # embedded-QuickJS pure-script signing (no Node)
 ```
 
 See the full [Examples index (48+)](examples/README.md).
@@ -206,10 +226,9 @@ See the full [Examples index (48+)](examples/README.md).
 
 ## 🖥️ Supported platforms & browsers
 
-- **Platforms**: macOS (arm64, primary) · Linux · Windows (named-pipe transport, working).
-- **Browser**: [Camoufox](https://github.com/daijro/camoufox) (anti-detect Firefox fork), **auto-downloaded** on first run; optional Chromium backend (Chrome / Edge / Brave / Electron, `--features cdp`).
-- **Protocol**: Firefox's **Juggler** (not CDP) — Camoufox only supports Juggler; this library implements its own
-  async Juggler client on `tokio`. The Chromium backend speaks **CDP**.
+- **Platforms**: macOS (arm64, primary) · Linux · **Windows (stable)** — CDP launches the local browser directly; the Camoufox backend uses named-pipe transport.
+- **Browser**: **Google Chrome by default** (also Edge / Brave / Chromium / Electron, CDP) with smart path detection (Windows registry `App Paths` + user-level `%LOCALAPPDATA%` + `PATH`, mirroring DrissionPage). Optional [Camoufox](https://github.com/daijro/camoufox) (anti-detect Firefox fork, `--features camoufox`, **auto-downloaded** on first run).
+- **Protocol**: the Chromium backend speaks **CDP** (Chrome DevTools Protocol); Camoufox speaks Firefox's **Juggler** (this library implements its own async Juggler client on `tokio`).
 - **Rust**: ≥ 1.85 (edition 2024).
 
 ---
@@ -222,8 +241,8 @@ A: The API is deliberately aligned with DrissionPage, so migrating from Python D
 **Q: Does captcha solving need the network or a solving service?**
 A: No. Character OCR runs **offline** with ddddocr pretrained models + pure-Rust inference; slider-gap distance is a local image algorithm. Only the model is auto-downloaded once to cache.
 
-**Q: Firefox only, or does it support Chrome?**
-A: The default backend is Camoufox (anti-detect Firefox); enable `--features cdp` for a **Chromium / CDP** backend that drives or attaches to Chrome / Edge / Brave / Electron.
+**Q: Does it support Chrome? Which browser is the default?**
+A: **Google Chrome is the default** (Chromium / CDP backend, out of the box; also Edge / Brave / Chromium / Electron). The local Chrome path is auto-detected (`CHROME_BIN` / `DRISSION_CHROME` → install paths → **Windows registry `App Paths`** → `PATH`, mirroring DrissionPage); if not found, pin it via `ChromiumBrowser::launch_with(path, headless)`. For the Firefox anti-detect engine, enable `--features camoufox`.
 
 **Q: Can it pass Cloudflare?**
 A: Yes. `tab.pass_cloudflare()` supports interactive trusted Turnstile clicks and non-interactive auto-pass.
@@ -272,8 +291,8 @@ product/service for profit is prohibited.** See [`LICENSE`](LICENSE).
 
 ## 🙏 Acknowledgements
 
-- [DrissionPage](https://github.com/g1879/DrissionPage): API design inspiration.
-- [Camoufox](https://github.com/daijro/camoufox): default browser engine.
+- [DrissionPage](https://github.com/g1879/DrissionPage): API design inspiration (incl. Chrome path detection).
+- [Camoufox](https://github.com/daijro/camoufox): the optional anti-detect Firefox engine.
 - [ddddocr](https://github.com/sml2h3/ddddocr): captcha OCR pretrained models.
 - [tract](https://github.com/sonos/tract): pure-Rust ONNX inference engine.
 
