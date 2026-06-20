@@ -21,6 +21,7 @@
 //! > 因为 Camoufox 只支持 Juggler。
 
 pub mod browser;
+pub mod cdp;
 pub mod codec;
 pub mod error;
 pub mod launcher;
@@ -42,6 +43,7 @@ pub use error::{Error, Result};
 /// let _opts = BrowserOptions::new().headless(true);
 /// ```
 pub mod prelude {
+    pub use crate::cdp::{ChromiumBrowser, ChromiumTab};
     pub use crate::browser::{
         Actions, Browser, BrowserServer, Console, ConsoleData, ConsoleFilter, ConsoleSteps,
         ContextOverride, Cookie, CookieParam, DataPacket, DialogInfo, DownloadInfo, DownloadMission,
