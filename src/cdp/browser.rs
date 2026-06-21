@@ -141,6 +141,8 @@ impl ChromiumBrowser {
             "SingletonLock",
             "SingletonCookie",
             "SingletonSocket",
+            // 删除版本标记:避免「锁定较旧主版本」时 Chrome 因 profile 由更新版本创建而拒绝打开(降级保护)。
+            "Last Version",
         ] {
             let _ = std::fs::remove_file(dir.join(stale));
         }

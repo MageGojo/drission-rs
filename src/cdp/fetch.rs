@@ -24,6 +24,8 @@ use crate::{Error, Result};
 
 /// Chrome for Testing 已知良好版本索引(含各平台下载直链)。
 const CFT_ENDPOINT: &str = "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json";
+/// 每个里程碑(主版本)最新版索引(用于**锁定指定主版本**,如 137——与 wreq TLS 指纹对齐)。
+const CFT_MILESTONE_ENDPOINT: &str = "https://googlechromelabs.github.io/chrome-for-testing/latest-versions-per-milestone-with-downloads.json";
 const USER_AGENT: &str = concat!("drission-rs/", env!("CARGO_PKG_VERSION"));
 
 /// 默认下载渠道。
@@ -32,6 +34,12 @@ pub const DEFAULT_CHANNEL: &str = "Stable";
 #[derive(Debug, Deserialize)]
 struct CftIndex {
     channels: std::collections::HashMap<String, Channel>,
+}
+
+/// 里程碑索引:`milestones["137"] = { version, downloads }`(复用 [`Channel`] 的形状)。
+#[derive(Debug, Deserialize)]
+struct CftMilestoneIndex {
+    milestones: std::collections::HashMap<String, Channel>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -159,6 +167,74 @@ pub async fn download_chrome_for(platform: &str, channel: &str) -> Result<PathBu
     ensure_executable_bit(&found);
 
     Ok(found)
+}
+
+/// 确保**指定主版本(里程碑)**的 Chrome for Testing 已下载到缓存,返回可执行文件路径。
+///
+/// 用于把内置浏览器**锁定到某个 Chrome 主版本**(如 `137`),让其 TLS/JA3 指纹与 `wreq` 的
+/// 模拟档(同主版本、同为 BoringSSL)对齐 —— 这样浏览器过盾拿到的 `cf_clearance` 能被 `wreq`
+/// 协议请求复用更久(详见调用方 pgid_auto 的说明)。
+///
+/// 缓存目录 `~/.cache/drission/chrome/<platform>-m<milestone>`(与 Stable 缓存隔离,不互相覆盖)。
+pub async fn download_chrome_milestone(platform: &str, milestone: &str) -> Result<PathBuf> {
+    let chrome_root = cache_root().join("chrome");
+    let dest = chrome_root.join(format!("{platform}-m{milestone}"));
+    let exe_name = chrome_exe_name(platform);
+
+    if let Some(found) = find_executable(&dest, exe_name) {
+        tracing::debug!(path = %found.display(), "复用缓存中的 Chrome for Testing(指定里程碑)");
+        return Ok(found);
+    }
+
+    tokio::fs::create_dir_all(&dest).await?;
+    let zip_path = chrome_root.join(format!("chrome-{platform}-m{milestone}.zip"));
+    if zip_path.exists() {
+        tracing::info!(path = %zip_path.display(), "发现预下载的 Chrome zip(里程碑),直接解压复用");
+    } else {
+        let (version, url) = pick_asset_milestone(platform, milestone).await?;
+        tracing::info!(%version, %platform, %milestone, "缓存未命中,下载指定里程碑 Chrome for Testing …");
+        download(&url, &zip_path).await?;
+    }
+
+    let dest_clone = dest.clone();
+    let zip_clone = zip_path.clone();
+    tokio::task::spawn_blocking(move || extract_zip(&zip_clone, &dest_clone))
+        .await
+        .map_err(|e| Error::Other(format!("解压任务 join 失败: {e}")))??;
+    let _ = tokio::fs::remove_file(&zip_path).await;
+
+    let found = find_executable(&dest, exe_name).ok_or_else(|| {
+        Error::BrowserNotFound(format!(
+            "解压后未找到 Chrome 可执行文件({exe_name}),目录: {}",
+            dest.display()
+        ))
+    })?;
+    #[cfg(unix)]
+    ensure_executable_bit(&found);
+    Ok(found)
+}
+
+/// 查询里程碑索引,返回指定平台 / 主版本的 (version, url)。
+async fn pick_asset_milestone(platform: &str, milestone: &str) -> Result<(String, String)> {
+    let client = reqwest::Client::builder().user_agent(USER_AGENT).build()?;
+    let index: CftMilestoneIndex = client
+        .get(CFT_MILESTONE_ENDPOINT)
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+    let m = index.milestones.get(milestone).ok_or_else(|| {
+        Error::BrowserNotFound(format!("Chrome for Testing 无里程碑 `{milestone}`"))
+    })?;
+    for dl in &m.downloads.chrome {
+        if dl.platform == platform {
+            return Ok((m.version.clone(), dl.url.clone()));
+        }
+    }
+    Err(Error::BrowserNotFound(format!(
+        "里程碑 `{milestone}` 无平台 `{platform}` 的 chrome 资产"
+    )))
 }
 
 /// 查询 Chrome for Testing 索引,返回指定平台 / 渠道的 (version, url)。

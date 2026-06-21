@@ -62,7 +62,7 @@ pub use console::{ChromiumConsole, ConsoleData, ConsoleFilter};
 pub use download::{ChromiumDownloads, DownloadMission, DownloadState};
 pub use dump_env::{ChromiumEnvDumper, ChromiumEnvProbe};
 pub use element::{ChromiumElement, ChromiumElementWait, ElementRect as ChromiumElementRect};
-pub use fetch::{cft_platform, download_chrome_for, ensure_chrome};
+pub use fetch::{cft_platform, download_chrome_for, download_chrome_milestone, ensure_chrome};
 pub use fingerprint::{CdpFingerprint, CdpFingerprintPool, CdpOs};
 pub use frame::ChromiumFrame;
 pub use handles::{ChromiumScroll, ChromiumSetTab, ChromiumWait, ChromiumWindow};
