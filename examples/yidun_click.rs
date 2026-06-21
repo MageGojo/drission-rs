@@ -77,12 +77,13 @@ async fn main() -> drission::Result<()> {
     let cw = ClickWord::new().await?;
     println!("[yidun] 模型就绪 ✓");
 
-    let browser = ChromiumBrowser::launch(
-        ChromiumOptions::new()
-            .headless(headless)
-            .window_size(1200, 900),
-    )
-    .await?;
+    // 可选持久 profile(`YIDUN_PROFILE`=目录):有头本地跑时设它 —— Edge/Chrome 的首启/「使用 xxx 身份」
+    // 账户提示只需手动关一次,profile 记住后续不再弹(临时 profile 每次都会重弹挡住首次验证点击)。
+    let mut opts = ChromiumOptions::new().headless(headless).window_size(1200, 900);
+    if let Some(dir) = std::env::var_os("YIDUN_PROFILE") {
+        opts = opts.user_data_dir(std::path::PathBuf::from(dir));
+    }
+    let browser = ChromiumBrowser::launch(opts).await?;
     let tab = browser.new_tab(Some(URL)).await?;
     tokio::time::sleep(Duration::from_secs(5)).await;
 
@@ -124,9 +125,14 @@ async fn main() -> drission::Result<()> {
 
         // ① 监听取这一题:bg 干净图 URL + front 点击顺序(等到最新一题的 api/get)。
         let Some((bg_url, front)) = wait_challenge(&tab, Duration::from_secs(12)).await else {
-            println!("[yidun] 未监听到 api/get(未弹出/被风控);换图重试");
+            // 点选图没弹出来:首次"点击验证"那一下常被浏览器弹窗(如 Edge「使用 xxx 身份」账户提示)
+            // 或窗口失焦挡掉 → 验证框压根没开(此时没有「换图」按钮)。**检测到没弹就再点一次验证按钮**
+            // 重新唤起挑战;若验证框其实开着(只是这题没拿到),才退回「换图」。
+            println!("[yidun] 未监听到 api/get(点选图未弹出);重新点击「点击验证」再触发…");
             if attempt < tries {
-                trusted_refresh(&tab).await;
+                if !retrigger_verify(&tab).await {
+                    trusted_refresh(&tab).await;
+                }
                 tokio::time::sleep(Duration::from_secs(2)).await;
             }
             continue;
@@ -359,6 +365,30 @@ async fn wait_check(tab: &drission::cdp::ChromiumTab, timeout: Duration) -> Opti
             return None;
         }
     }
+}
+
+/// **重新唤起挑战**(点选图没弹出时):先跑一遍 demo 触发器(验证条可能整个没出来),
+/// 再**可信点击**验证按钮(「点击按钮进行验证」`.yidun_control` / `.yidun_intelli-icon` 等)。
+/// 应对首次点击被浏览器弹窗(Edge 账户提示等)或窗口失焦挡掉 → 挑战没弹的情况。返回是否点到了按钮。
+async fn retrigger_verify(tab: &drission::cdp::ChromiumTab) -> bool {
+    // 验证条可能根本没出来:先重跑 demo 触发器把它唤出。
+    let _ = tab.run_js(TRIGGER_JS).await;
+    tokio::time::sleep(Duration::from_millis(600)).await;
+    for s in [
+        "css:.yidun_control",
+        "css:.yidun_tips",
+        "css:.yidun_intelli-icon",
+        "css:.yidun",
+    ] {
+        if let Ok(el) = tab.ele(s).await
+            && el.click().await.is_ok()
+        {
+            println!("[yidun] 重新点击验证按钮 {s}(再触发点选图)");
+            return true;
+        }
+    }
+    println!("[yidun] 未找到可点的验证按钮(验证条未加载?)");
+    false
 }
 
 /// 换图:优先**可信点击**易盾刷新键(真 `<button>`),兜底 JS click。

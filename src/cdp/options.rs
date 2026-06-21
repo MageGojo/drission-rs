@@ -21,9 +21,19 @@ pub struct ChromiumOptions {
     /// 无头 Chrome 的 `navigator.userAgent` 串默认带 `HeadlessChrome`,是 CF 识破的头号信号;
     /// 开启后探测 `chrome --version` 主版本、构造与之一致的精简 UA,经 **`--user-agent` 启动参数**
     /// (浏览器级,覆盖 Turnstile 跨域子帧 —— 对标 DrissionPage `set_user_agent`)下发。
-    /// 仅在**无头 + stealth + 未显式 `user_agent`** 时生效。(新无头的 Sec-CH-UA 品牌默认已不含
-    /// Headless,无需再改客户端提示。)注:**无头仍难过 Turnstile**,过 CF 建议有头。
+    /// 仅在**无头 + stealth + 未显式 `user_agent`** 时生效。(新无头的低熵 Sec-CH-UA 品牌默认已不含
+    /// Headless;但 `--user-agent` 会**清空高熵 Client Hints**,见 [`full_ua_metadata`](Self::full_ua_metadata)。)
     pub mask_ua: bool,
+    /// 无头补全**高熵 Client Hints**(默认 `false` = 不改变现有行为)。
+    ///
+    /// `mask_ua` 用 `--user-agent` 抹掉 UA 串里的 `HeadlessChrome` 时,Chrome 会**清空**
+    /// `navigator.userAgentData.getHighEntropyValues(['fullVersionList','architecture',…])`
+    /// (留下空 `fullVersionList`、空 `architecture/bitness/platformVersion/uaFullVersion`)——
+    /// 这是有头/无头 diff 里仅剩的强无头信号。开启后,每个标签 attach 时再用 CDP
+    /// `Emulation.setUserAgentOverride` 补回完整 `userAgentMetadata`(低熵品牌**运行时读取**以保
+    /// GREASE 正确;完整版本/架构/平台版本据真机推导)→ 高熵 CH 与有头一致。
+    /// 仅在**无头 + stealth + mask_ua(未显式 `user_agent`)**时生效。
+    pub full_ua_metadata: bool,
     /// 窗口大小 `(width, height)`(有头是初始窗口、无头是视口)。
     pub window_size: Option<(u32, u32)>,
     /// User-Agent 覆盖(默认不改,用真实 Chrome UA)。
@@ -55,6 +65,7 @@ impl Default for ChromiumOptions {
             user_data_dir: None,
             stealth: true,
             mask_ua: true,
+            full_ua_metadata: false,
             window_size: None,
             user_agent: None,
             locale: None,
@@ -97,6 +108,13 @@ impl ChromiumOptions {
     /// 开/关无头 UA 伪装(默认开,把 `HeadlessChrome` 改回 `Chrome`)。
     pub fn mask_ua(mut self, yes: bool) -> Self {
         self.mask_ua = yes;
+        self
+    }
+
+    /// 开/关无头**高熵 Client Hints 补全**(默认关;见 [`full_ua_metadata`](Self::full_ua_metadata) 字段)。
+    /// 开启后无头的 `getHighEntropyValues`(fullVersionList/architecture/…)与有头一致。
+    pub fn full_ua_metadata(mut self, yes: bool) -> Self {
+        self.full_ua_metadata = yes;
         self
     }
 

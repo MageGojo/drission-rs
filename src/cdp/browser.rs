@@ -25,6 +25,16 @@ pub struct ChromiumBrowser {
     stealth: bool,
     /// 是否无头(无头时额外注入屏幕尺寸补丁,消除 800x600 这个无头破绽)。
     headless: bool,
+    /// 无头补全高熵 Client Hints(`ChromiumOptions::full_ua_metadata`,opt-in)。
+    /// 仅当为 `true` 且 `ua_override`/`ua_full_version` 就绪时,attach 才用 CDP 补 `userAgentMetadata`。
+    full_ua_metadata: bool,
+    /// 实际经 `--user-agent` 下发的 UA 串(= 无头 mask 路径构造的精简 UA);补环境时复用为
+    /// `Emulation.setUserAgentOverride` 的 `userAgent`,与浏览器级 UA 一致。仅 mask 路径触发时为 `Some`。
+    ua_override: Option<String>,
+    /// Chrome 完整版本号(如 `149.0.7827.115`),补 `fullVersionList` 用。
+    ua_full_version: Option<String>,
+    /// 平台版本(CH 高熵 `platformVersion`,如 mac 的 `26.5.1`);据真机探测。
+    platform_version: Option<String>,
     /// 下载目录(`ChromiumOptions::download_path`):每个新标签 attach 时设下载行为并传给 `CdpCore`。
     download_dir: Option<PathBuf>,
     /// 导航前注入脚本(`ChromiumOptions::init_scripts`):每个新标签 attach 时按序注入(深指纹伪装等),
@@ -148,7 +158,11 @@ impl ChromiumBrowser {
         }
         let mut cmd = tokio::process::Command::new(exe);
         // 受库管理的基础参数(用户参数不得覆盖,见 ChromiumOptions::validate)。
-        cmd.arg("--remote-debugging-port=0")
+        // 用**已知空闲端口**而非 `0`:部分 Chromium 变体(如 CloakBrowser)**不写 `DevToolsActivePort` 文件**,
+        // 若用 `0` 让内核随机选端口,我们就无从得知端口、连不上(现象:浏览器开了但页面空白卡死)。
+        // 指定一个先探到的空闲端口,即可直接轮询 `http://127.0.0.1:<port>/json/version` 拿 WS 端点。
+        let debug_port = pick_free_port()?;
+        cmd.arg(format!("--remote-debugging-port={debug_port}"))
             .arg(format!("--user-data-dir={}", dir.display()));
         if opts.stealth {
             // 反检测启动参数(核心:关掉 AutomationControlled,不传 --enable-automation)。
@@ -170,16 +184,39 @@ impl ChromiumBrowser {
         // UA:**走 `--user-agent` 启动参数**(浏览器级,覆盖所有帧含 Turnstile 跨域 iframe ——
         // 对标 DrissionPage `set_user_agent`;per-session 的 Emulation 覆盖到不了 OOPIF 子帧)。
         // 显式 UA 优先;否则无头 + stealth + mask_ua 时,探测真实 Chrome 版本构造"去 Headless"的精简 UA。
+        // `auto_mask` = 走"自动构造精简 UA"分支(此时 `--user-agent` 会清空高熵 CH,补环境据此触发)。
+        let auto_mask = opts.user_agent.is_none() && opts.headless && opts.stealth && opts.mask_ua;
+        // 版本号(无头 mask 构造精简 UA、以及补环境 fullVersionList 都要):**跨平台**探测。
+        // ⚠ Windows 下 GUI 版 Chrome/Edge 的 `exe --version` 不往 stdout 打印(还会误启动浏览器),
+        // 故 Windows 走 PE 文件版本资源,其它平台才用 `--version`(见 [`probe_chrome_version`])。
+        let chrome_version = if auto_mask {
+            probe_chrome_version(exe).await
+        } else {
+            None
+        };
         let ua = if let Some(u) = &opts.user_agent {
             Some(u.clone())
-        } else if opts.headless && opts.stealth && opts.mask_ua {
-            probe_chrome_major(exe).await.map(stealth::reduced_ua)
+        } else if auto_mask {
+            chrome_version
+                .as_deref()
+                .and_then(stealth::parse_chrome_major)
+                .map(stealth::reduced_ua)
         } else {
             None
         };
         if let Some(ua) = &ua {
             cmd.arg(format!("--user-agent={ua}"));
         }
+        // 无头补环境(opt-in):仅在自动 mask 路径(`--user-agent` 清空了高熵 CH)且拿到 UA 时,
+        // 用完整版本号 + 平台版本,attach 时经 CDP `Emulation.setUserAgentOverride` 补回完整
+        // `userAgentMetadata`。默认 `full_ua_metadata=false` → 三者皆 None → attach 处为 no-op。
+        let want_meta = opts.full_ua_metadata && auto_mask && ua.is_some();
+        let ua_override = if want_meta { ua.clone() } else { None };
+        let (ua_full_version, platform_version) = if want_meta {
+            (chrome_version.clone(), detect_platform_version().await)
+        } else {
+            (None, None)
+        };
         // 地区:走启动参数 / 环境变量(比 CDP Emulation 覆盖更干净)。
         if let Some(loc) = &opts.locale {
             cmd.arg(format!("--lang={loc}"));
@@ -217,9 +254,14 @@ impl ChromiumBrowser {
             .raw_handle()
             .and_then(|h| crate::transport::JobHandle::create_for(h as _));
 
-        // Chrome 启动调试服务后把端口写到 user-data-dir/DevToolsActivePort(首行)。
-        let port = wait_for_devtools_port(&dir.join("DevToolsActivePort")).await?;
-        let ws_url = browser_ws_url(&format!("http://127.0.0.1:{port}")).await?;
+        // 等 DevTools 端点就绪并取浏览器级 WS 端点:**主路径**用我们指定的已知端口轮询 `/json/version`
+        // (不依赖 `DevToolsActivePort` 文件——CloakBrowser 等不写它);**兜底**再读该文件(万一端口写到了别处)。
+        let ws_url = wait_for_ws_url(
+            debug_port,
+            &dir.join("DevToolsActivePort"),
+            Duration::from_secs(30),
+        )
+        .await?;
         let ws = crate::transport::ws_connect(&ws_url).await?;
         Ok(Self {
             conn: Connection::from_ws(ws),
@@ -228,6 +270,10 @@ impl ChromiumBrowser {
             user_data_dir: if persist { None } else { Some(dir) },
             stealth: opts.stealth,
             headless: opts.headless,
+            full_ua_metadata: opts.full_ua_metadata,
+            ua_override,
+            ua_full_version,
+            platform_version,
             download_dir: opts.download_path.clone(),
             init_scripts: opts.init_scripts.clone(),
             #[cfg(windows)]
@@ -254,6 +300,11 @@ impl ChromiumBrowser {
             stealth: opts.stealth,
             // 接管方未知是否无头,保守不注入屏幕补丁。
             headless: false,
+            // 接管不重启浏览器(无 `--user-agent` 注入路径),补环境不适用。
+            full_ua_metadata: false,
+            ua_override: None,
+            ua_full_version: None,
+            platform_version: None,
             download_dir: opts.download_path.clone(),
             init_scripts: opts.init_scripts.clone(),
             // 接管不接管对方生命周期,故不绑 Job。
@@ -426,6 +477,13 @@ impl ChromiumBrowser {
                 )
                 .await;
         }
+        // 无头补环境(opt-in):补回被 `--user-agent` 清空的高熵 Client Hints。
+        // 用 CDP `Emulation.setUserAgentOverride` 下发完整 `userAgentMetadata`(会话级持久,跨导航有效)。
+        if self.full_ua_metadata {
+            if let (Some(ua), Some(full)) = (&self.ua_override, &self.ua_full_version) {
+                apply_ua_metadata(&core, ua, full, self.platform_version.as_deref()).await;
+            }
+        }
         Ok(ChromiumTab::new(core))
     }
 
@@ -452,14 +510,160 @@ impl ChromiumBrowser {
 
 /// 探测浏览器主版本号:运行 `<exe> --version`(打印版本即退出)解析。失败返回 `None`。
 /// 用于无头时构造与真实版本一致的"去 Headless"UA(版本对不上 fingerprintjs/CF 也会拦)。
-async fn probe_chrome_major(exe: &Path) -> Option<u32> {
-    let out = tokio::process::Command::new(exe)
-        .arg("--version")
-        .output()
-        .await
-        .ok()?;
-    let s = String::from_utf8_lossy(&out.stdout);
-    stealth::parse_chrome_major(&s)
+/// 探测浏览器**完整版本号**(如 `149.0.7827.115`)。
+///
+/// - **Windows**:读 PE **文件版本资源**(`VS_FIXEDFILEINFO`)。原因:GUI 版 Chrome/Edge 的
+///   `exe --version` **不向 stdout 打印**(且会误启动一个浏览器实例触发单例锁报错),不可用;
+/// - **其它平台**:`<exe> --version` 解析(mac/linux 正常输出)。
+///
+/// 失败返回 `None`(则无头不去 Headless 化、补环境不触发——退回安全默认,不破坏)。
+async fn probe_chrome_version(exe: &Path) -> Option<String> {
+    #[cfg(windows)]
+    {
+        win_file_version(exe)
+    }
+    #[cfg(not(windows))]
+    {
+        let out = tokio::process::Command::new(exe)
+            .arg("--version")
+            .output()
+            .await
+            .ok()?;
+        let s = String::from_utf8_lossy(&out.stdout);
+        stealth::parse_chrome_full(&s)
+            .or_else(|| stealth::parse_chrome_major(&s).map(|m| format!("{m}.0.0.0")))
+    }
+}
+
+/// Windows:读取可执行文件的 PE 版本资源,返回 `ProductVersion`(如 `149.0.7827.115`)。
+/// 用 `VS_FIXEDFILEINFO` 的数值字段拼装(免去字符串/代码页查询)。失败返回 `None`。
+#[cfg(windows)]
+fn win_file_version(exe: &Path) -> Option<String> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Storage::FileSystem::{
+        GetFileVersionInfoSizeW, GetFileVersionInfoW, VS_FIXEDFILEINFO, VerQueryValueW,
+    };
+    let wide: Vec<u16> = exe
+        .as_os_str()
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    unsafe {
+        let mut handle: u32 = 0;
+        let size = GetFileVersionInfoSizeW(wide.as_ptr(), &mut handle);
+        if size == 0 {
+            return None;
+        }
+        let mut buf = vec![0u8; size as usize];
+        if GetFileVersionInfoW(wide.as_ptr(), 0, size, buf.as_mut_ptr().cast()) == 0 {
+            return None;
+        }
+        // 查询根块 "\" 得到 VS_FIXEDFILEINFO。
+        let sub: [u16; 2] = ['\\' as u16, 0];
+        let mut value_ptr: *mut core::ffi::c_void = core::ptr::null_mut();
+        let mut value_len: u32 = 0;
+        if VerQueryValueW(
+            buf.as_ptr().cast(),
+            sub.as_ptr(),
+            &mut value_ptr,
+            &mut value_len,
+        ) == 0
+            || value_ptr.is_null()
+            || (value_len as usize) < core::mem::size_of::<VS_FIXEDFILEINFO>()
+        {
+            return None;
+        }
+        let info = &*(value_ptr as *const VS_FIXEDFILEINFO);
+        let ms = info.dwProductVersionMS;
+        let ls = info.dwProductVersionLS;
+        Some(format!(
+            "{}.{}.{}.{}",
+            (ms >> 16) & 0xffff,
+            ms & 0xffff,
+            (ls >> 16) & 0xffff,
+            ls & 0xffff
+        ))
+    }
+}
+
+/// 探测平台版本(CH 高熵 `platformVersion`)。mac 用 `sw_vers -productVersion`(精确);
+/// Windows 最佳努力(`cmd /c ver` 取 build:Win11≥22000→`15.0.0`,否则 `10.0.0`);其它平台 `None`。
+/// 无头补环境是 opt-in,主要在 mac 验证;Win 后续可按需细化映射。
+async fn detect_platform_version() -> Option<String> {
+    #[cfg(target_os = "macos")]
+    {
+        let out = tokio::process::Command::new("sw_vers")
+            .arg("-productVersion")
+            .output()
+            .await
+            .ok()?;
+        let v = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        (!v.is_empty()).then_some(v)
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let out = tokio::process::Command::new("cmd")
+            .args(["/c", "ver"])
+            .output()
+            .await
+            .ok()?;
+        let s = String::from_utf8_lossy(&out.stdout);
+        // 形如 "Microsoft Windows [Version 10.0.22631.4317]" → 取 build 段(第三段)。
+        let build = s
+            .split(|c: char| !c.is_ascii_digit() && c != '.')
+            .find(|t| t.starts_with("10.0."))
+            .and_then(|t| t.split('.').nth(2))
+            .and_then(|b| b.parse::<u32>().ok());
+        Some(match build {
+            Some(b) if b >= 22000 => "15.0.0".to_string(),
+            _ => "10.0.0".to_string(),
+        })
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        None
+    }
+}
+
+/// 无头补环境核心:据**纯 Rust 复现的 Chromium GREASE 品牌算法**(版本正确、无需读页面、
+/// 不依赖 about:blank 的 opaque origin)构造完整 `userAgentMetadata`,经 CDP
+/// `Emulation.setUserAgentOverride` 下发(会话级、跨导航持久)→ 补回被 `--user-agent` 清空的
+/// 高熵 Client Hints(`fullVersionList`/`architecture`/`bitness`/`platformVersion`/`uaFullVersion`)。
+/// 失败静默放弃,绝不破坏既有行为。
+async fn apply_ua_metadata(
+    core: &CdpCore,
+    ua: &str,
+    full_version: &str,
+    platform_version: Option<&str>,
+) {
+    let Some(major) = stealth::parse_chrome_major(full_version) else {
+        return;
+    };
+    let to_json = |list: Vec<(String, String)>| -> Vec<Value> {
+        list.into_iter()
+            .map(|(b, v)| json!({ "brand": b, "version": v }))
+            .collect()
+    };
+    let brands = to_json(stealth::ua_brand_list(major, full_version, false));
+    let full_list = to_json(stealth::ua_brand_list(major, full_version, true));
+    let meta = json!({
+        "brands": brands,
+        "fullVersion": full_version,
+        "fullVersionList": full_list,
+        "platform": stealth::ch_platform(),
+        "platformVersion": platform_version.unwrap_or(""),
+        "architecture": stealth::ch_architecture(),
+        "model": "",
+        "mobile": false,
+        "bitness": stealth::ch_bitness(),
+        "wow64": false,
+    });
+    let _ = core
+        .send(
+            "Emulation.setUserAgentOverride",
+            json!({ "userAgent": ua, "userAgentMetadata": meta }),
+        )
+        .await;
 }
 
 fn now_ms() -> u128 {
@@ -469,26 +673,58 @@ fn now_ms() -> u128 {
         .unwrap_or(0)
 }
 
-/// 轮询读取 `DevToolsActivePort` 文件首行的端口号(Chrome 启动调试服务后写入)。
-async fn wait_for_devtools_port(file: &Path) -> Result<u16> {
-    for _ in 0..100 {
-        if let Ok(s) = std::fs::read_to_string(file) {
-            if let Some(line) = s.lines().next() {
-                if let Ok(port) = line.trim().parse::<u16>() {
-                    return Ok(port);
+/// 选一个空闲 TCP 端口(绑定到 `127.0.0.1:0` 拿到内核分配的端口后立即释放)。
+/// 用于 `--remote-debugging-port`,从而**不依赖 `DevToolsActivePort` 文件**发现端口
+/// (CloakBrowser 等部分 Chromium 不写该文件)。释放到 Chrome 绑定之间有极小竞态,单机自动化可接受。
+fn pick_free_port() -> Result<u16> {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0")
+        .map_err(|e| Error::msg(format!("CDP: 选空闲调试端口失败: {e}")))?;
+    let port = listener
+        .local_addr()
+        .map_err(|e| Error::msg(format!("CDP: 读空闲端口失败: {e}")))?
+        .port();
+    Ok(port)
+}
+
+/// 轮询取浏览器级 WebSocket 端点:**主路径**用已知 `port` 打 `/json/version`;
+/// **兜底**读 `DevToolsActivePort` 文件(若浏览器把端口写到了别处)。每次尝试都带超时,绝不无限等待。
+async fn wait_for_ws_url(port: u16, devtools_file: &Path, timeout: Duration) -> Result<String> {
+    let deadline = std::time::Instant::now() + timeout;
+    loop {
+        match browser_ws_url(&format!("http://127.0.0.1:{port}")).await {
+            Ok(url) => return Ok(url),
+            Err(e) => {
+                // 兜底:浏览器若写了 DevToolsActivePort 且端口与我们指定的不同,用它再试一次。
+                if let Ok(s) = std::fs::read_to_string(devtools_file) {
+                    if let Some(p) = s.lines().next().and_then(|l| l.trim().parse::<u16>().ok()) {
+                        if p != port {
+                            if let Ok(url) = browser_ws_url(&format!("http://127.0.0.1:{p}")).await {
+                                return Ok(url);
+                            }
+                        }
+                    }
+                }
+                if std::time::Instant::now() >= deadline {
+                    return Err(Error::msg(format!(
+                        "CDP: 等待调试端点就绪超时(端口 {port});最后错误: {e}"
+                    )));
                 }
             }
         }
-        sleep(Duration::from_millis(100)).await;
+        sleep(Duration::from_millis(150)).await;
     }
-    Err(Error::msg(
-        "CDP: 等待 DevToolsActivePort 超时(浏览器未就绪)",
-    ))
 }
 
-/// 查询 `{http}/json/version` 拿浏览器级 WebSocket 调试端点。
+/// 查询 `{http}/json/version` 拿浏览器级 WebSocket 调试端点。**带超时**(5s),
+/// 避免端口已打开但 HTTP 不应答时 `reqwest` 无限挂起。
 async fn browser_ws_url(http: &str) -> Result<String> {
-    let body: Value = reqwest::get(format!("{http}/json/version"))
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .map_err(|e| Error::msg(format!("CDP: 构建 HTTP 客户端失败: {e}")))?;
+    let body: Value = client
+        .get(format!("{http}/json/version"))
+        .send()
         .await
         .map_err(|e| Error::msg(format!("CDP: 访问 {http}/json/version 失败: {e}")))?
         .json()

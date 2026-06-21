@@ -117,6 +117,11 @@ required-features = ["cdp"]
 name = "cdp_fp"
 required-features = ["cdp"]
 
+# 无头 Client Hints 诊断:mask_ua 开/关对高熵 CH(fullVersionList 等)与 UA 的影响。
+[[example]]
+name = "hl_ch"
+required-features = ["cdp"]
+
 # 每浏览器不同指纹:CdpFingerprint/CdpFingerprintPool 起 N 个浏览器各套一份指纹,dump 验证各异。
 [[example]]
 name = "cdp_fingerprint"

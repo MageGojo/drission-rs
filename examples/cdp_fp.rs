@@ -82,12 +82,15 @@ const PROBE: &str = r#"(async () => {
 #[tokio::main]
 async fn main() -> drission::Result<()> {
     let headless = matches!(std::env::var("HEADLESS").ok().as_deref(), Some("1"));
+    // FULLCH=1:开启无头高熵 Client Hints 补全(验证补环境后 fullVersionList 等不再为空)。
+    let full_ch = matches!(std::env::var("FULLCH").ok().as_deref(), Some("1"));
     let url = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "https://example.com".to_string());
     let browser = Browser::launch(
         BrowserOptions::new()
             .headless(headless)
+            .full_ua_metadata(full_ch)
             .window_size(1280, 800),
     )
     .await?;

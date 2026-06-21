@@ -33,12 +33,18 @@ async fn main() -> drission::Result<()> {
         std::env::var("HEADLESS").ok().as_deref(),
         Some("1") | Some("true")
     );
-    println!("模式: {}", if headless { "无头" } else { "有头" });
+    // FULLCH=1:无头补全高熵 Client Hints(`full_ua_metadata`),验证补环境不破坏过盾。
+    let full_ch = matches!(std::env::var("FULLCH").ok().as_deref(), Some("1"));
+    println!(
+        "模式: {} | full_ua_metadata={full_ch}",
+        if headless { "无头" } else { "有头" }
+    );
     // 统一接口名:`Browser`/`BrowserOptions`(cdp feature 下=Chromium 后端,camoufox 下=Camoufox 后端)。
     // 同一份代码切 feature 即换协议。
     let browser = Browser::launch(
         BrowserOptions::new()
             .headless(headless)
+            .full_ua_metadata(full_ch)
             .window_size(1280, 800),
     )
     .await?;
