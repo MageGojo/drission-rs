@@ -174,10 +174,12 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cross
-      # 编 lib(cdp + ocr)+ cdp_demo 示例:cdp_demo 产物用于验证「完全静态链接」(最硬的 C 依赖
-      # aws-lc-sys 也被静态编入);ocr 为纯 Rust(tract/image/fontdue),一并证其在 musl 可编。
-      - name: build musl static (lib + cdp_demo, with ocr)
-        run: cross build --release --target ${{ matrix.target }} --features ocr --lib --example cdp_demo
+      # 编默认后端(cdp)lib + cdp_demo 示例:cdp_demo 产物用于验证「完全静态链接」——最硬的 C 依赖
+      # aws-lc-sys(reqwest rustls)也被静态编入即证 musl 链路通。**不带 ocr**:tract-onnx 的 x86_64
+      # SIMD 内核极多、冷缓存全量编译要 20+ 分钟,拖慢每次 push;ocr 是纯 Rust、在 gnu 已验证,且
+      # aarch64 musl 实测带 ocr 也能编过(见 docs 里程碑 71)。需要 ocr 的 musl 包用 scripts/linux-musl-build.sh。
+      - name: build musl static (lib + cdp_demo)
+        run: cross build --release --target ${{ matrix.target }} --lib --example cdp_demo
       - name: verify fully static (no glibc / no dynamic deps)
         run: |
           BIN="target/${{ matrix.target }}/release/examples/cdp_demo"
