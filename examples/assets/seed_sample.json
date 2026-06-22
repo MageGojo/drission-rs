@@ -1,0 +1,23 @@
+{
+  "navigator": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "platform": "Win32",
+    "language": "zh-CN",
+    "hardwareConcurrency": 8,
+    "deviceMemory": 8,
+    "vendor": "Google Inc.",
+    "maxTouchPoints": 0
+  },
+  "screen": {
+    "width": 1920,
+    "height": 1080,
+    "availWidth": 1920,
+    "availHeight": 1040,
+    "colorDepth": 24,
+    "pixelDepth": 24
+  },
+  "location": {
+    "host": "example.com",
+    "origin": "https://example.com"
+  }
+}

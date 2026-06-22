@@ -146,4 +146,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
-      - run: cargo doc --no-deps --all-features
+      # 注意:仓库根 rust-toolchain.toml 钉了 stable,会覆盖上面装的 nightly;而 feature(doc_cfg)
+      # 只能在 nightly 用(stable 报 E0554)。故用 `cargo +nightly` 显式覆盖 toolchain 文件走 nightly。
+      - run: cargo +nightly doc --no-deps --all-features

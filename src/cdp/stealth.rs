@@ -79,6 +79,10 @@ pub(crate) fn parse_chrome_major(s: &str) -> Option<u32> {
 /// 从一段文本(`chrome --version` 输出 / UA 串)里抽**完整版本号**(如 `149.0.7827.115`)。
 /// 规则:第一段形如 `数字.数字.数字.数字` 的连续版本串;不足四段则返回 `None`。
 /// 用于无头补环境时构造 `userAgentMetadata.fullVersionList`(每个品牌的完整版本)。
+///
+/// 仅 `#[cfg(not(windows))]` 的 `chrome --version` 探测路径(browser.rs)调用它;Windows 走注册表/
+/// 固定路径不经这里,故 Windows 下本函数(非 test 构建)无调用方——豁免 dead_code(单测仍覆盖)。
+#[cfg_attr(windows, allow(dead_code))]
 pub(crate) fn parse_chrome_full(s: &str) -> Option<String> {
     let bytes = s.as_bytes();
     let mut i = 0;

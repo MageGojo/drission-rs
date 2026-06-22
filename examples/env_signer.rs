@@ -28,10 +28,15 @@
 use rquickjs::{CatchResultExt, Context, Ctx, Runtime};
 use serde_json::{Value, json};
 
-/// 补环境模块(由 `dump_env` 导出;内含录制种子 `__SEED__` 与 `setup()` 回放逻辑)。编进二进制。
-const ENV_JS: &str = include_str!("../douyin-env/env.js");
+/// 补环境模块(由 `dump_env` 导出;内含录制种子与回放逻辑)。编进二进制。
+///
+/// 这里默认嵌入仓库自带的**最小占位样本** `assets/env_sample.js`(开箱即编、自检通过);
+/// 实际使用请改成你自己 `tab.dump_env().export_project(...)` 出的 `env.js`,例如:
+/// `include_str!("../douyin-env/env.js")`(那是 gitignore 的运行产物,故不入仓库)。
+const ENV_JS: &str = include_str!("assets/env_sample.js");
 /// 录制种子(对比基准:浏览器真实采集到的环境/指纹)。编进二进制。
-const SEED_JSON: &str = include_str!("../douyin-env/seed.json");
+/// 同上,默认嵌入占位样本,实际请换成你的 `seed.json`(如 `include_str!("../douyin-env/seed.json")`)。
+const SEED_JSON: &str = include_str!("assets/seed_sample.json");
 
 /// 加载站点签名脚本前注入的「浏览器 IO/事件壳」补丁:补齐 env.js(只回放数据型环境)未覆盖的
 /// 行为型 API(定时器/事件/fetch/XHR/crypto/TextEncoder…)。它们只是让风控/上报代码**初始化时不崩**,
