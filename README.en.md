@@ -56,6 +56,9 @@ download and run, **no Rust toolchain required**:
 Includes `win_smoke` / `win_diag` / `win_cf_test` (Cloudflare bypass) / `win_bilibili_test` / `session_mode` / `yidun_click` (NetEase click-word) example binaries.
 **Prerequisite**: Chrome / Edge installed (point to it via `CHROME_BIN`); `yidun_click` auto-downloads the OCR model to cache on first run.
 
+> 🦀 **Want to build from source but don't have Rust?** (Python / TS devs welcome) Use the **one-click setup scripts** (China-mirror accelerated, **double-click**, with progress + auto-verify):
+> see [`install/`](install/) — macOS: double-click `install-mac.command`; Windows: double-click `install-windows.bat`. Then `cargo add drission`.
+
 ---
 
 ## 🆕 New in v0.3.1
