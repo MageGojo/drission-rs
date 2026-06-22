@@ -27,7 +27,11 @@ mod windows;
 #[cfg(windows)]
 pub use windows::{Spawned, spawn};
 // Windows 进程树兜底杀手(Job Object,KILL_ON_JOB_CLOSE);CDP 后端也用它绑 Chrome 进程树。
+// 该 re-export 仅在 `feature="cdp"` 时被 cdp/browser.rs 经 `crate::transport::JobHandle` 消费;
+// 纯 camoufox(无 cdp)等组合下无 crate 内消费方(camoufox 的 transport/windows.rs 用同模块内的
+// `JobHandle` 而非此 re-export)→ 豁免 unused_imports,避免 windows clippy `-D warnings` 误报。
 #[cfg(windows)]
+#[allow(unused_imports)]
 pub(crate) use windows::JobHandle;
 
 // ── 跨平台传输类型别名 ────────────────────────────────────────────────────────
