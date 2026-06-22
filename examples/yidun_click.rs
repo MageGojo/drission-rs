@@ -63,15 +63,32 @@ const MARKERS_JS: &str = r#"(()=>{const m=document.querySelectorAll('[class*=yid
 const tip=document.querySelector('.yidun_tips__text');
 return JSON.stringify({point_nodes:m.length,tip:tip?tip.innerText.trim():''});})()"#;
 
+// 点选目标图选择器(读**实时** rect 用)。
+const BG_SEL: &str = ".yidun_bg-img, img.yidun_bg-img, .yidun_bgimg";
+
+// 在页面上画"将点击处"的红点(position:fixed ⇒ 直接用视口坐标;pointer-events:none 不挡真正的点击)。
+// 配合截图 plan_*.png:一眼看出计划点击点是否压在要点的字上(排查偏移的铁证)。
+const MARK_JS: &str = r#"((pts)=>{document.querySelectorAll('.__ymk').forEach(e=>e.remove());
+for(const p of pts){const d=document.createElement('div');d.className='__ymk';
+d.style.cssText='position:fixed;left:'+(p[0]-7)+'px;top:'+(p[1]-7)+'px;width:14px;height:14px;border-radius:50%;'
++'background:rgba(255,0,0,.55);border:2px solid #fff;box-shadow:0 0 4px #000;z-index:2147483647;pointer-events:none';
+document.body.appendChild(d);}return pts.length;})"#;
+
 #[tokio::main]
 async fn main() -> drission::Result<()> {
     let headless = matches!(
         std::env::var("HL").ok().as_deref(),
         Some("1") | Some("true")
     );
-    let out_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("target")
-        .join("yidun");
+    // 输出目录:发布二进制(如 Windows 验证包)用 `YIDUN_OUT` 指向可写目录(`CARGO_MANIFEST_DIR`
+    // 是**编译期**路径,在别的机器上不存在 → 截图/叠加图会静默写不出);本地 `cargo run` 不设则回退 target/yidun。
+    let out_dir = std::env::var_os("YIDUN_OUT")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| {
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("target")
+                .join("yidun")
+        });
     std::fs::create_dir_all(&out_dir).ok();
     println!("[yidun] 加载 det+ocr 模型…");
     let cw = ClickWord::new().await?;
@@ -79,13 +96,32 @@ async fn main() -> drission::Result<()> {
 
     // 可选持久 profile(`YIDUN_PROFILE`=目录):有头本地跑时设它 —— Edge/Chrome 的首启/「使用 xxx 身份」
     // 账户提示只需手动关一次,profile 记住后续不再弹(临时 profile 每次都会重弹挡住首次验证点击)。
-    let mut opts = ChromiumOptions::new().headless(headless).window_size(1200, 900);
+    // ★ 跨平台一致的关键:**强制设备像素比 = 1**。Windows 显示缩放(125%/150%)有头时,
+    //   `getBoundingClientRect`(CSS px)与 CDP `Input.dispatchMouseEvent` 的像素口径可能不一致 →
+    //   点击整体偏移(mac retina 能点中、Win 缩放下点不到字的根因)。`--force-device-scale-factor=1`
+    //   令 CSS px == 设备 px,读到的 rect 与点击坐标一一对应,Win/mac 行为一致。
+    let mut opts = ChromiumOptions::new()
+        .headless(headless)
+        .window_size(1200, 900)
+        .add_arg("--force-device-scale-factor=1")
+        .add_arg("--high-dpi-support=1");
     if let Some(dir) = std::env::var_os("YIDUN_PROFILE") {
         opts = opts.user_data_dir(std::path::PathBuf::from(dir));
     }
     let browser = ChromiumBrowser::launch(opts).await?;
     let tab = browser.new_tab(Some(URL)).await?;
     tokio::time::sleep(Duration::from_secs(5)).await;
+    if let Ok(v) = tab
+        .run_js("({dpr:devicePixelRatio,iw:innerWidth,ih:innerHeight})")
+        .await
+    {
+        println!(
+            "[yidun] 视口 dpr={} {:.0}x{:.0}(已强制 device-scale=1 ⇒ CSS px == 设备 px)",
+            v["dpr"].as_f64().unwrap_or(0.0),
+            v["iw"].as_f64().unwrap_or(0.0),
+            v["ih"].as_f64().unwrap_or(0.0)
+        );
+    }
 
     // ★ 监听验证码接口(在触发前开,确保抓到第一题)。只过滤 `c.dun.163.com/api/*`(=get/check),
     //   不抓 `/v4/j/up`(上报)与 `/node/api/check-guardian`(不同路径),噪声最小。
@@ -196,10 +232,7 @@ async fn main() -> drission::Result<()> {
             tab.mouse_move(b.0, b.1).await.ok();
             tokio::time::sleep(Duration::from_millis(450)).await;
         }
-        let view = tab
-            .image_view(".yidun_bg-img, img.yidun_bg-img, .yidun_bgimg")
-            .await
-            .ok();
+        let view = tab.image_view(BG_SEL).await.ok();
         let mut mv = view.clone().unwrap_or_default();
         if let Ok(im) = image::load_from_memory(&cap) {
             mv.natural_w = im.width() as f64;
@@ -248,16 +281,43 @@ async fn main() -> drission::Result<()> {
                     .ok();
                 println!("[yidun] 点击点叠加图 → target/yidun/overlay_{attempt}.png");
             }
-            // 拟人轨迹点击:图内像素 → `mv.map_u32` 映射页面坐标 → `clamp_point` 钳在显示 rect 内。
-            let points: Vec<(f64, f64)> = hits
+            // 图内像素 → **像素分数**(与平台/DPI/缩放无关)。点击时再用 `.yidun_bg-img` 的**实时 rect**
+            // 还原页面坐标(rect.x + frac·rect.w),避开"一次性 rect 过期 / Win 缩放下 CSS↔设备 px 偏移"。
+            let cap_w = mv.natural_w.max(1.0);
+            let cap_h = mv.natural_h.max(1.0);
+            let fracs: Vec<(f64, f64)> = hits
                 .iter()
-                .map(|h| mv.clamp_point(mv.map_u32(h.point)))
+                .map(|h| (h.point.0 as f64 / cap_w, h.point.1 as f64 / cap_h))
                 .collect();
+            // 先 hover 验证条让 hover 面板出现/保持可见,再读**实时** rect(隐藏态 rect 不可靠)。
+            let bar_pt = bar.unwrap_or((mv.x + mv.w / 2.0, mv.y + mv.h + 40.0));
+            tab.mouse_move(bar_pt.0, bar_pt.1).await.ok();
+            tokio::time::sleep(Duration::from_millis(450)).await;
+            let points = live_points(&tab, BG_SEL, &fracs).await;
+            if points.len() != hits.len() {
+                println!("[yidun] 实时 rect 不可用(面板未展开?);换图重试");
+                if attempt < tries {
+                    trusted_refresh(&tab).await;
+                    tokio::time::sleep(Duration::from_secs(2)).await;
+                }
+                continue;
+            }
             for (h, &(cx, cy)) in hits.iter().zip(&points) {
                 println!("[yidun] 拟人点击「{}」→ 页面({cx:.0},{cy:.0})", h.target);
             }
+            // ★ 页面内可视红点 + 截图:直观确认"计划点击点"是否压在字上(排查偏移的铁证,留档 plan_*.png)。
+            let arr: Vec<[f64; 2]> = points.iter().map(|&(x, y)| [x, y]).collect();
+            let _ = tab
+                .run_js(&format!(
+                    "({MARK_JS})({})",
+                    serde_json::to_string(&arr).unwrap_or_default()
+                ))
+                .await;
+            if let Ok(shot) = tab.screenshot_bytes().await {
+                std::fs::write(out_dir.join(format!("plan_{attempt}.png")), &shot).ok();
+                println!("[yidun] 计划点击点截图(红点=将点击处)→ target/yidun/plan_{attempt}.png");
+            }
             // 从验证条**连续移入**面板逐字点击,全程不离开控件(避免 hover 面板被收起 → 点到隐藏层不生效)。
-            let bar_pt = bar.unwrap_or((mv.x + mv.w / 2.0, mv.y + mv.h + 40.0));
             hover_click(&tab, bar_pt, &points).await?;
             tokio::time::sleep(Duration::from_secs(1)).await;
             if let Ok(v) = tab.run_js(MARKERS_JS).await
@@ -457,6 +517,25 @@ async fn hover_click(
         tokio::time::sleep(Duration::from_millis(180 + (nextf(&mut seed) * 160.0) as u64)).await;
     }
     Ok(())
+}
+
+/// 用图内像素**分数** × 元素**实时** rect 求页面点(避开一次性 rect 过期 / Win 缩放下 CSS↔设备 px 偏移)。
+/// `fracs` 为各点的 `(x/自然宽, y/自然高)`;读不到有效 rect(宽 ≤ 1)返回空切片。
+async fn live_points(
+    tab: &drission::cdp::ChromiumTab,
+    sel: &str,
+    fracs: &[(f64, f64)],
+) -> Vec<(f64, f64)> {
+    let Ok(view) = tab.image_view(sel).await else {
+        return Vec::new();
+    };
+    if view.w <= 1.0 {
+        return Vec::new();
+    }
+    fracs
+        .iter()
+        .map(|&(fx, fy)| view.clamp_point((view.x + fx * view.w, view.y + fy * view.h)))
+        .collect()
 }
 
 /// 解析易盾 `api/get` 的 JSONP 响应体 → `(bg 图 URL, front 点击顺序文本)`。

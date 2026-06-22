@@ -746,13 +746,23 @@ impl ChromiumTab {
     /// 每项含 `name`/`value`/`domain`/`path`/`expires`/`httpOnly`/`secure` 等字段。
     /// 用于把登录态交接给 [`SessionPage`](crate::session::SessionPage)(纯 HTTP 接力)或存盘复用。
     pub async fn get_cookies(&self) -> Result<Vec<Value>> {
-        let r = self.core.send("Storage.getCookies", json!({})).await?;
+        let mut p = json!({});
+        // 隔离 BrowserContext(`new_tab_with` 建的标签)必须带 browserContextId,否则 Storage 域
+        // 默认读 default context,拿不到本标签 context 的 cookie。普通标签(None)行为不变。
+        if let Some(ctx) = &self.core.browser_context_id {
+            p["browserContextId"] = json!(ctx);
+        }
+        let r = self.core.send("Storage.getCookies", p).await?;
         Ok(r["cookies"].as_array().cloned().unwrap_or_default())
     }
 
     /// 取全部 cookie 为**类型化** [`Cookie`](对齐 camoufox `Tab::cookies`)。
     pub async fn cookies(&self) -> Result<Vec<Cookie>> {
-        let r = self.core.send("Storage.getCookies", json!({})).await?;
+        let mut p = json!({});
+        if let Some(ctx) = &self.core.browser_context_id {
+            p["browserContextId"] = json!(ctx);
+        }
+        let r = self.core.send("Storage.getCookies", p).await?;
         let s = |c: &Value, k: &str| c.get(k).and_then(Value::as_str).unwrap_or("").to_string();
         Ok(r["cookies"]
             .as_array()
@@ -798,9 +808,12 @@ impl ChromiumTab {
                 o
             })
             .collect();
-        self.core
-            .send("Storage.setCookies", json!({ "cookies": arr }))
-            .await?;
+        let mut params = json!({ "cookies": arr });
+        // 隔离 BrowserContext 的标签:把 cookie 写进**本 context**(否则落到 default context、本标签用不上)。
+        if let Some(ctx) = &self.core.browser_context_id {
+            params["browserContextId"] = json!(ctx);
+        }
+        self.core.send("Storage.setCookies", params).await?;
         Ok(())
     }
 

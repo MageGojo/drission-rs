@@ -35,19 +35,27 @@ async fn main() -> drission::Result<()> {
     );
     // FULLCH=1:无头补全高熵 Client Hints(`full_ua_metadata`),验证补环境不破坏过盾。
     let full_ch = matches!(std::env::var("FULLCH").ok().as_deref(), Some("1"));
+    // HIDDEN=1:**有头但隐藏**(窗口移到屏幕外 -32000,-32000 + 关闭遮挡节流)——保留真实 GPU 渲染
+    // (过 Turnstile 的关键:无头常退化 SwiftShader 软渲染被识破),但用户看不到窗口。等价"视觉无头"。
+    let hidden = matches!(std::env::var("HIDDEN").ok().as_deref(), Some("1") | Some("true"));
     println!(
-        "模式: {} | full_ua_metadata={full_ch}",
+        "模式: {} | full_ua_metadata={full_ch} | hidden={hidden}",
         if headless { "无头" } else { "有头" }
     );
     // 统一接口名:`Browser`/`BrowserOptions`(cdp feature 下=Chromium 后端,camoufox 下=Camoufox 后端)。
     // 同一份代码切 feature 即换协议。
-    let browser = Browser::launch(
-        BrowserOptions::new()
-            .headless(headless)
-            .full_ua_metadata(full_ch)
-            .window_size(1280, 800),
-    )
-    .await?;
+    let mut opts = BrowserOptions::new()
+        .headless(headless)
+        .full_ua_metadata(full_ch)
+        .window_size(1280, 800);
+    if hidden {
+        opts = opts
+            .add_arg("--window-position=-32000,-32000")
+            .add_arg("--disable-backgrounding-occluded-windows")
+            .add_arg("--disable-renderer-backgrounding")
+            .add_arg("--disable-features=CalculateNativeWinOcclusion");
+    }
+    let browser = Browser::launch(opts).await?;
     let tab = browser.latest_tab().await?;
 
     tab.get(URL).await?;
@@ -96,6 +104,15 @@ async fn main() -> drission::Result<()> {
         println!("\n结果: 已过 CF 盾(Turnstile 有效 token,长度 {token_len})");
     } else {
         println!("\n结果: 未过(无 Turnstile token)。可重试,或检查出网 IP 是否被风控。");
+    }
+
+    // 视觉证据:存一张视口截图到工作目录(过盾后 Turnstile 应显示「成功!」)。
+    match tab.screenshot_bytes().await {
+        Ok(bytes) => match std::fs::write("exa_cf_shot.png", &bytes) {
+            Ok(_) => println!("SHOT_SAVED exa_cf_shot.png ({} bytes)", bytes.len()),
+            Err(e) => println!("SHOT_WRITE_FAIL {e}"),
+        },
+        Err(e) => println!("SHOT_CAPTURE_FAIL {e}"),
     }
 
     browser.quit().await?;

@@ -5,6 +5,53 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/),
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.3.1] - 2026-06-22
+
+> Windows 实机点选 / 过盾精准度收尾:**高 DPI 坐标对齐** + **无头 GPU 自适应** + **反检测身份一致**,
+> 并增强 **Cloudflare 内嵌 Turnstile** 过盾与 **CDP 隔离上下文 cookie**。均向后兼容,补丁号递增。
+
+### 新增 Added
+
+- **无头 GPU 自适应(反检测核心)**:新增 Windows 显示适配器探测 `windows_has_hardware_gpu()`(读注册表
+  Class `{4d36e968-…}` 各 `DriverDesc`)。**有真实 GPU** → `--enable-gpu` 走硬件 ANGLE(真实 renderer,
+  绕开 `--headless=new` 默认的 SwiftShader 软渲染——被 Turnstile 识破的破绽);**无 GPU**(VM / RDP /
+  "Microsoft Basic Display Adapter")→ `--disable-gpu` 退 **D3D11 WARP**(renderer = "Microsoft Basic
+  Render Driver",WebGL 可用且对该硬件**真实**;此时强行 `--enable-gpu` 会让 WebGL 创建直接失败,比软渲染
+  更可疑)。`DRISSION_HEADLESS_GPU=0/software | 1/hardware` 可强制。
+- **无头补全高熵 Client Hints(`full_ua_metadata`)+ 身份一致**:走"自动 mask 成 Chrome UA"分支时**必定**
+  补回与该 UA 一致的 `userAgentMetadata`(品牌 GREASE + `fullVersionList` + 架构 / 位数 / 平台版本),令 UA /
+  `navigator.userAgentData.brands` / 高熵 CH 三者一致呈现为 Google Chrome——消除 ① `--user-agent` 清空高熵
+  CH(空 `fullVersionList` 是强无头信号)、② **非 Chrome 浏览器(如 Edge)** 上 brands 仍是原厂、与伪装的
+  Chrome UA 自相矛盾 两处破绽。
+- **`download_chrome` 锁定 Chrome 主版本**:自动下载 / 分发的 Chrome for Testing 与无头 mask 构造的 UA、
+  补环境 `fullVersionList`、以及 `impersonate`(wreq)的 TLS / JA3 模拟档**主版本对齐**,避免版本错配被风控。
+- **新增示例 `gpu_probe`**:探测无头是否拿到真实 GPU(读 WebGL `UNMASKED_RENDERER_WEBGL`),判断"真无头
+  (完全无窗口)"是否可行;`exa_cf` 增 `HIDDEN=1`"视觉无头"(窗口移屏外 + 关遮挡节流,保真实 GPU 渲染)
+  与过盾截图证据。
+
+### 修复 Fixed
+
+- **Windows 高 DPI 合成点击偏移(关键)**:Windows 下启动浏览器追加 `--force-device-scale-factor=1` +
+  `--high-dpi-support=1`,令 CDP `Input.dispatchMouseEvent` 的视口坐标与页面 `getBoundingClientRect()` 的
+  CSS 像素严格一致。否则在 125% / 150% 缩放的 Windows 桌面(Win11 默认即非 100%)上合成鼠标按**物理像素**
+  命中(偏移 = 缩放比)→ Cloudflare Turnstile 复选框 / 易盾点选"点不中"。`yidun_click` 同步强制
+  device-scale=1,并改为"图内像素**分数** × 元素**实时** rect"还原页面坐标(避开一次性 rect 过期)。
+- **Cloudflare 内嵌 Turnstile 过盾**:CF 探测改 **三级定位**——① light DOM + **开放 shadow DOM** 找 iframe;
+  ② iframe 在**闭合 shadow DOM** 时,用 `cf-turnstile-response` 隐藏域的"可见祖先盒"定位(CDP 屏幕坐标合成
+  点击可穿透闭合 shadow / 跨域 iframe);③ host 容器兜底。并以 **token 是否产出**为过盾判据(widget 过盾后
+  仍留在 DOM,不能等"挑战消失")——**支持表单内嵌 Turnstile**,不止整页托管质询。
+- **CDP 隔离 BrowserContext 的 cookie**:`get_cookies` / `cookies` / `set_cookies` 对 `new_tab_with` 建的
+  隔离上下文标签带上 `browserContextId`,否则读写落到 default context、本标签拿不到 / 用不上其 cookie
+  (普通标签行为不变)。
+- **发布二进制的输出目录**:`yidun_click` 等支持 `YIDUN_OUT` 指向可写目录——`CARGO_MANIFEST_DIR` 是**编译期**
+  路径,发布二进制在别的机器上不存在 → 截图 / 叠加图会静默写不出。
+
+### 变更 Changed
+
+- **发布产物体积优化**:`[profile.release]` 设 `opt-level="z"` + `lto=true` + `codegen-units=1` + `strip=true`
+  (零环境交付的 Windows 测试二进制尽量小);**保留 `panic="unwind"`**(tokio / mutex 等依赖栈展开,`abort`
+  会让一次 panic 直接杀进程)。
+
 ## [0.3.0] - 2026-06-21
 
 ### 新增 Added
@@ -171,7 +218,9 @@
 - **内置验证码 OCR**(ddddocr 模型 + tract 纯 Rust 推理)与**图片滑块缺口距离识别**(极验)。
 - 跨平台:macOS / Linux / Windows(命名管道传输)。
 
-[Unreleased]: https://github.com/MageGojo/drission-rs/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/MageGojo/drission-rs/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/MageGojo/drission-rs/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/MageGojo/drission-rs/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/MageGojo/drission-rs/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/MageGojo/drission-rs/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/MageGojo/drission-rs/releases/tag/v0.1.0

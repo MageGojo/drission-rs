@@ -178,6 +178,16 @@ impl ChromiumBrowser {
         if let Some((w, h)) = opts.window_size {
             cmd.arg(format!("--window-size={w},{h}"));
         }
+        // Windows 高 DPI 修正(关键):把设备缩放强制为 1,使 CDP `Input.dispatchMouseEvent` 的
+        // 视口坐标与页面 `getBoundingClientRect()` 的 CSS 像素严格一致。否则在 125%/150% 缩放的
+        // Windows 桌面(Win11 默认即非 100%)上,合成鼠标事件按**物理像素**命中(偏移=缩放比)→
+        // Cloudflare Turnstile 复选框等"点不中"(mac Retina 由 fingerprint 维持 dpr=2,且其 Turnstile
+        // 走自动放行不依赖点击,故仅在 Windows 上强制)。
+        #[cfg(windows)]
+        {
+            cmd.arg("--force-device-scale-factor=1")
+                .arg("--high-dpi-support=1");
+        }
         if let Some(server) = &opts.proxy {
             cmd.arg(format!("--proxy-server={server}"));
         }
@@ -189,7 +199,7 @@ impl ChromiumBrowser {
         // 版本号(无头 mask 构造精简 UA、以及补环境 fullVersionList 都要):**跨平台**探测。
         // ⚠ Windows 下 GUI 版 Chrome/Edge 的 `exe --version` 不往 stdout 打印(还会误启动浏览器),
         // 故 Windows 走 PE 文件版本资源,其它平台才用 `--version`(见 [`probe_chrome_version`])。
-        let chrome_version = if auto_mask {
+        let chrome_version = if auto_mask || opts.full_ua_metadata {
             probe_chrome_version(exe).await
         } else {
             None
@@ -207,10 +217,13 @@ impl ChromiumBrowser {
         if let Some(ua) = &ua {
             cmd.arg(format!("--user-agent={ua}"));
         }
-        // 无头补环境(opt-in):仅在自动 mask 路径(`--user-agent` 清空了高熵 CH)且拿到 UA 时,
-        // 用完整版本号 + 平台版本,attach 时经 CDP `Emulation.setUserAgentOverride` 补回完整
-        // `userAgentMetadata`。默认 `full_ua_metadata=false` → 三者皆 None → attach 处为 no-op。
-        let want_meta = opts.full_ua_metadata && auto_mask && ua.is_some();
+        // 反检测一致性(关键):只要走了"自动 mask 成 Chrome UA"分支,就**必须**补回与该 UA 一致的
+        // `userAgentMetadata`。因为 `--user-agent` 只改 UA 串:① 会清空高熵 CH(`fullVersionList`/
+        // `architecture`/`platformVersion` 等留空 —— 强无头信号);② 在**非 Chrome 浏览器(如 Edge)**上
+        // `navigator.userAgentData.brands` 仍是原厂品牌(Microsoft Edge),与伪装的 Chrome UA **自相矛盾**
+        // (UA=Chrome 而 brands=Edge,被严格 CF 一眼识破)。补回后 UA / 品牌 / 高熵 CH 三者一致呈现为
+        // Google Chrome。`full_ua_metadata` 仍可在显式 UA 等非 auto_mask 场景强制开启。
+        let want_meta = ua.is_some() && opts.stealth && (auto_mask || opts.full_ua_metadata);
         let ua_override = if want_meta { ua.clone() } else { None };
         let (ua_full_version, platform_version) = if want_meta {
             (chrome_version.clone(), detect_platform_version().await)
@@ -230,13 +243,37 @@ impl ChromiumBrowser {
         }
         if opts.headless {
             cmd.arg("--headless=new");
-            // 反检测:不禁用 GPU(SwiftShader 软渲染的 WebGL renderer 是无头破绽);
-            // 让无头也走真实 GPU/ANGLE。mac 显式 Metal 后端。DRISSION_HEADLESS_GPU=0 可退回禁用。
-            if std::env::var("DRISSION_HEADLESS_GPU").as_deref() == Ok("0") {
-                cmd.arg("--disable-gpu");
-            } else {
+            // GPU 策略(无头反检测核心,**按是否有真实 GPU 自适应**):
+            // - **有真实 GPU** → `--enable-gpu` 走硬件 ANGLE(真实 renderer,关掉 `--headless=new` 默认
+            //   强制的 SwiftShader 软渲染——SwiftShader 是被 Turnstile 识破的无头破绽);mac 显式 Metal。
+            // - **无真实 GPU**(VM / RDP / "Microsoft Basic Display Adapter")→ `--disable-gpu`:Windows 下
+            //   退 **D3D11 WARP**(WebGL renderer = "Microsoft Basic Render Driver",**WebGL 可用且对该硬件
+            //   真实**)。若此时仍 `--enable-gpu`,无 D3D11 设备会让 **WebGL 创建直接失败(`ok:false`)**——
+            //   这比软渲染**更可疑**(真机几乎不会 WebGL 全废)。`--enable-unsafe-swiftshader` 再兜一层。
+            // Windows 经注册表显示适配器自动探测;`DRISSION_HEADLESS_GPU` 可强制(0/software 软、1/hardware 硬)。
+            #[cfg(windows)]
+            let auto_hardware = windows_has_hardware_gpu();
+            #[cfg(not(windows))]
+            let auto_hardware = true; // mac/linux 默认按有 GPU(mac Metal)。
+            let use_hardware = match std::env::var("DRISSION_HEADLESS_GPU").ok().as_deref() {
+                Some("0") | Some("off") | Some("software") | Some("swiftshader") => false,
+                Some("1") | Some("on") | Some("hardware") => true,
+                _ => auto_hardware,
+            };
+            if use_hardware {
+                cmd.arg("--enable-gpu").arg("--enable-unsafe-swiftshader");
                 #[cfg(target_os = "macos")]
                 cmd.arg("--use-angle=metal");
+                #[cfg(windows)]
+                cmd.arg("--ignore-gpu-blocklist");
+            } else {
+                // 软件渲染:`--disable-gpu`。Windows 下据此退 **D3D11 WARP**(renderer = "Microsoft Basic
+                // Render Driver",对无 GPU 的 Windows 机**最真实**,WARP 恒可用);**不**加
+                // `--enable-unsafe-swiftshader`(它会把 renderer 抢成 Chrome 自带 SwiftShader,真实度更低)。
+                // 非 Windows(linux 无 GPU)才用 SwiftShader 兜底,否则 WebGL 可能不可用。
+                cmd.arg("--disable-gpu");
+                #[cfg(not(windows))]
+                cmd.arg("--enable-unsafe-swiftshader");
             }
         }
         cmd.arg("about:blank");
@@ -270,7 +307,8 @@ impl ChromiumBrowser {
             user_data_dir: if persist { None } else { Some(dir) },
             stealth: opts.stealth,
             headless: opts.headless,
-            full_ua_metadata: opts.full_ua_metadata,
+            // = want_meta:走了 mask 路径就补一致的 userAgentMetadata(见 attach)。
+            full_ua_metadata: want_meta,
             ua_override,
             ua_full_version,
             platform_version,
@@ -583,6 +621,100 @@ fn win_file_version(exe: &Path) -> Option<String> {
             (ls >> 16) & 0xffff,
             ls & 0xffff
         ))
+    }
+}
+
+/// Windows:枚举显示适配器(注册表 Class GUID `{4d36e968-…}` 下各子键的 `DriverDesc`),
+/// 判断是否存在**真实硬件 GPU**。仅有 "Microsoft Basic Display Adapter" / "Basic Render Driver" /
+/// 远程显示等软件适配器 → 视为**无硬件 GPU**(无头应走 `--disable-gpu` 退 D3D11 WARP 软渲染,
+/// WebGL 才可用;`--enable-gpu` 在无设备机器上会让 WebGL 创建失败)。读不到注册表时**保守返回
+/// `true`**(按有 GPU 处理 → 不改变既有 `--enable-gpu` 行为)。
+#[cfg(windows)]
+fn windows_has_hardware_gpu() -> bool {
+    use windows_sys::Win32::Foundation::FILETIME;
+    use windows_sys::Win32::System::Registry::{
+        HKEY, HKEY_LOCAL_MACHINE, KEY_READ, RegCloseKey, RegEnumKeyExW, RegOpenKeyExW,
+        RegQueryValueExW,
+    };
+    let class_key: Vec<u16> =
+        r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+    let valname: Vec<u16> = "DriverDesc"
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect();
+    unsafe {
+        let mut root: HKEY = std::ptr::null_mut();
+        if RegOpenKeyExW(
+            HKEY_LOCAL_MACHINE,
+            class_key.as_ptr(),
+            0,
+            KEY_READ,
+            &mut root,
+        ) != 0
+        {
+            return true; // 读不到 → 保守按有 GPU。
+        }
+        let mut found_hw = false;
+        let mut idx: u32 = 0;
+        loop {
+            let mut name = [0u16; 256];
+            let mut name_len: u32 = name.len() as u32;
+            let st = RegEnumKeyExW(
+                root,
+                idx,
+                name.as_mut_ptr(),
+                &mut name_len,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                std::ptr::null_mut::<FILETIME>(),
+            );
+            if st != 0 {
+                break; // ERROR_NO_MORE_ITEMS。
+            }
+            idx += 1;
+            let sub: Vec<u16> = name[..name_len as usize]
+                .iter()
+                .copied()
+                .chain(std::iter::once(0))
+                .collect();
+            let mut sk: HKEY = std::ptr::null_mut();
+            if RegOpenKeyExW(root, sub.as_ptr(), 0, KEY_READ, &mut sk) != 0 {
+                continue;
+            }
+            let mut buf = [0u16; 512];
+            let mut len: u32 = (buf.len() * 2) as u32;
+            let r = RegQueryValueExW(
+                sk,
+                valname.as_ptr(),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                buf.as_mut_ptr() as *mut u8,
+                &mut len,
+            );
+            RegCloseKey(sk);
+            if r == 0 && len >= 2 {
+                let count = (len as usize / 2).min(buf.len());
+                let desc = String::from_utf16_lossy(&buf[..count])
+                    .trim_end_matches('\0')
+                    .to_lowercase();
+                let is_software = desc.is_empty()
+                    || desc.contains("basic display adapter")
+                    || desc.contains("basic render")
+                    || desc.contains("remote display")
+                    || desc.contains("rdpudd")
+                    || desc.contains("mirror");
+                if !is_software {
+                    found_hw = true;
+                    break;
+                }
+            }
+        }
+        RegCloseKey(root);
+        found_hw
     }
 }
 

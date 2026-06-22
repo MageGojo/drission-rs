@@ -391,3 +391,13 @@ windows-sys = { version = "0.61", features = [
 [[bench]]
 name = "parsing"
 harness = false
+
+# 发布产物体积优化(零环境交付的测试二进制要尽量小):
+#   opt-level="z" 最小体积、lto 跨 crate 内联去死代码、codegen-units=1 利于 LTO、strip 去符号表。
+#   ⚠️ 不设 panic="abort":frb/tokio/mutex 等依赖 unwind,abort 会让一次 panic 直接杀进程。
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "unwind"
