@@ -4,8 +4,10 @@
 [![docs.rs](https://docs.rs/drission/badge.svg)](https://docs.rs/drission)
 [![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org)
 [![platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue.svg)](#-支持的平台与浏览器)
+[![GitHub](https://img.shields.io/badge/GitHub-MageGojo%2Fdrission--rs-181717?logo=github)](https://github.com/MageGojo/drission-rs)
+[![GitCode](https://img.shields.io/badge/GitCode-Roufsi%2Fdrission--rs-c71d23)](https://gitcode.com/Roufsi/drission-rs)
 
-[English](README.en.md) · **简体中文**
+[English](README.en.md) · **简体中文** · 仓库:[GitHub](https://github.com/MageGojo/drission-rs) · [GitCode](https://gitcode.com/Roufsi/drission-rs)
 
 > **drission 是一个用 Rust 编写的高性能浏览器自动化库**:**默认开箱驱动 Google Chrome**(Chromium / CDP,
 > 也支持 Edge / Brave / Chromium / Electron),**一行开启** [Camoufox](https://github.com/daijro/camoufox)(Firefox 反检测内核)
@@ -42,9 +44,30 @@
 
 ---
 
-## 🆕 最新版本 v0.3.0 新增
+## 📦 预编译二进制(免编译,直接试用)
 
-> 完整记录见 [CHANGELOG.md](CHANGELOG.md)。本版**双协议统一接口全面对齐**、新增 Session TLS 指纹、每浏览器指纹与 AI 编程技能文档。
+本地编译有问题、只想快速试跑?仓库已附带 **macOS(arm64)+ Windows(x86_64)** 的预编译示例二进制,
+下载即可运行,**无需 Rust 工具链**:
+
+- **GitHub**:<https://github.com/MageGojo/drission-rs> → [`dist/win`](https://github.com/MageGojo/drission-rs/tree/main/dist/win) · [`dist/mac`](https://github.com/MageGojo/drission-rs/tree/main/dist/mac)
+- **GitCode(国内访问更快)**:<https://gitcode.com/Roufsi/drission-rs> → [`dist/win`](https://gitcode.com/Roufsi/drission-rs/tree/main/dist/win) · [`dist/mac`](https://gitcode.com/Roufsi/drission-rs/tree/main/dist/mac)
+
+含 `win_smoke` / `win_diag` / `win_cf_test`(Cloudflare 过盾)/ `win_bilibili_test` / `session_mode` / `yidun_click`(易盾点选)等示例二进制。
+**运行前提**:本机已装 Chrome / Edge(可用环境变量 `CHROME_BIN` 指定路径);`yidun_click` 首次运行会自动下载 OCR 模型到缓存。
+
+---
+
+## 🆕 最新版本 v0.3.1 新增
+
+> 完整记录见 [CHANGELOG.md](CHANGELOG.md)。**v0.3.1** 聚焦 **Windows 实机点选 / 过盾精准度**与**无头反检测真实度**:
+>
+> - **Windows 高 DPI 点击对齐**:强制 `device-scale=1`,修复 125% / 150% 缩放下合成点击按物理像素偏移导致的 Cloudflare Turnstile / 易盾点选「点不中」。
+> - **无头 GPU 自适应**:有真实 GPU 走硬件 ANGLE、无 GPU(VM / RDP)退 D3D11 WARP,WebGL 真实可用(避开 SwiftShader 软渲染破绽)。
+> - **反检测身份一致**:伪装 Chrome UA 时必定补回一致的高熵 Client Hints / `userAgentMetadata`(消除空 `fullVersionList`、Edge 品牌矛盾)。
+> - **Cloudflare 内嵌 Turnstile 过盾**:三级定位(含闭合 shadow DOM)+ 以 token 产出判过,支持表单内嵌 Turnstile。
+> - **CDP 隔离上下文 cookie 修复**;发布产物体积优化(`opt-level=z` + LTO + strip)。
+>
+> **v0.3.0** 起的能力:本版**双协议统一接口全面对齐**、新增 Session TLS 指纹、每浏览器指纹与 AI 编程技能文档。
 
 - **CDP 后端全面对齐 Camoufox(同一份代码切 feature 即换后端)**:补齐 iframe / Shadow DOM / 动作链 / 控制台 / WebSocket 监听 / 截图录像 / 上传 / 对话框 / **吐环境 `dump_env`** / **高并发池 `ChromiumPool`** / **修饰组合键**(无头也真执行 Ctrl+A/C/V 编辑命令)/ **Windows 进程树兜底(Job Object)**。
 - **Session 浏览器 TLS / JA3 / JA4 + HTTP2 指纹伪装(`--features impersonate`)**:给纯 HTTP 双模套**真实浏览器握手指纹**(`wreq` + BoringSSL,`BrowserProfile::Chrome/Firefox/Safari/Edge`),让「浏览器过盾 → HTTP 接力」不再被现代 WAF(Akamai / CF / DataDome)凭 TLS 指纹拦下;Windows(含 mingw 交叉编译)已实测产出 `.exe`。

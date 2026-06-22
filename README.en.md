@@ -4,8 +4,10 @@
 [![docs.rs](https://docs.rs/drission/badge.svg)](https://docs.rs/drission)
 [![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org)
 [![platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue.svg)](#-supported-platforms--browsers)
+[![GitHub](https://img.shields.io/badge/GitHub-MageGojo%2Fdrission--rs-181717?logo=github)](https://github.com/MageGojo/drission-rs)
+[![GitCode](https://img.shields.io/badge/GitCode-Roufsi%2Fdrission--rs-c71d23)](https://gitcode.com/Roufsi/drission-rs)
 
-**English** · [简体中文](README.md)
+**English** · [简体中文](README.md) · Repo: [GitHub](https://github.com/MageGojo/drission-rs) · [GitCode](https://gitcode.com/Roufsi/drission-rs)
 
 > **drission is a high-performance browser-automation library written in Rust.** It **drives Google Chrome by default**
 > (Chromium / CDP — also Edge / Brave / Chromium / Electron) and **enables the [Camoufox](https://github.com/daijro/camoufox)
@@ -43,9 +45,30 @@ A single `tokio` async API gives you, at once:
 
 ---
 
-## 🆕 New in v0.3.0
+## 📦 Prebuilt binaries (try it without compiling)
 
-> Full history in [CHANGELOG.md](CHANGELOG.md). This release brings **full dual-protocol API parity**, Session TLS fingerprinting, per-browser fingerprints, and an AI coding skill doc.
+Compilation trouble, or just want a quick try? The repo ships prebuilt example binaries for **macOS (arm64) + Windows (x86_64)** —
+download and run, **no Rust toolchain required**:
+
+- **GitHub**: <https://github.com/MageGojo/drission-rs> → [`dist/win`](https://github.com/MageGojo/drission-rs/tree/main/dist/win) · [`dist/mac`](https://github.com/MageGojo/drission-rs/tree/main/dist/mac)
+- **GitCode (faster in China)**: <https://gitcode.com/Roufsi/drission-rs> → [`dist/win`](https://gitcode.com/Roufsi/drission-rs/tree/main/dist/win) · [`dist/mac`](https://gitcode.com/Roufsi/drission-rs/tree/main/dist/mac)
+
+Includes `win_smoke` / `win_diag` / `win_cf_test` (Cloudflare bypass) / `win_bilibili_test` / `session_mode` / `yidun_click` (NetEase click-word) example binaries.
+**Prerequisite**: Chrome / Edge installed (point to it via `CHROME_BIN`); `yidun_click` auto-downloads the OCR model to cache on first run.
+
+---
+
+## 🆕 New in v0.3.1
+
+> Full history in [CHANGELOG.md](CHANGELOG.md). **v0.3.1** focuses on **Windows real-machine click / bypass precision** and **headless anti-detect authenticity**:
+>
+> - **Windows high-DPI click alignment**: force `device-scale=1`, fixing the physical-pixel offset under 125% / 150% scaling that made Cloudflare Turnstile / click-word captchas "unclickable".
+> - **Headless GPU adaptive**: real GPU → hardware ANGLE, no GPU (VM / RDP) → D3D11 WARP, so WebGL stays real (avoids the SwiftShader software-render tell).
+> - **Consistent anti-detect identity**: when masking as Chrome UA, always backfill matching high-entropy Client Hints / `userAgentMetadata` (no empty `fullVersionList`, no Edge-brand contradiction).
+> - **Cloudflare inline-Turnstile bypass**: 3-level locating (incl. closed shadow DOM) + token-presence pass criterion, supporting form-embedded Turnstile.
+> - **CDP isolated-context cookie fix**; release-size optimization (`opt-level=z` + LTO + strip).
+>
+> Since **v0.3.0**: full dual-protocol API parity, Session TLS fingerprinting, per-browser fingerprints, and an AI coding skill doc.
 
 - **CDP backend at full parity with Camoufox (same code, swap a feature to switch backend)**: adds iframe / Shadow DOM / action chains / console & WebSocket listening / screenshot & screencast / upload / dialogs / **env-dump `dump_env`** / **concurrency pool `ChromiumPool`** / **modifier hotkeys** (headless really executes Ctrl+A/C/V edit commands) / **Windows process-tree cleanup (Job Object)**.
 - **Session browser TLS / JA3 / JA4 + HTTP2 fingerprint (`--features impersonate`)**: wear a **real browser handshake fingerprint** on the pure-HTTP dual mode (`wreq` + BoringSSL, `BrowserProfile::Chrome/Firefox/Safari/Edge`), so "pass the shield in the browser → continue over HTTP" isn't blocked by modern WAFs (Akamai / CF / DataDome) on the TLS fingerprint; Windows (incl. mingw cross-compile) verified to produce a real `.exe`.
