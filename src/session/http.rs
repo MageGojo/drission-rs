@@ -79,8 +79,8 @@ impl HttpBackend {
     ) -> Result<RawResponse> {
         match self {
             HttpBackend::Plain(c) => {
-                let m = reqwest::Method::from_bytes(method.as_bytes())
-                    .unwrap_or(reqwest::Method::GET);
+                let m =
+                    reqwest::Method::from_bytes(method.as_bytes()).unwrap_or(reqwest::Method::GET);
                 let mut req = c.request(m, url);
                 for (k, v) in headers {
                     req = req.header(k.as_str(), v.as_str());
@@ -143,7 +143,11 @@ fn build_plain(opts: &SessionOptions) -> Result<reqwest::Client> {
 
 fn collect_headers_reqwest(h: &reqwest::header::HeaderMap) -> Vec<(String, String)> {
     h.iter()
-        .filter_map(|(k, v)| v.to_str().ok().map(|s| (k.as_str().to_string(), s.to_string())))
+        .filter_map(|(k, v)| {
+            v.to_str()
+                .ok()
+                .map(|s| (k.as_str().to_string(), s.to_string()))
+        })
         .collect()
 }
 
@@ -186,7 +190,11 @@ fn profile_to_emulation(p: BrowserProfile) -> wreq_util::Emulation {
 #[cfg(feature = "impersonate")]
 fn collect_headers_wreq(h: &wreq::header::HeaderMap) -> Vec<(String, String)> {
     h.iter()
-        .filter_map(|(k, v)| v.to_str().ok().map(|s| (k.as_str().to_string(), s.to_string())))
+        .filter_map(|(k, v)| {
+            v.to_str()
+                .ok()
+                .map(|s| (k.as_str().to_string(), s.to_string()))
+        })
         .collect()
 }
 

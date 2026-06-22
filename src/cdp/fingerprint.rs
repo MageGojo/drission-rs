@@ -607,7 +607,10 @@ mod tests {
         assert_ne!(a.canvas_noise_seed, b.canvas_noise_seed);
         let opts = pool.worker_options(&ChromiumOptions::new().headless(true));
         assert_eq!(opts.len(), 5);
-        assert!(opts.iter().all(|o| o.headless && !o.init_scripts.is_empty()));
+        assert!(
+            opts.iter()
+                .all(|o| o.headless && !o.init_scripts.is_empty())
+        );
     }
 
     #[test]

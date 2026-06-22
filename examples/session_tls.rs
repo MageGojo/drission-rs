@@ -27,7 +27,12 @@ async fn probe(profile: BrowserProfile) -> drission::Result<Value> {
 
 /// 提取关心的指纹字段:(ja3_hash, ja4, akamai_hash, user_agent)。
 fn fp(v: &Value) -> (String, String, String, String) {
-    let s = |p: &str| v.pointer(p).and_then(Value::as_str).unwrap_or("?").to_string();
+    let s = |p: &str| {
+        v.pointer(p)
+            .and_then(Value::as_str)
+            .unwrap_or("?")
+            .to_string()
+    };
     (
         s("/tls/ja3_hash"),
         s("/tls/ja4"),

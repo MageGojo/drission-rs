@@ -117,6 +117,11 @@ required-features = ["cdp"]
 name = "cdp_fp"
 required-features = ["cdp"]
 
+# 无头 GPU 探针:读 WebGL UNMASKED_RENDERER_WEBGL 判断无头是否拿到真实 GPU(非 SwiftShader)。
+[[example]]
+name = "gpu_probe"
+required-features = ["cdp"]
+
 # 无头 Client Hints 诊断:mask_ua 开/关对高熵 CH(fullVersionList 等)与 UA 的影响。
 [[example]]
 name = "hl_ch"

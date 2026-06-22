@@ -115,9 +115,7 @@ pub(crate) fn parse_chrome_full(s: &str) -> Option<String> {
 /// - GREASE 版本取自 `["8","99","24"]` 按 `seed%3`;
 /// - 基础序 `[greasey, Chromium, Google Chrome]` 再按 `orders[seed%6]` 重排(`out[order[i]]=base[i]`)。
 pub(crate) fn ua_brand_list(major: u32, full_version: &str, full: bool) -> Vec<(String, String)> {
-    const GREASEY_CHARS: [&str; 11] = [
-        " ", "(", ":", "-", ".", "/", ")", ";", "=", "?", "_",
-    ];
+    const GREASEY_CHARS: [&str; 11] = [" ", "(", ":", "-", ".", "/", ")", ";", "=", "?", "_"];
     const GREASED_VERSIONS: [&str; 3] = ["8", "99", "24"];
     const ORDERS: [[usize; 3]; 6] = [
         [0, 1, 2],

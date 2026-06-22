@@ -830,7 +830,8 @@ async fn wait_for_ws_url(port: u16, devtools_file: &Path, timeout: Duration) -> 
                 if let Ok(s) = std::fs::read_to_string(devtools_file) {
                     if let Some(p) = s.lines().next().and_then(|l| l.trim().parse::<u16>().ok()) {
                         if p != port {
-                            if let Ok(url) = browser_ws_url(&format!("http://127.0.0.1:{p}")).await {
+                            if let Ok(url) = browser_ws_url(&format!("http://127.0.0.1:{p}")).await
+                            {
                                 return Ok(url);
                             }
                         }

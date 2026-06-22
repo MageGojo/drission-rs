@@ -1,4 +1,4 @@
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 //! # drission
 //!
 //! 一个 **Rust** 编写的浏览器自动化库,提供与 [DrissionPage](https://github.com/g1879/DrissionPage)

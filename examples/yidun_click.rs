@@ -38,8 +38,7 @@ const TIPS_JS: &str = r#"(() => {
 })()"#;
 
 // 点击后读结果提示。
-const RESULT_JS: &str =
-    r#"(()=>{const e=document.querySelector('.yidun_tips__text');return e?e.innerText.trim():'';})()"#;
+const RESULT_JS: &str = r#"(()=>{const e=document.querySelector('.yidun_tips__text');return e?e.innerText.trim():'';})()"#;
 
 // 换图(换一题):点易盾刷新键(兜底 JS click)。
 const REFRESH_JS: &str = r#"(() => {
@@ -191,7 +190,10 @@ async fn main() -> drission::Result<()> {
         let cap = match fetch_image(&bg_url).await {
             Ok(b) if b.len() > 1000 => b,
             other => {
-                println!("[yidun] 拉取 bg 失败({:?});换图重试", other.map(|b| b.len()));
+                println!(
+                    "[yidun] 拉取 bg 失败({:?});换图重试",
+                    other.map(|b| b.len())
+                );
                 if attempt < tries {
                     trusted_refresh(&tab).await;
                     tokio::time::sleep(Duration::from_secs(2)).await;
@@ -340,7 +342,9 @@ async fn main() -> drission::Result<()> {
                 .unwrap_or_default();
             let shot = tab.screenshot_bytes().await?;
             std::fs::write(out_dir.join(format!("result_{attempt}.png")), &shot).ok();
-            println!("[yidun] 点击后提示=「{result_tip}」,结果截图 target/yidun/result_{attempt}.png");
+            println!(
+                "[yidun] 点击后提示=「{result_tip}」,结果截图 target/yidun/result_{attempt}.png"
+            );
 
             let ok = result_tip.contains("成功")
                 || chk
@@ -379,7 +383,10 @@ async fn main() -> drission::Result<()> {
 
 /// 监听排空,取**最新一题**的 `api/get`:解析 JSONP → `(bg[0] URL, front 点击顺序)`。
 /// 持续 `wait` 直到缓冲暂空且已拿到一题,或超时。换图后调用即拿到新题。
-async fn wait_challenge(tab: &drission::cdp::ChromiumTab, timeout: Duration) -> Option<(String, String)> {
+async fn wait_challenge(
+    tab: &drission::cdp::ChromiumTab,
+    timeout: Duration,
+) -> Option<(String, String)> {
     let deadline = Instant::now() + timeout;
     let mut latest: Option<(String, String)> = None;
     loop {
@@ -514,7 +521,10 @@ async fn hover_click(
         tokio::time::sleep(Duration::from_millis(45 + (nextf(&mut seed) * 45.0) as u64)).await;
         tab.mouse_up(p.0, p.1).await?;
         cur = p;
-        tokio::time::sleep(Duration::from_millis(180 + (nextf(&mut seed) * 160.0) as u64)).await;
+        tokio::time::sleep(Duration::from_millis(
+            180 + (nextf(&mut seed) * 160.0) as u64,
+        ))
+        .await;
     }
     Ok(())
 }

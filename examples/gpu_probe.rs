@@ -27,7 +27,9 @@ async fn main() -> drission::Result<()> {
         .or_else(|_| std::env::var("CHROME_BIN"))
         .ok();
 
-    let mut opts = ChromiumOptions::new().headless(headless).window_size(1280, 900);
+    let mut opts = ChromiumOptions::new()
+        .headless(headless)
+        .window_size(1280, 900);
     if let Some(e) = &exe {
         opts = opts.binary_path(std::path::PathBuf::from(e));
     }
@@ -45,12 +47,15 @@ async fn main() -> drission::Result<()> {
     println!("GPU_PROBE headless={headless}");
     println!("WEBGL_RENDERER= {webgl}");
     let soft = webgl.to_lowercase();
-    let is_soft = soft.contains("swiftshader")
-        || soft.contains("llvmpipe")
-        || soft.contains("software");
+    let is_soft =
+        soft.contains("swiftshader") || soft.contains("llvmpipe") || soft.contains("software");
     println!(
         "VERDICT= {}",
-        if is_soft { "SOFTWARE (SwiftShader) -> headless detectable" } else { "HARDWARE GPU -> headless viable" }
+        if is_soft {
+            "SOFTWARE (SwiftShader) -> headless detectable"
+        } else {
+            "HARDWARE GPU -> headless viable"
+        }
     );
     browser.quit().await?;
     Ok(())

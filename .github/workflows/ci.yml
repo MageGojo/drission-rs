@@ -94,6 +94,25 @@ jobs:
       - run: cargo clippy --all-targets --no-default-features --features signer -- -D warnings
       - run: cargo test --no-default-features --features signer --lib
 
+  impersonate-linux:
+    name: build+test (impersonate feature, linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # impersonate = wreq + BoringSSL(boring-sys2);build.rs 跑 cmake 编 BoringSSL + bindgen 解析头文件,
+      # 需 cmake / C++ 编译器 / libclang。ubuntu-latest 多已自带,这里显式装齐兜底。
+      - name: Install BoringSSL build deps (cmake / clang / libclang)
+        run: sudo apt-get update && sudo apt-get install -y cmake clang libclang-dev
+      # impersonate 隐含 camoufox(SessionPage 在 camoufox 门下),故用 --no-default-features 让统一接口
+      # canonical=camoufox,session_tls 示例(required-features=impersonate)才能正确编译。
+      # 全量目标编译 = Linux 上 impersonate(含 BoringSSL / JA3 指纹)能否落地的硬证据(能编过即可用)。
+      - name: build all targets (impersonate)
+        run: cargo build --all-targets --no-default-features --features impersonate
+      - name: lib unit tests (impersonate)
+        run: cargo test --no-default-features --features impersonate --lib
+
   cross-windows-gnu:
     name: cross-check (x86_64-pc-windows-gnu)
     runs-on: ubuntu-latest
@@ -103,14 +122,25 @@ jobs:
         with:
           targets: x86_64-pc-windows-gnu
       - uses: Swatinem/rust-cache@v2
+      # reqwest 默认 rustls 后端会引入 aws-lc-sys(C 代码),交叉编译到 windows-gnu 需 mingw-w64 的
+      # x86_64-w64-mingw32-gcc;nasm 供其 x86_64 汇编(同 scripts/win-cross-build.sh 的依赖约定)。
+      - name: Install mingw-w64 + nasm (C deps cross-compile to windows-gnu)
+        run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64 nasm
       # 两后端 lib 一起交叉编译(验证 Windows 注册表 / 命名管道分支类型正确)。
-      - run: cargo check --lib --target x86_64-pc-windows-gnu --features camoufox,cdp,slider
+      - name: cross-check lib
+        run: cargo check --lib --target x86_64-pc-windows-gnu --features camoufox,cdp,slider
+        env:
+          # aws-lc-sys 的 cmake/cc 交叉构建显式指向 mingw 工具链。
+          CC_x86_64_pc_windows_gnu: x86_64-w64-mingw32-gcc
+          CXX_x86_64_pc_windows_gnu: x86_64-w64-mingw32-g++
+          AR_x86_64_pc_windows_gnu: x86_64-w64-mingw32-ar
+          CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER: x86_64-w64-mingw32-gcc
 
   docs:
     name: docs.rs build
     runs-on: ubuntu-latest
     env:
-      # 与 docs.rs 一致:nightly + --cfg docsrs,启用 doc_auto_cfg 的 feature 徽标。
+      # 与 docs.rs 一致:nightly + --cfg docsrs,启用 doc_cfg(已合并 doc_auto_cfg)的 feature 徽标。
       RUSTDOCFLAGS: --cfg docsrs
     steps:
       - uses: actions/checkout@v4

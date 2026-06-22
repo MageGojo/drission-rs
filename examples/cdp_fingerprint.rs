@@ -9,8 +9,8 @@
 //! - `PERSONA=1 cargo run --example cdp_fingerprint`        完整跨 OS 画像(伪装 UA/platform/WebGL)
 //! - `HEADFUL=1 cargo run --example cdp_fingerprint`        有头可视
 
-use drission::cdp::{CdpFingerprintPool, ChromiumBrowser, ChromiumOptions};
 use drission::Result;
+use drission::cdp::{CdpFingerprintPool, ChromiumBrowser, ChromiumOptions};
 use serde_json::Value;
 
 const DUMP_JS: &str = r#"(function(){
@@ -49,7 +49,10 @@ const DUMP_JS: &str = r#"(function(){
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let n: usize = std::env::var("N").ok().and_then(|s| s.parse().ok()).unwrap_or(3);
+    let n: usize = std::env::var("N")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(3);
     let headful = std::env::var("HEADFUL").as_deref() == Ok("1");
     let persona = std::env::var("PERSONA").as_deref() == Ok("1");
 
@@ -60,7 +63,11 @@ async fn main() -> Result<()> {
     };
     println!(
         "模式: {} | 浏览器数: {} | headless: {}\n",
-        if persona { "完整跨 OS 画像(伪装 UA/platform/WebGL)" } else { "同 OS 变体(保真 UA/WebGL,Turnstile 友好)" },
+        if persona {
+            "完整跨 OS 画像(伪装 UA/platform/WebGL)"
+        } else {
+            "同 OS 变体(保真 UA/WebGL,Turnstile 友好)"
+        },
         n,
         !headful
     );
@@ -71,8 +78,10 @@ async fn main() -> Result<()> {
         let browser = ChromiumBrowser::launch(opts).await?;
         let tab = browser.new_tab(Some("about:blank")).await?;
         // 必须导航到一份新文档,导航前注入脚本才会对其生效(addScriptToEvaluateOnNewDocument 只作用于后续文档)。
-        tab.get("data:text/html,<!doctype html><meta charset=utf-8><title>fp</title><body>fp</body>")
-            .await?;
+        tab.get(
+            "data:text/html,<!doctype html><meta charset=utf-8><title>fp</title><body>fp</body>",
+        )
+        .await?;
         let raw = tab
             .run_js(DUMP_JS)
             .await?
@@ -97,6 +106,8 @@ async fn main() -> Result<()> {
         let _ = browser.quit().await;
     }
 
-    println!("完成。canvas# / 屏幕 / 时区 / 硬件 各浏览器应各不相同(persona 模式连 UA/WebGL 也不同)。");
+    println!(
+        "完成。canvas# / 屏幕 / 时区 / 硬件 各浏览器应各不相同(persona 模式连 UA/WebGL 也不同)。"
+    );
     Ok(())
 }

@@ -33,8 +33,8 @@ use crate::launcher::Proxy;
 use crate::{Error, Result};
 
 mod http;
-use http::{HttpBackend, RawResponse};
 pub use http::BrowserProfile;
+use http::{HttpBackend, RawResponse};
 
 /// 默认 UA(真实 Firefox;与 Driver 侧去 Camoufox 令牌后的形态一致)。
 const DEFAULT_UA: &str =
@@ -182,7 +182,10 @@ impl SessionPage {
                 form_encode(&f),
                 Some("application/x-www-form-urlencoded".to_string()),
             )),
-            Some(PostData::Json(j)) => Some((serde_json::to_string(&j)?, Some("application/json".to_string()))),
+            Some(PostData::Json(j)) => Some((
+                serde_json::to_string(&j)?,
+                Some("application/json".to_string()),
+            )),
             Some(PostData::Raw(s, ct)) => Some((s, ct)),
             None => None,
         };
