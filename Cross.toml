@@ -1,0 +1,17 @@
+# cross(https://github.com/cross-rs/cross)配置:musl 静态构建。
+#
+# 为什么要它:drission 始终依赖 reqwest,reqwest 默认 rustls 后端会引入 aws-lc-sys(C 代码),
+# 其 build.rs 需要 cmake 编 aws-lc、(必要时)bindgen/libclang 生成绑定。cross 的目标镜像
+# 自带 musl 交叉 C 工具链,但默认没装 cmake/clang,故在 pre-build 阶段(镜像内、宿主架构上跑,
+# 为目标交叉编译 C)补齐。这样 `cross build --target *-unknown-linux-musl` 能编出**完全静态、
+# 不依赖任何 glibc**的二进制,在 CentOS7 / Alibaba Cloud Linux / Ubuntu / Alpine 等所有发行版通用。
+
+[target.x86_64-unknown-linux-musl]
+pre-build = [
+    "apt-get update && apt-get install -y --no-install-recommends cmake clang libclang-dev",
+]
+
+[target.aarch64-unknown-linux-musl]
+pre-build = [
+    "apt-get update && apt-get install -y --no-install-recommends cmake clang libclang-dev",
+]

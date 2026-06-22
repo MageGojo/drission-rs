@@ -149,3 +149,47 @@ jobs:
       # 注意:仓库根 rust-toolchain.toml 钉了 stable,会覆盖上面装的 nightly;而 feature(doc_cfg)
       # 只能在 nightly 用(stable 报 E0554)。故用 `cargo +nightly` 显式覆盖 toolchain 文件走 nightly。
       - run: cargo +nightly doc --no-deps --all-features
+
+  # musl 静态构建:产出**完全静态、不依赖 glibc** 的 Linux 二进制,一份跑遍所有发行版
+  # (CentOS7 / Alibaba Cloud Linux / Ubuntu / Alpine …),覆盖国内绝大多数服务器。
+  # x86_64 + aarch64 两个架构(后者覆盖鲲鹏/倚天/飞腾/信创 ARM 服务器)。
+  # 用 cross(Docker 内置 musl 交叉 C 工具链)+ Cross.toml(装 cmake/clang 供 aws-lc-sys)。
+  musl-static:
+    name: musl static (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - x86_64-unknown-linux-musl
+          - aarch64-unknown-linux-musl
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: musl-${{ matrix.target }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+      # 编 lib(cdp + ocr)+ cdp_demo 示例:cdp_demo 产物用于验证「完全静态链接」(最硬的 C 依赖
+      # aws-lc-sys 也被静态编入);ocr 为纯 Rust(tract/image/fontdue),一并证其在 musl 可编。
+      - name: build musl static (lib + cdp_demo, with ocr)
+        run: cross build --release --target ${{ matrix.target }} --features ocr --lib --example cdp_demo
+      - name: verify fully static (no glibc / no dynamic deps)
+        run: |
+          BIN="target/${{ matrix.target }}/release/examples/cdp_demo"
+          file "$BIN"
+          if file "$BIN" | grep -q "statically linked"; then
+            echo "OK: 完全静态链接 → 跨所有 Linux 发行版通用"
+          else
+            echo "ERROR: 不是静态二进制(仍依赖动态库)"; exit 1
+          fi
+      - name: upload static binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: drission-cdp_demo-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/examples/cdp_demo
+          if-no-files-found: error
