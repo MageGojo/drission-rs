@@ -579,6 +579,49 @@ impl ClickWord {
         Ok(out)
     }
 
+    /// 按**单个** [`BBox`] 从原图裁出该字图 PNG(与 [`solve`](Self::solve)/[`crops`](Self::crops) **同样的外扩裁剪**)。
+    /// 用于「过盾即验真」采样:拿到命中 [`ClickHit`] 后,按其 `bbox` 从干净图裁字 → [`SampleBank::save_labeled`]。
+    pub fn crop_bbox(&self, image: &[u8], b: &BBox) -> Result<Vec<u8>> {
+        let img = image::load_from_memory(image).map_err(terr)?;
+        let (iw, ih) = (img.width(), img.height());
+        let crop = crop_padded(&img, b, iw, ih);
+        let mut buf = std::io::Cursor::new(Vec::new());
+        crop.write_to(&mut buf, image::ImageFormat::Png)
+            .map_err(terr)?;
+        Ok(buf.into_inner())
+    }
+
+    /// **「过盾即验真」自动采样**:把一组**已验证正确**的命中按其 `bbox` 从 `image`(干净图)裁字,按
+    /// `{目标字}/` 存进样本库目录 `dir`(内容寻址去重)。返回**本次新增**样本数。
+    ///
+    /// 由来:易盾 `api/check` 回 `result:true` ⇒ 这一题各 [`ClickHit`] 的 `target` 就是其 `bbox` 框里
+    /// **真实的字**(点击序与 `front` 一致且被服务端判过)。于是每过一次盾就白捡若干**标签已验证**的真样本,
+    /// bank 越跑越厚、[`GlyphMatcher`]/[`SampleBank`] 模板信号越准——**零人工**破解里程碑 59 的「数据墙」。
+    /// 采到的样本下次进程启动即被 `DRISSION_GLYPH_SAMPLES` 自动加载,或本进程内调
+    /// [`reload_sample_bank`](Self::reload_sample_bank) 即时生效。
+    pub fn harvest_verified(&self, image: &[u8], hits: &[ClickHit], dir: &Path) -> Result<usize> {
+        let img = image::load_from_memory(image).map_err(terr)?;
+        let (iw, ih) = (img.width(), img.height());
+        let mut n = 0;
+        for h in hits {
+            let crop = crop_padded(&img, &h.bbox, iw, ih);
+            let mut buf = std::io::Cursor::new(Vec::new());
+            if crop.write_to(&mut buf, image::ImageFormat::Png).is_err() {
+                continue;
+            }
+            if SampleBank::save_labeled(dir, h.target, buf.get_ref())?.is_some() {
+                n += 1;
+            }
+        }
+        Ok(n)
+    }
+
+    /// 从目录**重载真样本库**(采样后即时生效:让同一进程内后续题就能用上刚白捡的样本)。
+    /// 目录为空/不存在 ⇒ 置 `None`(退化为渲染字体模板或纯 OCR)。
+    pub fn reload_sample_bank(&mut self, dir: &Path) {
+        self.bank = SampleBank::from_dir(dir).ok();
+    }
+
     /// **受约束求解**(点选内核):检测主图 → 逐框对**每个目标字**算亲和度([`Ocr::char_affinity`])→
     /// **全局最优指派**([`assign_optimal`]:每个目标分到**互不相同**的框、最大化总亲和度)→ 按目标顺序
     /// 返回命中 [`ClickHit`](含框 / 点击点 / **置信度** `affinity`)。

@@ -62,6 +62,44 @@ const MARKERS_JS: &str = r#"(()=>{const m=document.querySelectorAll('[class*=yid
 const tip=document.querySelector('.yidun_tips__text');
 return JSON.stringify({point_nodes:m.length,tip:tip?tip.innerText.trim():''});})()"#;
 
+// WebGL 自检:取 UNMASKED vendor/renderer(验证容器「补环境」是否把软渲染破绽改写掉)。
+const WEBGL_PROBE_JS: &str = r#"(()=>{try{
+  const c=document.createElement('canvas');
+  const gl=c.getContext('webgl')||c.getContext('experimental-webgl');
+  if(!gl) return {ok:false,vendor:'',renderer:''};
+  const e=gl.getExtension('WEBGL_debug_renderer_info');
+  return {ok:true,
+    vendor:e?gl.getParameter(e.UNMASKED_VENDOR_WEBGL):gl.getParameter(gl.VENDOR),
+    renderer:e?gl.getParameter(e.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER)};
+}catch(err){return {ok:false,vendor:'',renderer:String(err)};}})()"#;
+
+// 环境诊断:挑战图不弹时排查根因——页面是否聚焦/可见(易盾不下发挑战图的头号嫌疑)、webdriver、
+// 屏幕/窗口几何、各 yidun 关键节点是否存在/可见(看验证条是否真打开了 hover 面板)。
+const DIAG_JS: &str = r#"(()=>{
+  const vis=(s)=>{const e=document.querySelector(s);if(!e)return 'none';
+    const b=e.getBoundingClientRect();const st=getComputedStyle(e);
+    const v=e.offsetParent!==null&&st.visibility!=='hidden'&&parseFloat(st.opacity)>0.01;
+    return (v?'vis':'hid')+'['+Math.round(b.x)+','+Math.round(b.y)+','+Math.round(b.width)+','+Math.round(b.height)+']';};
+  const bgEl=document.querySelector('.yidun_bg-img,img.yidun_bg-img,.yidun_bgimg');
+  const bgCs=bgEl?getComputedStyle(bgEl):null;
+  const ans=document.querySelector('.yidun_tips__answer,.yidun_tips__point,.yidun_tips__text');
+  return JSON.stringify({
+    focus:document.hasFocus(), visState:document.visibilityState, hidden:document.hidden,
+    wd:navigator.webdriver,
+    scr:[screen.width,screen.height,screen.availWidth,screen.availHeight,screen.colorDepth],
+    win:[innerWidth,innerHeight,outerWidth,outerHeight,devicePixelRatio,window.screenX,window.screenY],
+    iframes:document.querySelectorAll('iframe').length,
+    control:vis('.yidun_control'), tips:vis('.yidun_tips'), bg:vis('.yidun_bg-img'),
+    panel:vis('.yidun_panel'), intelli:vis('.yidun_intelli-icon'),
+    modal:vis('.yidun_modal'), popup:vis('.yidun_popup'), loadingImg:vis('.yidun_loading'),
+    // bg-img 真实加载状态:src 尾段 / naturalWidth(>0 = 图真加载了 = api/get 网络层成功)/ CSS 背景图。
+    bgTag:bgEl?bgEl.tagName:'', bgSrc:bgEl?((bgEl.src||bgEl.currentSrc||'')+'').slice(-45):'',
+    bgNat:bgEl?(bgEl.naturalWidth||0):0, bgCss:bgCs?(bgCs.backgroundImage||'').slice(0,40):'',
+    frontTxt:ans?ans.innerText.trim().slice(0,20):'',
+    lang:(navigator.languages||[]).join(','), plat:navigator.platform
+  });
+})()"#;
+
 // 点选目标图选择器(读**实时** rect 用)。
 const BG_SEL: &str = ".yidun_bg-img, img.yidun_bg-img, .yidun_bgimg";
 
@@ -121,6 +159,17 @@ async fn main() -> drission::Result<()> {
             v["ih"].as_f64().unwrap_or(0.0)
         );
     }
+    // WebGL 自检:验证「补环境」是否生效(Docker/Xvfb 默认会是 SwiftShader/llvmpipe 且可能 ok=false,
+    // 库的容器补环境应令 ok=true 且 renderer 显示为常见 Linux 桌面 GPU)。
+    if let Ok(v) = tab
+        .run_js(WEBGL_PROBE_JS)
+        .await
+    {
+        println!(
+            "[yidun] WebGL ok={} vendor={} renderer={}",
+            v["ok"], v["vendor"], v["renderer"]
+        );
+    }
 
     // ★ 监听验证码接口(在触发前开,确保抓到第一题)。只过滤 `c.dun.163.com/api/*`(=get/check),
     //   不抓 `/v4/j/up`(上报)与 `/node/api/check-guardian`(不同路径),噪声最小。
@@ -144,6 +193,7 @@ async fn main() -> drission::Result<()> {
         }
     }
     tokio::time::sleep(Duration::from_secs(3)).await;
+    dump_diag(&tab, "触发后").await;
 
     let tries: u32 = std::env::var("YIDUN_TRIES")
         .ok()
@@ -164,6 +214,7 @@ async fn main() -> drission::Result<()> {
             // 或窗口失焦挡掉 → 验证框压根没开(此时没有「换图」按钮)。**检测到没弹就再点一次验证按钮**
             // 重新唤起挑战;若验证框其实开着(只是这题没拿到),才退回「换图」。
             println!("[yidun] 未监听到 api/get(点选图未弹出);重新点击「点击验证」再触发…");
+            dump_diag(&tab, &format!("第{attempt}次未弹")).await;
             if attempt < tries {
                 if !retrigger_verify(&tab).await {
                     trusted_refresh(&tab).await;
@@ -381,6 +432,16 @@ async fn main() -> drission::Result<()> {
     Ok(())
 }
 
+/// 环境诊断:跑 [`DIAG_JS`] 打印聚焦/可见性/webdriver/屏幕窗口几何/yidun 关键节点可见性。
+/// 挑战图不弹时定位根因(Docker/Xvfb 下「无焦点 → 易盾不下发挑战图」是头号嫌疑)。
+async fn dump_diag(tab: &drission::cdp::ChromiumTab, label: &str) {
+    if let Ok(v) = tab.run_js(DIAG_JS).await
+        && let Some(s) = v.as_str()
+    {
+        println!("[yidun] 诊断[{label}] = {s}");
+    }
+}
+
 /// 监听排空,取**最新一题**的 `api/get`:解析 JSONP → `(bg[0] URL, front 点击顺序)`。
 /// 持续 `wait` 直到缓冲暂空且已拿到一题,或超时。换图后调用即拿到新题。
 async fn wait_challenge(
@@ -389,12 +450,28 @@ async fn wait_challenge(
 ) -> Option<(String, String)> {
     let deadline = Instant::now() + timeout;
     let mut latest: Option<(String, String)> = None;
+    // 诊断模式(`YIDUN_DIAG=1`):打印监听到的每个包,排查 api/get 是否被抓到 / 响应体能否解析。
+    let diag = std::env::var("YIDUN_DIAG").is_ok();
     loop {
         match tab.listen().wait(Some(Duration::from_millis(300))).await {
             Ok(Some(p)) => {
+                if diag {
+                    println!(
+                        "[yidun]   监听包 {} [{}] status={} body={}B",
+                        short(&p.url, 64),
+                        p.resource_type,
+                        p.response.status,
+                        p.response.body.len()
+                    );
+                }
                 if p.url.contains("/get") {
-                    if let Some(c) = parse_yidun_get(&p.response.body) {
-                        latest = Some(c); // 保留最新一题
+                    match parse_yidun_get(&p.response.body) {
+                        Some(c) => latest = Some(c), // 保留最新一题
+                        None if diag => println!(
+                            "[yidun]   /get 解析失败(无 data.bg);body 头 = {}",
+                            short(&p.response.body, 120)
+                        ),
+                        None => {}
                     }
                 }
             }

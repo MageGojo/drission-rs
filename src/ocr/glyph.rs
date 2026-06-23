@@ -294,6 +294,35 @@ impl SampleBank {
         }
         best.clamp(0.0, 1.0)
     }
+
+    /// 把一张**已知真值**的单字图(PNG 字节)存进样本库目录 `dir/{ch}/`,**内容寻址去重**(同图只存一次),
+    /// 返回 `Some(写入路径)`;命中去重则 `None`。
+    ///
+    /// 用于**「过盾即验真」自动采样**:易盾 check 回 `result:true` 时,提示 `front` 的字序就是各点中框的
+    /// 真值——把这些框裁出来按 `{字}/` 落盘,即得**零人工、标签已验证**的真样本,bank 越跑越厚、模板信号
+    /// 越准(见 [`SampleBank::similarity`])。配合 [`crate::ocr::ClickWord::harvest_verified`] 一行采集。
+    pub fn save_labeled(dir: &Path, ch: char, crop_png: &[u8]) -> Result<Option<PathBuf>> {
+        let sub = dir.join(ch.to_string());
+        std::fs::create_dir_all(&sub).map_err(|e| Error::msg(format!("样本库建目录: {e}")))?;
+        // **内容寻址**文件名:同一张图无论来自种子还是采样都得到同一文件名 ⇒ 天然去重、不重复堆积。
+        let path = sub.join(format!("{:016x}.png", content_hash(crop_png)));
+        if path.exists() {
+            return Ok(None); // 去重:同一张图已存过。
+        }
+        std::fs::write(&path, crop_png).map_err(|e| Error::msg(format!("样本写盘: {e}")))?;
+        Ok(Some(path))
+    }
+}
+
+/// FNV-1a 64 位内容哈希(**确定性**、无外部依赖):仅用于真样本去重的文件名,碰撞概率对此用途可忽略
+/// (即便碰撞也只是少存一张近似图)。
+fn content_hash(bytes: &[u8]) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for &b in bytes {
+        h ^= b as u64;
+        h = h.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    h
 }
 
 #[cfg(test)]
@@ -321,5 +350,28 @@ mod tests {
         src[10 * N + 12] = 1.0;
         let r = rotate_grid(&src, N, 0.0);
         assert!((r[10 * N + 12] - 1.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn save_labeled_dedupes_and_routes_by_char() {
+        let dir = std::env::temp_dir().join(format!("drission_bank_{}", content_hash(b"unique-seed")));
+        let _ = std::fs::remove_dir_all(&dir);
+        // 第一次写入返回路径且落到 `{字}/` 子目录;同图第二次去重返回 None。
+        let png = b"\x89PNG\r\n\x1a\n-fake-but-stable-bytes";
+        let first = SampleBank::save_labeled(&dir, '特', png).unwrap();
+        assert!(first.is_some());
+        let p = first.unwrap();
+        assert!(p.exists());
+        assert_eq!(p.parent().unwrap().file_name().unwrap(), "特");
+        assert!(SampleBank::save_labeled(&dir, '特', png).unwrap().is_none());
+        // 不同图 → 不同文件名(不去重)。
+        assert!(SampleBank::save_labeled(&dir, '特', b"other-bytes").unwrap().is_some());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn content_hash_is_deterministic() {
+        assert_eq!(content_hash(b"abc"), content_hash(b"abc"));
+        assert_ne!(content_hash(b"abc"), content_hash(b"abd"));
     }
 }
