@@ -11,7 +11,7 @@ use tokio::time::sleep;
 use crate::cdp::core::CdpCore;
 use crate::cdp::options::{ChromiumContextOverride, ChromiumOptions};
 use crate::cdp::tab::ChromiumTab;
-use crate::cdp::{fetch, locate, stealth};
+use crate::cdp::{container, fetch, locate, stealth};
 use crate::protocol::Connection;
 use crate::{Error, Result};
 
@@ -40,6 +40,10 @@ pub struct ChromiumBrowser {
     /// 导航前注入脚本(`ChromiumOptions::init_scripts`):每个新标签 attach 时按序注入(深指纹伪装等),
     /// 在内置反检测脚本之后。
     init_scripts: Vec<String>,
+    /// 容器 / 无 GPU Linux「补环境」WebGL renderer 改写脚本(`Some` 即在 attach 时注入,见
+    /// [`container`](crate::cdp::container))。在内置反检测脚本之后、用户 init_scripts 之前注入,
+    /// 把软渲染破绽(SwiftShader/llvmpipe)改写成常见 Linux 桌面 GPU。
+    container_js: Option<String>,
     /// Windows:把 Chrome 绑入 KILL_ON_JOB_CLOSE 的 Job,quit/Drop 时级联杀掉渲染/GPU 等子进程
     /// (`kill_on_drop` 只杀主进程,会留孤儿)。仅自启动时为 `Some`;接管不接管生命周期。
     #[cfg(windows)]
@@ -241,6 +245,51 @@ impl ChromiumBrowser {
         for a in &opts.args {
             cmd.arg(a);
         }
+        // 容器 / 无 GPU Linux「补环境」判定(仅 Linux 触发,见 cdp::container):用于下方有头补
+        // `--enable-unsafe-swiftshader`(软件 WebGL 可用)与 attach 时注入 WebGL renderer 改写脚本。
+        let spoof_gpu = container::should_spoof(opts.stealth, opts.spoof_container);
+        // 预生成「补环境」注入脚本:把软渲染 renderer(SwiftShader/llvmpipe)改写成常见 Linux 桌面 GPU。
+        // 用户已自带 WebGL 覆盖(CdpFingerprint persona 等)且未显式要求补环境时,尊重用户、不重复注入。
+        let container_js = if spoof_gpu && opts.stealth {
+            let user_has_webgl = opts.init_scripts.iter().any(|s| s.contains("37446"));
+            if user_has_webgl && opts.spoof_container != Some(true) {
+                None
+            } else {
+                Some(container::spoof_js(
+                    &container::spoof_vendor(opts.webgl_vendor.as_deref()),
+                    &container::spoof_renderer(opts.webgl_renderer.as_deref()),
+                ))
+            }
+        } else {
+            None
+        };
+        // Linux 服务器(无显示器即可,用无头;但有无界面之外还有两条**硬条件**,否则 Chromium 直接崩):
+        // - 以 root 运行(Docker / 多数云服务器默认 root)→ user-namespace sandbox 起不来,报
+        //   "No usable sandbox! / Failed to move to new namespace",必须 `--no-sandbox` 旁路;
+        // - 容器内 `/dev/shm` 常仅 64MB,渲染进程写爆后页面崩(Tab crashed)→ `--disable-dev-shm-usage`
+        //   改用临时文件。故 Linux 自动补这两个;用户已在 args 显式给出则不重复,`DRISSION_NO_SANDBOX=0`
+        //   可在已配好非 root 沙箱的环境关掉 sandbox 旁路。
+        #[cfg(target_os = "linux")]
+        {
+            let has = |needle: &str| opts.args.iter().any(|a| a.starts_with(needle));
+            let keep_sandbox = matches!(
+                std::env::var("DRISSION_NO_SANDBOX").ok().as_deref(),
+                Some("0") | Some("off") | Some("false")
+            );
+            if !keep_sandbox && !has("--no-sandbox") {
+                cmd.arg("--no-sandbox");
+            }
+            if !has("--disable-dev-shm-usage") {
+                cmd.arg("--disable-dev-shm-usage");
+            }
+            // 有头(Xvfb)+ 容器/无 GPU:补 `--enable-unsafe-swiftshader`,让**软件 WebGL 可用**。
+            // 近期 Chrome(≥121)默认禁用 SwiftShader 的 WebGL,不加这个 `getContext('webgl')` 直接返回
+            // null(=完全没有 WebGL,比软渲染更可疑),后续 renderer 改写也就无从谈起。无头路径在下方
+            // GPU 策略里本就始终带该旁路,故这里仅补"有头"这一缺口(避免重复)。
+            if spoof_gpu && !opts.headless && !has("--enable-unsafe-swiftshader") {
+                cmd.arg("--enable-unsafe-swiftshader");
+            }
+        }
         if opts.headless {
             cmd.arg("--headless=new");
             // GPU 策略(无头反检测核心,**按是否有真实 GPU 自适应**):
@@ -314,6 +363,7 @@ impl ChromiumBrowser {
             platform_version,
             download_dir: opts.download_path.clone(),
             init_scripts: opts.init_scripts.clone(),
+            container_js,
             #[cfg(windows)]
             job: std::sync::Mutex::new(job_guard),
         })
@@ -345,6 +395,8 @@ impl ChromiumBrowser {
             platform_version: None,
             download_dir: opts.download_path.clone(),
             init_scripts: opts.init_scripts.clone(),
+            // 接管不重启浏览器(无法改启动 GPU 参数),补环境不适用。
+            container_js: None,
             // 接管不接管对方生命周期,故不绑 Job。
             #[cfg(windows)]
             job: std::sync::Mutex::new(None),
@@ -502,6 +554,17 @@ impl ChromiumBrowser {
                     .send(
                         "Page.addScriptToEvaluateOnNewDocument",
                         json!({ "source": stealth::headless_screen_js() }),
+                    )
+                    .await;
+            }
+            // 容器 / 无 GPU Linux「补环境」:把软渲染 WebGL renderer 改写成常见 Linux 桌面 GPU,
+            // 抹掉 SwiftShader/llvmpipe 破绽(在用户/指纹脚本之前注入,默认占先;用户显式 webgl 覆盖见
+            // launch_inner 的 user_has_webgl 判定)。
+            if let Some(js) = &self.container_js {
+                let _ = core
+                    .send(
+                        "Page.addScriptToEvaluateOnNewDocument",
+                        json!({ "source": js }),
                     )
                     .await;
             }

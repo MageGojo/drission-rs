@@ -52,6 +52,19 @@ pub struct ChromiumOptions {
     /// (crate::cdp::CdpFingerprint) 生成:platform / 硬件 / 屏幕 / 语言 / canvas·webgl·audio 噪声)。
     /// 在内置反检测脚本(`STEALTH_JS` 等)**之后**注入。默认空。
     pub init_scripts: Vec<String>,
+    /// 容器 / 无 GPU Linux「补环境」开关(默认 `None` = **自动判定**)。
+    ///
+    /// Docker / 云服务器 / Xvfb「假有头」里 Chrome 无真实 GPU、WebGL 走 SwiftShader/llvmpipe,
+    /// 是强机器人信号(易盾等据此不下发挑战)。开启后(自动或显式):① 启动补
+    /// `--enable-unsafe-swiftshader` 保证软件 WebGL 可用;② 注入脚本把 `UNMASKED_RENDERER_WEBGL`
+    /// 改写成常见 Linux 桌面 GPU(默认 Intel Mesa,可经 `webgl()` / `DRISSION_WEBGL_*` 自定义)。
+    /// `Some(true)`/`Some(false)` 显式开/关;`None` 时:**Linux + stealth + (容器 或 无 DRM 渲染节点)**
+    /// 才开。仅 Linux 生效(改写的是 Linux GPU 串)。详见 [`container`](crate::cdp::container)。
+    pub spoof_container: Option<bool>,
+    /// 补环境改写的 WebGL `UNMASKED_VENDOR_WEBGL`。`None` = 用默认 / `DRISSION_WEBGL_VENDOR`。
+    pub webgl_vendor: Option<String>,
+    /// 补环境改写的 WebGL `UNMASKED_RENDERER_WEBGL`。`None` = 用默认 / `DRISSION_WEBGL_RENDERER`。
+    pub webgl_renderer: Option<String>,
     /// 额外命令行参数。
     pub args: Vec<String>,
 }
@@ -73,6 +86,9 @@ impl Default for ChromiumOptions {
             proxy: None,
             download_path: None,
             init_scripts: Vec::new(),
+            spoof_container: None,
+            webgl_vendor: None,
+            webgl_renderer: None,
             args: Vec::new(),
         }
     }
@@ -167,6 +183,21 @@ impl ChromiumOptions {
     /// 设置导航前注入脚本列表(覆盖既有)。
     pub fn init_scripts(mut self, scripts: Vec<String>) -> Self {
         self.init_scripts = scripts;
+        self
+    }
+
+    /// 容器 / 无 GPU Linux「补环境」显式开/关(默认自动判定,见 [`spoof_container`](Self::spoof_container) 字段)。
+    /// `true` = 强制补(即便检测不到容器,如某些 GPU 直通仍想统一 renderer);`false` = 强制不补。
+    pub fn spoof_container(mut self, yes: bool) -> Self {
+        self.spoof_container = Some(yes);
+        self
+    }
+
+    /// 自定义补环境改写的 WebGL vendor / renderer 字符串(覆盖默认 Intel Mesa 与 `DRISSION_WEBGL_*`)。
+    /// 仅在补环境生效时使用;应与浏览器 UA / 平台自洽(默认 Linux 桌面值)。
+    pub fn webgl(mut self, vendor: impl Into<String>, renderer: impl Into<String>) -> Self {
+        self.webgl_vendor = Some(vendor.into());
+        self.webgl_renderer = Some(renderer.into());
         self
     }
 

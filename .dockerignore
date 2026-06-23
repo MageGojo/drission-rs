@@ -1,0 +1,12 @@
+# 不要把这些拷进 docker 构建上下文(尤其 target/ 与 .git/ 体积巨大,会拖慢构建)。
+target/
+.git/
+dist/
+docs/
+# 运行期产物 / 样本 / 自训脚手架(已在 .gitignore,这里也排除)。
+yidun_samples/
+yidun-train/
+dump-env/
+dump-env-fp/
+douyin-env/
+**/*.zip

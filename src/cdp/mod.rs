@@ -35,6 +35,7 @@ mod actions;
 mod browser;
 mod cloudflare;
 mod console;
+mod container;
 mod core;
 mod download;
 mod dump_env;
