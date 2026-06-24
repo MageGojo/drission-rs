@@ -44,19 +44,11 @@
 
 ---
 
-## 📦 预编译二进制(免编译,直接试用)
+## 📦 没装 Rust 也能用(免编译上手)
 
-本地编译有问题、只想快速试跑?仓库已附带 **macOS(arm64)+ Windows(x86_64)** 的预编译示例二进制,
-下载即可运行,**无需 Rust 工具链**:
-
-- **GitHub**:<https://github.com/MageGojo/drission-rs> → [`dist/win`](https://github.com/MageGojo/drission-rs/tree/main/dist/win) · [`dist/mac`](https://github.com/MageGojo/drission-rs/tree/main/dist/mac)
-- **GitCode(国内访问更快)**:<https://gitcode.com/Roufsi/drission-rs> → [`dist/win`](https://gitcode.com/Roufsi/drission-rs/tree/main/dist/win) · [`dist/mac`](https://gitcode.com/Roufsi/drission-rs/tree/main/dist/mac)
-
-含 `win_smoke` / `win_diag` / `win_cf_test`(Cloudflare 过盾)/ `win_bilibili_test` / `session_mode` / `yidun_click`(易盾点选)等示例二进制。
-**运行前提**:本机已装 Chrome / Edge(可用环境变量 `CHROME_BIN` 指定路径);`yidun_click` 首次运行会自动下载 OCR 模型到缓存。
-
-> 🦀 **想用源码开发但没装 Rust?**(Python / TS 开发者友好)用**一键环境配置脚本**(国内镜像加速、**双击即装**、带进度、自动验证):
-> 见 [`install/`](install/) —— macOS 双击 `install-mac.command`、Windows 双击 `install-windows.bat`,装完即可 `cargo add drission`。
+🦀 **Python / TS 开发者友好**:不想手动装 Rust?用**一键环境配置脚本**(国内镜像加速、**双击即装**、带进度、自动验证):
+见 [`install/`](install/) —— macOS 双击 `install-mac.command`、Windows 双击 `install-windows.bat`,装完即可 `cargo add drission`。
+**运行前提**:本机已装 Chrome / Edge(可用环境变量 `CHROME_BIN` 指定路径);用到 OCR 的示例首次运行会自动下载模型到缓存。
 
 ---
 

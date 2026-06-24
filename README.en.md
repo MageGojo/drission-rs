@@ -45,19 +45,11 @@ A single `tokio` async API gives you, at once:
 
 ---
 
-## 📦 Prebuilt binaries (try it without compiling)
+## 📦 No Rust installed? (get started without compiling)
 
-Compilation trouble, or just want a quick try? The repo ships prebuilt example binaries for **macOS (arm64) + Windows (x86_64)** —
-download and run, **no Rust toolchain required**:
-
-- **GitHub**: <https://github.com/MageGojo/drission-rs> → [`dist/win`](https://github.com/MageGojo/drission-rs/tree/main/dist/win) · [`dist/mac`](https://github.com/MageGojo/drission-rs/tree/main/dist/mac)
-- **GitCode (faster in China)**: <https://gitcode.com/Roufsi/drission-rs> → [`dist/win`](https://gitcode.com/Roufsi/drission-rs/tree/main/dist/win) · [`dist/mac`](https://gitcode.com/Roufsi/drission-rs/tree/main/dist/mac)
-
-Includes `win_smoke` / `win_diag` / `win_cf_test` (Cloudflare bypass) / `win_bilibili_test` / `session_mode` / `yidun_click` (NetEase click-word) example binaries.
-**Prerequisite**: Chrome / Edge installed (point to it via `CHROME_BIN`); `yidun_click` auto-downloads the OCR model to cache on first run.
-
-> 🦀 **Want to build from source but don't have Rust?** (Python / TS devs welcome) Use the **one-click setup scripts** (China-mirror accelerated, **double-click**, with progress + auto-verify):
-> see [`install/`](install/) — macOS: double-click `install-mac.command`; Windows: double-click `install-windows.bat`. Then `cargo add drission`.
+🦀 **Python / TS devs welcome**: don't want to install Rust by hand? Use the **one-click setup scripts** (China-mirror accelerated, **double-click**, with progress + auto-verify):
+see [`install/`](install/) — macOS: double-click `install-mac.command`; Windows: double-click `install-windows.bat`. Then `cargo add drission`.
+**Prerequisite**: Chrome / Edge installed (point to it via `CHROME_BIN`); OCR examples auto-download the model to cache on first run.
 
 ---
 
