@@ -64,7 +64,7 @@ impl ChromiumScroll {
 
 /// 标签设置句柄(`tab.set()`)。
 pub struct ChromiumSetTab {
-    core: Arc<CdpCore>,
+    pub(crate) core: Arc<CdpCore>,
 }
 
 impl ChromiumSetTab {
@@ -156,7 +156,7 @@ impl ChromiumWindow {
 
 /// 标签级等待句柄(`tab.wait()`)。各方法超时返回 `false`、不报错。
 pub struct ChromiumWait {
-    core: Arc<CdpCore>,
+    pub(crate) core: Arc<CdpCore>,
 }
 
 impl ChromiumWait {

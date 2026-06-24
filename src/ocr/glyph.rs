@@ -199,8 +199,14 @@ fn cjk_font_candidates() -> Vec<PathBuf> {
 /// 比渲染字体模板更贴合目标验证码的具体字体——对**小固定字表**(如易盾试用 ~10 字)几张真样本即奏效,
 /// 无需训练/torch。目录结构:`{dir}/{字}/任意.png`(子目录名即该字)。
 pub struct SampleBank {
-    /// (字, N×N 归一梯度特征)。
-    samples: Vec<(char, Vec<f32>)>,
+    samples: Vec<Sample>,
+}
+
+/// 一条真样本:字、`N×N` 归一梯度特征、原图 **FNV-1a 内容哈希**(留一法据此识别并排除「自己」)。
+struct Sample {
+    ch: char,
+    feat: Vec<f32>,
+    hash: u64,
 }
 
 impl SampleBank {
@@ -241,7 +247,11 @@ impl SampleBank {
                 if let Ok(bytes) = std::fs::read(&fp)
                     && let Ok(img) = image::load_from_memory(&bytes)
                 {
-                    samples.push((ch, crop_feat(&img)));
+                    samples.push(Sample {
+                        ch,
+                        feat: crop_feat(&img),
+                        hash: content_hash(&bytes),
+                    });
                 }
             }
         }
@@ -261,11 +271,17 @@ impl SampleBank {
     }
     /// 是否含某字的样本。
     pub fn has_char(&self, ch: char) -> bool {
-        self.samples.iter().any(|(c, _)| *c == ch)
+        self.samples.iter().any(|s| s.ch == ch)
     }
 
     /// 某框梯度特征(由 [`crop_feat`])对字 `ch` 的最大相似度:对该字所有样本 × 几个旋转取最大,夹到 `[0,1]`。
     pub fn similarity(&self, crop_feat: &[f32], ch: char) -> f32 {
+        self.best_similarity(crop_feat, ch, None)
+    }
+
+    /// [`similarity`](Self::similarity) 的内核,但可**排除内容哈希等于 `exclude` 的样本**。
+    /// `exclude=Some(h)` 即留一法:评测时排除「待测图自己」那条,避免库就是用这些图建的导致**自我匹配**得到虚高 1.0。
+    fn best_similarity(&self, crop_feat: &[f32], ch: char, exclude: Option<u64>) -> f32 {
         if !self.has_char(ch) {
             return 0.0;
         }
@@ -281,18 +297,35 @@ impl SampleBank {
             })
             .collect();
         let mut best = 0f32;
-        for (c, feat) in &self.samples {
-            if *c != ch {
+        for sample in &self.samples {
+            if sample.ch != ch || Some(sample.hash) == exclude {
                 continue;
             }
             for q in &queries {
-                let s = dot(q, feat);
+                let s = dot(q, &sample.feat);
                 if s > best {
                     best = s;
                 }
             }
         }
         best.clamp(0.0, 1.0)
+    }
+
+    /// 对一张图(PNG/JPEG 等**字节**)算它是字 `ch` 的模板相似度:自动解码 + 取梯度特征 →
+    /// [`similarity`](Self::similarity)。便于无需先手算 `crop_feat` 的调用方(如离线精度自评)。
+    pub fn similarity_image(&self, image: &[u8], ch: char) -> Result<f32> {
+        let img = image::load_from_memory(image)
+            .map_err(|e| Error::msg(format!("样本图解码失败: {e}")))?;
+        Ok(self.best_similarity(&crop_feat(&img), ch, None))
+    }
+
+    /// **留一法**相似度:同 [`similarity_image`](Self::similarity_image),但排除与本图**内容完全相同**的
+    /// 样本(按 FNV-1a 内容哈希识别「自己」)。用于「样本库正是用这些图建的」场景下做**无泄漏**精度自评——
+    /// 否则待测图会匹配到库里的自己得到虚高 1.0,精度被夸大。
+    pub fn similarity_image_excluding(&self, image: &[u8], ch: char) -> Result<f32> {
+        let img = image::load_from_memory(image)
+            .map_err(|e| Error::msg(format!("样本图解码失败: {e}")))?;
+        Ok(self.best_similarity(&crop_feat(&img), ch, Some(content_hash(image))))
     }
 
     /// 把一张**已知真值**的单字图(PNG 字节)存进样本库目录 `dir/{ch}/`,**内容寻址去重**(同图只存一次),

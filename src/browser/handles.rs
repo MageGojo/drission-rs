@@ -96,6 +96,84 @@ impl Wait {
     pub async fn upload_paths_inputted(&self, timeout: Option<Duration>) -> Result<bool> {
         self.tab.wait_upload_paths_inputted(timeout).await
     }
+
+    /// 等待标题包含子串(与 cdp 端 `wait().title_contains` 对齐)。超时返回 `false`。
+    pub async fn title_contains(&self, sub: &str, timeout: Option<Duration>) -> Result<bool> {
+        let deadline = Instant::now() + self.timeout_or_default(timeout);
+        loop {
+            if self.tab.title().await.unwrap_or_default().contains(sub) {
+                return Ok(true);
+            }
+            if Instant::now() >= deadline {
+                return Ok(false);
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    }
+
+    /// 等待 URL 包含子串(与 cdp 端 `wait().url_contains` 对齐)。超时返回 `false`。
+    pub async fn url_contains(&self, sub: &str, timeout: Option<Duration>) -> Result<bool> {
+        let deadline = Instant::now() + self.timeout_or_default(timeout);
+        loop {
+            if self.tab.url().await.unwrap_or_default().contains(sub) {
+                return Ok(true);
+            }
+            if Instant::now() >= deadline {
+                return Ok(false);
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    }
+
+    /// 等待本标签弹出的**新标签 / 弹窗**(`window.open` / `target=_blank` / `Ctrl+点击`),返回可驱动的
+    /// 新 [`Tab`]。超时返回 `None`(对标 Playwright `expect_popup` / DP `tab.wait.new_tab`,与 cdp 端
+    /// `wait().new_tab` 对齐)。
+    ///
+    /// **用法**:先调用本方法(或与触发动作 `tokio::join!` 并发),**再**触发弹窗——内部在等待前即订阅
+    /// 事件,触发太早会漏掉。只认与打开者**同一 BrowserContext** 新出现的 page(弹窗与打开者同上下文),
+    /// 故不会误抓其它标签。
+    pub async fn new_tab(&self, timeout: Option<Duration>) -> Result<Option<Tab>> {
+        let conn = self.tab.core.conn.clone();
+        let opener = self.tab.core.target_id.clone();
+        let ctx = self.tab.core.browser_context_id.clone();
+        let dl = self.tab.core.download_path.clone();
+        let dur = self.timeout_or_default(timeout);
+        let deadline = Instant::now() + dur;
+        let mut events = conn.subscribe();
+        loop {
+            let remain = deadline.saturating_duration_since(Instant::now());
+            if remain.is_zero() {
+                return Ok(None);
+            }
+            let ev = match tokio::time::timeout(remain, events.recv()).await {
+                Ok(Ok(ev)) => ev,
+                Ok(Err(tokio::sync::broadcast::error::RecvError::Lagged(_))) => continue,
+                Ok(Err(tokio::sync::broadcast::error::RecvError::Closed)) => return Ok(None),
+                Err(_) => return Ok(None),
+            };
+            if ev.method != "Browser.attachedToTarget" {
+                continue;
+            }
+            let ti = &ev.params["targetInfo"];
+            if ti["type"].as_str() != Some("page") {
+                continue;
+            }
+            let target_id = ti["targetId"].as_str().unwrap_or_default().to_string();
+            if target_id.is_empty() || target_id == opener {
+                continue;
+            }
+            // 只认与打开者同 BrowserContext 的新 page(本标签的弹窗);别的标签是别的 context。
+            if ti["browserContextId"].as_str() != Some(ctx.as_str()) {
+                continue;
+            }
+            let Some(session_id) = ev.params["sessionId"].as_str().map(str::to_string) else {
+                continue;
+            };
+            let tab =
+                Tab::from_attached(conn, target_id, ctx, session_id, events, dl, dur).await?;
+            return Ok(Some(tab));
+        }
+    }
 }
 
 /// `tab.scroll()` 返回的滚动句柄(对应 DP `tab.scroll`)。
@@ -228,6 +306,56 @@ impl SetTab {
         self.tab.set_upload_files(paths).await
     }
 
+    /// 写 `localStorage`(便捷,经 JS;与 cdp 端 `set().local_storage_set` 对齐)。
+    pub async fn local_storage_set(&self, key: &str, value: &str) -> Result<()> {
+        self.storage_set("localStorage", key, value).await
+    }
+    /// 读 `localStorage`(不存在返回 `None`)。
+    pub async fn local_storage_get(&self, key: &str) -> Result<Option<String>> {
+        self.storage_get("localStorage", key).await
+    }
+    /// 删 `localStorage` 项。
+    pub async fn local_storage_remove(&self, key: &str) -> Result<()> {
+        self.storage_remove("localStorage", key).await
+    }
+    /// 清空 `localStorage`。
+    pub async fn local_storage_clear(&self) -> Result<()> {
+        self.tab.run_js("localStorage.clear()").await?;
+        Ok(())
+    }
+    /// 写 `sessionStorage`。
+    pub async fn session_storage_set(&self, key: &str, value: &str) -> Result<()> {
+        self.storage_set("sessionStorage", key, value).await
+    }
+    /// 读 `sessionStorage`。
+    pub async fn session_storage_get(&self, key: &str) -> Result<Option<String>> {
+        self.storage_get("sessionStorage", key).await
+    }
+    /// 删 `sessionStorage` 项。
+    pub async fn session_storage_remove(&self, key: &str) -> Result<()> {
+        self.storage_remove("sessionStorage", key).await
+    }
+    /// 清空 `sessionStorage`。
+    pub async fn session_storage_clear(&self) -> Result<()> {
+        self.tab.run_js("sessionStorage.clear()").await?;
+        Ok(())
+    }
+
+    async fn storage_set(&self, store: &str, key: &str, value: &str) -> Result<()> {
+        let js = format!("{store}.setItem({}, {})", js_str(key), js_str(value));
+        self.tab.run_js(&js).await?;
+        Ok(())
+    }
+    async fn storage_get(&self, store: &str, key: &str) -> Result<Option<String>> {
+        let js = format!("{store}.getItem({})", js_str(key));
+        Ok(self.tab.run_js(&js).await?.as_str().map(str::to_string))
+    }
+    async fn storage_remove(&self, store: &str, key: &str) -> Result<()> {
+        let js = format!("{store}.removeItem({})", js_str(key));
+        self.tab.run_js(&js).await?;
+        Ok(())
+    }
+
     /// 窗口句柄(对应 DP `tab.set.window`)。
     ///
     /// **注意平台限制**:Camoufox(Firefox/Juggler)**不支持**最小化 / 全屏 / 移动主窗口
@@ -236,6 +364,11 @@ impl SetTab {
     pub fn window(&self) -> Window {
         Window::new(self.tab.clone())
     }
+}
+
+/// JS 字符串字面量(用 `serde_json` 转义,安全嵌入表达式)。
+fn js_str(s: &str) -> String {
+    serde_json::to_string(s).unwrap_or_else(|_| "\"\"".into())
 }
 
 /// `tab.set().window()` 返回的窗口句柄(对应 DP `tab.set.window`)。

@@ -29,3 +29,10 @@
 /douyin-env/
 # 含真实 cookie/签名的测试脚本(不入库)
 /scripts/douyin_detail_test.py
+# 逆向子项目(含会员登录态 / 抓包产物 / 自训样本,严禁上传公开仓库)
+/luffycity/
+/beian-probe/
+/beian-probe.zip
+/yidun-env/
+# 抓包 / 下载产物(luffycity 会员下载的视频、polyv_secure、requests.jsonl、解密 key 等)
+/captures/

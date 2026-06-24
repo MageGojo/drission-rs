@@ -23,6 +23,9 @@
 //! > 更新历史见 [`CHANGELOG.md`](https://github.com/MageGojo/drission-rs/blob/main/CHANGELOG.md);
 //! > 设计与 API 映射文档见 [`docs/`](https://github.com/MageGojo/drission-rs/tree/main/docs)。
 
+/// 无障碍快照(后端无关):`AxNode`/`AxTree` + DOM 快照脚本 + CDP 扁平树重建。
+/// `tab.ax_tree()`(cdp 原生)/ `tab.ax_snapshot()`(两后端)各自提供。
+pub mod a11y;
 /// Camoufox / Firefox(Juggler)后端 + 全部高层浏览器能力。仅 `--features camoufox`。
 #[cfg(feature = "camoufox")]
 pub mod browser;
@@ -30,11 +33,17 @@ pub mod browser;
 #[cfg(feature = "cdp")]
 pub mod cdp;
 pub mod codec;
+/// 录制 → 生成代码(后端无关):`RecordedAction`/`RecordedScript` + 生成可运行 Rust / JSON。
+/// 录制采集见各后端(cdp:`tab.recorder()`)。
+pub mod codegen;
 /// 通用吐环境(dump browser env)后端无关核心:探针/env.js/导出工程/同构双跑验证 + 指纹回放。
 /// 两后端经 `EnvBackend` 复用同一套逻辑;`tab.dump_env()` 各自提供。
 #[cfg(any(feature = "camoufox", feature = "cdp"))]
 pub mod envkit;
 pub mod error;
+/// 读取浏览器**实时指纹快照**(后端无关):`tab.fingerprint_snapshot()` 一次性 dump UA/平台/语言/
+/// 时区/屏幕/硬件/WebGL renderer/canvas 哈希。区别于 `cdp::fingerprint`/`pool::fingerprint`(设定指纹)。
+pub mod fingerprint;
 pub mod human;
 pub mod keys;
 /// Camoufox 启动选项 / 指纹配置 / 自动下载分发。仅 `--features camoufox`。
@@ -77,7 +86,10 @@ pub use error::{Error, Result};
 /// ```
 pub mod prelude {
     // ── 后端无关(始终可用)──────────────────────────────────────────
+    pub use crate::a11y::{AxNode, AxTree};
+    pub use crate::codegen::{RecordedAction, RecordedScript};
     pub use crate::error::{Error, Result};
+    pub use crate::fingerprint::{FingerprintProbe, FingerprintSnapshot};
     pub use crate::human::{HumanClickOpts, Humanize, ImageView, fetch_image};
     pub use crate::keys::{KeyInput, Keys};
     pub use crate::locator::{Query, parse as parse_locator};
@@ -104,7 +116,8 @@ pub mod prelude {
         ChromiumConsole as Console, ChromiumDownloads as Downloads, ChromiumElement as Element,
         ChromiumElementRect as ElementRect, ChromiumElementWait as ElementWait,
         ChromiumFrame as Frame, ChromiumOptions as BrowserOptions, ChromiumPage as Page,
-        ChromiumScreencast as Screencast, ChromiumScroll as Scroll, ChromiumSetTab as SetTab,
+        ChromiumRecorder as Recorder, ChromiumScreencast as Screencast, ChromiumScroll as Scroll,
+        ChromiumSetTab as SetTab,
         ChromiumShadowRoot as ShadowRoot, ChromiumTab as Tab, ChromiumWait as Wait,
         ChromiumWindow as Window, ChromiumWsListener as WsListener,
     };
@@ -118,6 +131,12 @@ pub mod prelude {
         ConsoleData, ConsoleFilter, Cookie, CookieParam, DialogInfo, DownloadInfo, DownloadMission,
         DownloadState, GetOptions, ImageFormat, LoadMode, PageRect, ShotOpts, WsDirection,
         WsFilter, WsMessage,
+    };
+    /// CDP「标配补齐」能力类型(对标 Playwright/Puppeteer/DP;Chromium 专有,仅 cdp 后端)。
+    #[cfg(feature = "cdp")]
+    pub use crate::cdp::{
+        Device, ExposedFunction, HarLog, HarNotFound, HarPlayer, HarRecorder, HarReplayOptions,
+        NetworkConditions, PdfOptions,
     };
     // ── 统一名:仅 camoufox(无 cdp)时为 camoufox ──────────────────
     #[cfg(all(feature = "camoufox", not(feature = "cdp")))]
@@ -141,8 +160,9 @@ pub mod prelude {
         CdpIntercept, CdpInterceptedRequest, CdpListen, ChromiumActions, ChromiumBrowser,
         ChromiumConsole, ChromiumContextOverride, ChromiumDownloads, ChromiumElement,
         ChromiumElementRect, ChromiumElementWait, ChromiumFrame, ChromiumOptions, ChromiumPage,
-        ChromiumPool, ChromiumPoolOptions, ChromiumScreencast, ChromiumScroll, ChromiumSetTab,
-        ChromiumShadowRoot, ChromiumTab, ChromiumWait, ChromiumWindow, ChromiumWsListener,
+        ChromiumPool, ChromiumPoolOptions, ChromiumRecorder, ChromiumScreencast, ChromiumScroll,
+        ChromiumSetTab, ChromiumShadowRoot, ChromiumTab, ChromiumWait, ChromiumWindow,
+        ChromiumWsListener,
     };
 
     // ── Camoufox 后端显式名(始终随 camoufox 可用,供两后端并存时取用)─

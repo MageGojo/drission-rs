@@ -31,6 +31,7 @@
 //! - **网络监听** [`CdpListen`]:原生 `Network` 域事件 + `Network.getResponseBody`;
 //! - **请求拦截** [`CdpIntercept`]:`Fetch` 域 `requestPaused` + `continue`/`fulfill`/`fail`。
 
+mod a11y;
 mod actions;
 mod browser;
 mod cloudflare;
@@ -40,6 +41,7 @@ mod core;
 mod download;
 mod dump_env;
 pub mod element;
+mod extras;
 pub mod fetch;
 mod fingerprint;
 pub mod frame;
@@ -50,6 +52,7 @@ pub mod locate;
 mod options;
 mod page;
 mod pool;
+mod recorder;
 mod screencast;
 mod shadow;
 mod stealth;
@@ -63,6 +66,10 @@ pub use console::{ChromiumConsole, ConsoleData, ConsoleFilter};
 pub use download::{ChromiumDownloads, DownloadMission, DownloadState};
 pub use dump_env::{ChromiumEnvDumper, ChromiumEnvProbe};
 pub use element::{ChromiumElement, ChromiumElementWait, ElementRect as ChromiumElementRect};
+pub use extras::{
+    Device, ExposedFunction, HarLog, HarNotFound, HarPlayer, HarRecorder, HarReplayOptions,
+    NetworkConditions, PdfOptions,
+};
 pub use fetch::{cft_platform, download_chrome_for, download_chrome_milestone, ensure_chrome};
 pub use fingerprint::{CdpFingerprint, CdpFingerprintPool, CdpOs};
 pub use frame::ChromiumFrame;
@@ -73,6 +80,7 @@ pub use locate::chrome_path;
 pub use options::{ChromiumContextOverride, ChromiumOptions};
 pub use page::ChromiumPage;
 pub use pool::{ChromiumPool, ChromiumPoolOptions};
+pub use recorder::{ChromiumRecorder, RECORDER_JS};
 pub use screencast::ChromiumScreencast;
 pub use shadow::ChromiumShadowRoot;
 pub use tab::ChromiumTab;

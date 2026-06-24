@@ -127,6 +127,53 @@ DRISSION_GLYPH_SAMPLES=./yidun_samples/bank cargo run --example yidun_click --fe
 OCR 读不出的字也能被真样本顶起、综合置信度过阈驱动点击。**几张即用**,样本越多越稳——
 比小数据自训更划算;数据攒厚后再上 dddd_trainer 亦可。
 
+## 4.6 过盾即验真·样本库自增长(里程碑 78,零人工破数据墙)
+
+数据墙(4.5)的根因是**标注要人工**(验证码答案拿不到)。但易盾 `api/check` 回 `result:true` 时,这一题
+各命中框的字**就是**它的 `target`(点击序与 `front` 一致且被服务端判过)—— 于是**每过一次盾就白捡若干
+「标签已验证」的真样本**,完全零人工。这把 4.5 的"几张即用"升级成**自增长飞轮**:
+bank 越厚 → 模板越准 → 过盾越多 → 样本越厚。
+
+### 库 API(`src/ocr`,后端无关)
+
+| 能力 | API |
+|---|---|
+| 去重落盘一张已知真值字图 | `SampleBank::save_labeled(dir, ch, &png) -> Option<PathBuf>` |
+| 按单个检测框裁字(同 solve 口径) | `ClickWord::crop_bbox(&img, &bbox) -> Vec<u8>` |
+| **过盾即采样**(一行,返回新增数) | `ClickWord::harvest_verified(&img, &hits, dir) -> usize` |
+| 采样后进程内即时重载(后续题即用) | `ClickWord::reload_sample_bank(dir)` |
+
+文件名用 **FNV-1a 内容哈希**(`{字}/<hash>.png`),与 `tools/build_bank.py` **同一哈希算法**,所以种子(Python)
+与采样(Rust)对同一张图得到同名 ⇒ **跨来源天然去重、不重复堆积**(对齐"请求必须先保存·去重保存"纪律)。
+
+### 示例零改码用法(`examples/yidun_click_stable`)
+
+```bash
+# 1) 先建种子库(把 37 条人工标注归类进 bank/{字}/;幂等、会归一化去重历史文件)
+python3 yidun-train/tools/build_bank.py
+
+# 2) 连续采样模式:过盾不停、每轮重载页面取新题,过一次盾就把验证正确的字图追加进 bank
+YIDUN_HARVEST=1 YIDUN_TRIES=50 HL=1 \
+cargo run --example yidun_click_stable --features cdp,ocr
+# 启动会打印「字形样本库 = …/bank(现 N 张)」;过盾打印「采样 +k 张 → bank 现 M 张」
+```
+
+- 样本库目录优先级:`YIDUN_BANK` > `DRISSION_GLYPH_SAMPLES` > 默认 `yidun_samples/bank`(三者都指同一处时
+  「使用 == 采样」一致)。普通(非 HARVEST)模式过盾也会顺手采一次。
+- trial demo 控件**过一次会保持已验证**(刷新键消失、不再下发挑战),故 HARVEST 模式**每轮重载页面**(`fresh_challenge`)
+  逼出新题;真实站点每次请求即新题,自然累积。
+- **实测**(Mac 无头):某轮「特/安/体」三字 OCR `aff` 全 `0.00`、**纯靠真样本模板信号过盾**(`result:true`),
+  采到的恰是 OCR 读不出的硬样本 —— 最具训练价值;bank 当场 37→40→43 增长。
+
+### 攒厚后转自训(可选)
+
+样本攒到每字 ≥ ~50,可一键导出 dddd_trainer 数据集再训(产 onnx 后回到第 4.4 节热替换):
+
+```bash
+python3 yidun-train/tools/export_dataset.py     # bank → dataset/{images,labels.txt}(方式 B)
+# 严格保持 CRNN / Height64 / Width-1 / Channel1(与 drission CTC 推理兼容,见第 5 节)
+```
+
 ## 5. 注意
 
 - **tract 算子兼容**:沿用里程碑 41 结论——导出标准 LSTM 的 onnx(beta 路线),不要带

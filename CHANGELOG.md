@@ -5,6 +5,50 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/),
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+> **标配补齐**:对标 Playwright / Puppeteer / DrissionPage 的通用浏览器能力。这些能力为 **Chromium / CDP
+> 专有**(Firefox/Juggler 无对应),仅默认 CDP 后端提供。设计与两端可行性见 [`docs/标配补齐.md`](docs/标配补齐.md)。
+
+### 新增 Added
+
+- **PDF 导出** `tab.print_to_pdf(&PdfOptions)` / `save_pdf`(`Page.printToPDF`,无头);**保存 MHTML**
+  `tab.mhtml()` / `save_mhtml`(`Page.captureSnapshot`);**`set_content`** 直接灌 HTML(`Page.setDocumentContent`,回退 `document.write`)。
+- **媒体模拟** `tab.set().emulate_dark(bool)` / `emulate_media(media, features)`(深色 `prefers-color-scheme` / print / reduced-motion)。
+- **网络条件** `tab.set().offline(bool)` / `network_conditions(&NetworkConditions)`(`slow_3g` / `fast_3g` / `offline` 预设);**CPU 节流** `cpu_throttling(rate)`。
+- **运行时权限授予** `tab.set().grant_permissions(origin, &[..])` / `reset_permissions`(`Browser.grantPermissions`)。
+- **localStorage / sessionStorage 便捷读写** `tab.set().local_storage_set/get/remove/clear` + `session_storage_*`。
+- **等待** `tab.wait().new_tab`(等弹窗 / 新标签 → 返回新 `Tab`)/ `download_begin` / `network_idle(idle_secs, timeout)` /
+  `ele_loaded`(cdp 补齐);Camoufox 端补 `wait().title_contains` / `url_contains` 做两端对齐。
+- **移动端 / 触摸模拟 + 设备预设库** `tab.set().device(&Device)` / `touch(bool)` / `clear_device`;
+  `Device::{iphone_13, iphone_se, ipad, pixel_7, galaxy_s9}`(UA + 视口 + DPR + mobile + 触摸)。
+- **HAR 录制** `tab.har_record()` / `har_record_with(capture_bodies)` → `HarRecorder::stop() -> HarLog`
+  (`entry_count` / `to_json` / `save(.har)`,含响应体;符合"请求必须先保存")。
+- **`expose_function`** `tab.expose_function(name, |args| -> Result<Value>)`:把 Rust 闭包暴露为页面全局异步函数
+  `window.<name>(...)`(`Runtime.addBinding` + 注入 stub + 回写 Promise;需 `Runtime.enable`,反检测取舍同 `console()`)。
+- **HAR 回放** `tab.route_from_har(path, &HarReplayOptions)` / `route_from_har_log(&HarLog, ..)`(CDP,`Fetch` 拦截
+  匹配:命中用 HAR 录的响应满足,未命中按 `HarNotFound::{Abort, Fallback}` 处理)。与 HAR 录制配成"录制 → 回放"闭环。
+- **Camoufox 端对齐**:`tab.set_content(html)` + `tab.set().local_storage_*` / `session_storage_*`(纯 JS 通用),
+  连同 `wait().title_contains` / `url_contains` —— 两端常用能力对齐(CDP 专有项不在 Juggler 端重复)。
+- **`wait().new_tab` 两端补齐**:等本标签弹出的新标签 / 弹窗并返回可驱动的新 `Tab`(CDP `Target.targetCreated`、
+  Camoufox `Browser.attachedToTarget`,按 BrowserContext 精准识别)。新增 Camoufox 示例 `new_tab`。
+- **新示例 `cdp_extras`**:上述能力进程内离线端到端自验证(本机 Chrome 实测 ALL CHECKS PASSED,含 HAR 录制 + 回放命中/未命中)。
+- **录制生成代码(codegen / recorder)** —— 录一遍页面操作就拿到**可运行的 Rust 代码**(DrissionPage 风格选择器),对标
+  Playwright `codegen`。后端无关核心 `RecordedAction` / `RecordedScript`(`codegen` 模块,始终可用):`to_rust()` 出完整
+  可运行程序、`to_rust_body()` 出动作语句、`to_json()` 出中间表示;`push` 自动收敛连续输入 / 去重导航 / 去重悬停。CDP 录制句柄
+  `tab.recorder()`([`ChromiumRecorder`],canonical 名 `Recorder`):`start()`(导航前)→ 注入录制脚本(钩
+  click/change/keydown/mouseover/拖拽,计算 `#id` > `@name:val` > `css` 选择器)+ 收 `Runtime.bindingCalled` / 主框架
+  `Page.frameNavigated` → `stop() -> RecordedScript`。录制开 `Runtime.enable`(开发期行为,反检测取舍同 `console()`)。
+  覆盖动作:导航 / 点击 / 输入 / 勾选 / 下拉 / 按键 / **悬停**(防抖)/ **拖拽**(HTML5 DnD + 指针,元素→元素)/
+  **iframe 内动作**(元素动作带 `frame` 选择器,同源经 `frameElement`,生成 `tab.get_frame(..).ele(..)`)/
+  **多标签**(录制器自动附着本标签打开的弹窗,`NewTab` 让生成代码切到 `tab_2`/`tab_3`…)。
+- **无障碍快照(accessibility)** —— 把页面压成 `role "name"` 语义树 [`AxTree`],用于**抗改版断言**或**喂 LLM**(比整页 HTML 小一个
+  数量级),对标 Playwright `accessibility.snapshot`。后端无关 `AxNode` / `AxTree`(`a11y` 模块):`to_outline()` / `to_json()` /
+  `find_by_role` / `find_by_name`。两条获取路径:`tab.ax_tree()`(**CDP 原生** `Accessibility.getFullAXTree`,最准,仅 cdp)与
+  `tab.ax_snapshot()`(**DOM 派生**,注入 ARIA 规则脚本,**cdp / camoufox 两端一致**);`tab.ax_find(role)` 便捷检索。
+- **新示例 `cdp_recorder`**:录制生成代码 + 无障碍快照进程内离线端到端自验证(本机 Chrome 实测 ALL CHECKS PASSED——录到
+  Navigate/Fill/Check/Select/Click 并生成正确 Rust、ax_snapshot / ax_tree 语义树按角色与名断言通过)。
+
 ## [0.3.1] - 2026-06-22
 
 > Windows 实机点选 / 过盾精准度收尾:**高 DPI 坐标对齐** + **无头 GPU 自适应** + **反检测身份一致**,

@@ -1008,15 +1008,14 @@ impl Tab {
     /// 复用调用方已有的事件订阅 `events`(里面应已含/即将含该 page 的 frame/ctx 事件),
     /// 等到主帧与执行上下文后建内核 + 启动事件泵。`browserContextId` 沿用打开者所在上下文
     /// (弹窗与打开者同上下文,故指纹/代理/cookie 与打开者一致)。
-    // 弹窗 / 点击打开新标签的装配入口:能力已就绪,尚未在公开 API 接线(见路线图)。
-    #[allow(dead_code)]
+    /// 弹窗 / 点击打开新标签的装配入口(由 [`Wait::new_tab`](crate::browser::Wait::new_tab) 接线)。
     pub(crate) async fn from_attached(
         conn: Connection,
         target_id: String,
         browser_context_id: String,
         session_id: String,
         mut events: tokio::sync::broadcast::Receiver<Event>,
-        opts: &BrowserOptions,
+        download_path: Option<std::path::PathBuf>,
         timeout: Duration,
     ) -> Result<Self> {
         let (main_frame_id, exec_ctx_id) =
@@ -1067,7 +1066,7 @@ impl Tab {
             last_load_ok: AtomicBool::new(true),
             screencast: Arc::new(ScreencastShared::new()),
             downloads: Arc::new(DownloadShared::new()),
-            download_path: opts.download_path.clone(),
+            download_path,
             pump_abort,
         });
 
@@ -1215,6 +1214,23 @@ impl Tab {
     /// 执行 JS 表达式,返回其值(JSON)。
     pub async fn run_js(&self, script: &str) -> Result<Value> {
         self.core.evaluate(script, true).await
+    }
+
+    /// **DOM 派生**的无障碍快照(注入 [`AX_SNAPSHOT_JS`](crate::a11y::AX_SNAPSHOT_JS) 按 ARIA 规则算):
+    /// 把页面压成 `role "name"` 语义树,用于抗改版断言或喂 LLM。与 CDP 后端 `ax_snapshot()` 同实现、
+    /// 结果一致(Camoufox 无 CDP 的 `Accessibility` 域,故不提供 `ax_tree()` 原生版)。
+    pub async fn ax_snapshot(&self) -> Result<crate::a11y::AxTree> {
+        let v = self.core.evaluate(crate::a11y::AX_SNAPSHOT_JS, true).await?;
+        Ok(crate::a11y::build_from_snapshot(&v))
+    }
+
+    /// 直接把页面文档内容设为 `html`(对标 Playwright/Puppeteer `set_content`;Juggler 无原生命令,走 JS)。
+    pub async fn set_content(&self, html: &str) -> Result<()> {
+        let lit = serde_json::to_string(html).unwrap_or_else(|_| "\"\"".into());
+        let js =
+            format!("(function(h){{document.open();document.write(h);document.close();}})({lit})");
+        self.core.evaluate(&js, true).await?;
+        Ok(())
     }
 
     /// 当前页面的 `navigator.userAgent`。

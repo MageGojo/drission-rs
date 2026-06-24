@@ -62,6 +62,13 @@
 
 ## 🆕 最新版本 v0.3.1 新增
 
+> **开发中(Unreleased)** —— 对标 Playwright / Puppeteer / DrissionPage 的「标配补齐」+ 录制/无障碍:
+>
+> - **录制 → 生成代码(codegen / recorder)**:`tab.recorder()` 录一遍页面操作 → 直接产**可运行 Rust**(DrissionPage 风格选择器),覆盖点击/输入/勾选/下拉/按键/悬停/拖拽/iframe/多标签。对标 Playwright `codegen`。
+> - **无障碍快照(a11y)**:`tab.ax_tree()` / `ax_snapshot()` 把页面压成 `role "name"` 语义树,用于抗改版断言或**喂 LLM**(比整页 HTML 小一个数量级)。
+> - **实时指纹快照读取(fingerprint)**:`tab` 一次性 dump UA/平台/时区/屏幕/WebGL/canvas 等,用于验证「指纹确实换了」。
+> - **CDP 标配补齐**:PDF 导出 / MHTML / `set_content` / **HAR 录制+回放** / `expose_function` / 媒体·网络·CPU 模拟 / 移动端设备预设 / 运行时权限 / storage 便捷读写 / `wait().new_tab` 等。详见 [`docs/标配补齐.md`](docs/标配补齐.md)、[`docs/录制与无障碍.md`](docs/录制与无障碍.md)。
+>
 > 完整记录见 [CHANGELOG.md](CHANGELOG.md)。**v0.3.1** 聚焦 **Windows 实机点选 / 过盾精准度**与**无头反检测真实度**:
 >
 > - **Windows 高 DPI 点击对齐**:强制 `device-scale=1`,修复 125% / 150% 缩放下合成点击按物理像素偏移导致的 Cloudflare Turnstile / 易盾点选「点不中」。

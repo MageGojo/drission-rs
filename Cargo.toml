@@ -3,6 +3,9 @@ name = "drission"
 version = "0.3.1"
 edition = "2024"
 rust-version = "1.85"
+# 示例按能力分文件夹(examples/<分类>/),每个 [[example]] 显式声明 path;关掉自动发现(子目录无
+# main.rs 本就不会被当示例,这里再加一道保险,杜绝把资源/子目录误判为示例)。
+autoexamples = false
 authors = ["极数本源 (apizero.cn)"]
 description = "Rust 反检测浏览器自动化 + 内置验证码识别:ddddocr 离线 OCR 与图片滑块缺口距离(极验/顶象),默认 Camoufox/Firefox、自动过 Cloudflare 盾、高并发爬虫与 XHR 监听拦截,DrissionPage 风格 API。Anti-detect browser automation in Rust with built-in ddddocr captcha OCR + slider-gap (GeeTest) solving, Camoufox, Cloudflare bypass — a Rust DrissionPage."
 documentation = "https://docs.rs/drission"
@@ -84,6 +87,13 @@ zip = "8.6.0"
 [dev-dependencies]
 criterion = "0.7.0"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+# 仅供示例(examples/sites/luffycity_protocol.rs:纯协议无浏览器逆 polyv v11 DRM)的标准 crypto;
+# 纯 Rust(RustCrypto),不进发布库(dev-only)。
+md-5 = "0.10"
+aes = "0.8"
+cbc = { version = "0.1", features = ["alloc", "block-padding"] }
+base64 = "0.22"
+hex = "0.4"
 
 # ── 示例 feature 门控 ──────────────────────────────────────────────────────────
 # 默认后端是纯 CDP;用 Camoufox `Browser`/`Page` 的示例必须声明 `required-features=["camoufox"]`,
@@ -99,296 +109,435 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 # ⚠️ Camoufox 系务必带 `--no-default-features`:默认 cdp 与 camoufox 并存时统一接口按「cdp 优先」解析,
 #    会与 camoufox 示例的类型冲突(编译失败或跑成 cdp 后端)。cdp 系反之(默认即可)。
 
-# Chromium/CDP 后端示例(默认即可)。
+# ═════════ CDP 后端核心(examples/cdp/)═════════
 [[example]]
 name = "cdp_demo"
+path = "examples/cdp/cdp_demo.rs"
 required-features = ["cdp"]
 
 [[example]]
 name = "cdp_advanced"
+path = "examples/cdp/cdp_advanced.rs"
 required-features = ["cdp"]
 
 # Chrome 自动下载分发(对标 CloakBrowser 首次运行自动下载)。
 [[example]]
 name = "cdp_fetch"
-required-features = ["cdp"]
-
-# 指纹探针:dump 全面指纹 JSON,有头/无头 diff 出无头破绽(反检测诊断工具)。
-[[example]]
-name = "cdp_fp"
-required-features = ["cdp"]
-
-# 无头 GPU 探针:读 WebGL UNMASKED_RENDERER_WEBGL 判断无头是否拿到真实 GPU(非 SwiftShader)。
-[[example]]
-name = "gpu_probe"
-required-features = ["cdp"]
-
-# 无头 Client Hints 诊断:mask_ua 开/关对高熵 CH(fullVersionList 等)与 UA 的影响。
-[[example]]
-name = "hl_ch"
-required-features = ["cdp"]
-
-# 每浏览器不同指纹:CdpFingerprint/CdpFingerprintPool 起 N 个浏览器各套一份指纹,dump 验证各异。
-[[example]]
-name = "cdp_fingerprint"
+path = "examples/cdp/cdp_fetch.rs"
 required-features = ["cdp"]
 
 # 多任务下载管理 tab.downloads()(CDP 原生下载事件,真机端到端)。
 [[example]]
 name = "cdp_download"
+path = "examples/cdp/cdp_download.rs"
 required-features = ["cdp"]
 
 # 键盘:拟人输入 + 修饰组合键/热键(Ctrl/Cmd+A 等,CDP 原生 modifiers)。
 [[example]]
 name = "cdp_keyboard"
+path = "examples/cdp/cdp_keyboard.rs"
 required-features = ["cdp"]
 
 # CDP 高并发池 ChromiumPool(多 worker + 每任务独立 context + 断点续抓)。
 [[example]]
 name = "cdp_pool"
+path = "examples/cdp/cdp_pool.rs"
 required-features = ["cdp"]
 
 # CDP 吐环境 tab.dump_env()(探针 + env.js + 导出工程 + 同构双跑验证,复用 envkit)。
 [[example]]
 name = "cdp_dump_env"
+path = "examples/cdp/cdp_dump_env.rs"
 required-features = ["cdp"]
 
+# CDP「标配补齐」(对标 PW/Puppeteer/DP):set_content/媒体模拟/网络离线/设备/storage/wait/HAR/expose/PDF/MHTML。
+[[example]]
+name = "cdp_extras"
+path = "examples/cdp/cdp_extras.rs"
+required-features = ["cdp"]
+
+# 录制生成代码(codegen)+ 无障碍快照(accessibility):录一遍表单 → 出可运行 Rust;ax_tree/ax_snapshot 语义树。
+[[example]]
+name = "cdp_recorder"
+path = "examples/cdp/cdp_recorder.rs"
+required-features = ["cdp"]
+
+# ═════════ 反检测 / 指纹(examples/antidetect/)═════════
+# 指纹探针:dump 全面指纹 JSON,有头/无头 diff 出无头破绽(反检测诊断工具)。
+[[example]]
+name = "cdp_fp"
+path = "examples/antidetect/cdp_fp.rs"
+required-features = ["cdp"]
+
+# 无头 GPU 探针:读 WebGL UNMASKED_RENDERER_WEBGL 判断无头是否拿到真实 GPU(非 SwiftShader)。
+[[example]]
+name = "gpu_probe"
+path = "examples/antidetect/gpu_probe.rs"
+required-features = ["cdp"]
+
+# 无头 Client Hints 诊断:mask_ua 开/关对高熵 CH(fullVersionList 等)与 UA 的影响。
+[[example]]
+name = "hl_ch"
+path = "examples/antidetect/hl_ch.rs"
+required-features = ["cdp"]
+
+# 每浏览器不同指纹:CdpFingerprint/CdpFingerprintPool 起 N 个浏览器各套一份指纹,dump 验证各异。
+[[example]]
+name = "cdp_fingerprint"
+path = "examples/antidetect/cdp_fingerprint.rs"
+required-features = ["cdp"]
+
+# 指纹「确实换了」第三方验证:加载 FingerprintJS 取 visitorId + 自算 canvas/webgl/audio 哈希,
+# 不同画像两两不同、同画像复跑稳定。
+[[example]]
+name = "fp_verify"
+path = "examples/antidetect/fp_verify.rs"
+required-features = ["cdp"]
+
+# ═════════ 纯算签名 / 吐环境(examples/env/)═════════
 # 纯算签名运行器(QuickJS,不开浏览器)。
 [[example]]
 name = "env_signer"
+path = "examples/env/env_signer.rs"
 required-features = ["signer"]
 
+# ═════════ 验证码·字符 OCR(examples/ocr/)═════════
 # 目标检测(点选验证码)可行性探针:Det 跑通 common_det.onnx(CDP 截图喂入)。
 [[example]]
 name = "det_probe"
+path = "examples/ocr/det_probe.rs"
 required-features = ["cdp", "ocr"]
 
+# OCR/检测模型热替换(自训模型上线):自定义字符集 + 原地热替换 + 环境变量零改码(后端无关)。
+[[example]]
+name = "ocr_hotswap"
+path = "examples/ocr/ocr_hotswap.rs"
+required-features = ["ocr"]
+
+# 点选 OCR 命令行(无浏览器):图片+目标字 → 按序点击坐标 JSON(供补环境点选注入)。
+[[example]]
+name = "clickword_cli"
+path = "examples/ocr/clickword_cli.rs"
+required-features = ["ocr"]
+
+# 点选 OCR 离线精度自评(无浏览器):标注 crop → 量化 纯OCR vs OCR+字形模板第二信号(留一法,无泄漏)。
+[[example]]
+name = "clickword_eval"
+path = "examples/ocr/clickword_eval.rs"
+required-features = ["ocr"]
+
+# ═════════ 验证码·文字点选 / 易盾(examples/clickword/)═════════
 # 点选/文字点选验证码(易盾 picture-click):det → 逐框 OCR → 按序可信点击(CDP)。
 [[example]]
 name = "yidun_click"
+path = "examples/clickword/yidun_click.rs"
 required-features = ["cdp", "ocr"]
 
 # 易盾点选「稳定版」:先确认点选图真显示(hover 保活+重触发+iframe 兜底)才走识别/点击,
 # 且用 Outcome 诚实分类——绝不把「没出图/不稳定」误判成「过不了易盾」(CDP)。
 [[example]]
 name = "yidun_click_stable"
+path = "examples/clickword/yidun_click_stable.rs"
 required-features = ["cdp", "ocr"]
-
-# OCR/检测模型热替换(自训模型上线):自定义字符集 + 原地热替换 + 环境变量零改码(后端无关)。
-[[example]]
-name = "ocr_hotswap"
-required-features = ["ocr"]
 
 # 易盾点选样本采集(为阶段3 自训攒数据):反复弹挑战 → 切字框落盘 + OCR 猜测标签(CDP)。
 [[example]]
 name = "yidun_collect"
+path = "examples/clickword/yidun_collect.rs"
 required-features = ["cdp", "ocr"]
 
 # 易盾点选请求侦察:监听网络看验证码图片格式/来源 + 提示文字下发方式(CDP)。
 [[example]]
 name = "yidun_probe"
+path = "examples/clickword/yidun_probe.rs"
 required-features = ["cdp"]
 
 # 易盾提交侦察(为「补轨迹/纯算」可行性评估):dump check 的 query 参数 + up 的 postData,定位轨迹字段。
 [[example]]
 name = "yidun_trace"
+path = "examples/clickword/yidun_trace.rs"
 required-features = ["cdp", "ocr"]
 
 # 易盾点选风控侦察:普查监听事件 + 测点击事件密度 + 抓提交/check 请求(CDP)。
 [[example]]
 name = "yidun_detect"
+path = "examples/clickword/yidun_detect.rs"
 required-features = ["cdp"]
 
+# ═════════ 验证码·滑块/缺口(examples/slider/)═════════
 # 滑块/缺口识别示例(slider 自动带入 camoufox)。
 [[example]]
 name = "dx_slide"
+path = "examples/slider/dx_slide.rs"
 required-features = ["slider"]
 
 [[example]]
 name = "geetest_slide"
+path = "examples/slider/geetest_slide.rs"
 required-features = ["slider"]
 
 [[example]]
 name = "slider_local"
+path = "examples/slider/slider_local.rs"
 required-features = ["slider"]
 
-# OCR 示例:用 Camoufox 的 tab.ocr_image,需 camoufox + ocr。
+# 验证码·字符 OCR(Camoufox 后端 tab.ocr_image,需 camoufox + ocr;归 examples/ocr/)。
 [[example]]
 name = "ocr_captcha"
+path = "examples/ocr/ocr_captcha.rs"
 required-features = ["camoufox", "ocr"]
 
 [[example]]
 name = "apizero_login"
+path = "examples/ocr/apizero_login.rs"
 required-features = ["camoufox", "ocr"]
 
-# Camoufox 后端示例(Browser/Page/Tab/Pool/Session/吐环境/过盾…),需 --features camoufox。
+# ═════════ Camoufox 后端页面/元素/交互(examples/camoufox/)═════════
+# 需 --features camoufox(Browser/Page/Tab/Pool/Session/吐环境/过盾…)。
 [[example]]
 name = "quickstart"
+path = "examples/camoufox/quickstart.rs"
 required-features = ["camoufox"]
-
-[[example]]
-name = "form_input"
-required-features = ["camoufox"]
-
-[[example]]
-name = "anti_detect"
-required-features = ["camoufox"]
-
-[[example]]
-name = "stealth_check"
-required-features = ["camoufox"]
-
-[[example]]
-name = "cf_check"
-required-features = ["camoufox"]
-
-[[example]]
-name = "exa_cf"
-required-features = ["cdp"]
 
 [[example]]
 name = "fetch_browser"
-required-features = ["camoufox"]
-
-[[example]]
-name = "concurrent_listen"
-required-features = ["camoufox"]
-
-[[example]]
-name = "intercept"
-required-features = ["camoufox"]
-
-[[example]]
-name = "intercept_window"
-required-features = ["camoufox"]
-
-[[example]]
-name = "listen_handle"
-required-features = ["camoufox"]
-
-[[example]]
-name = "console_listen"
-required-features = ["camoufox"]
-
-[[example]]
-name = "ws_listen"
-required-features = ["camoufox"]
-
-[[example]]
-name = "ws_connect"
+path = "examples/camoufox/fetch_browser.rs"
 required-features = ["camoufox"]
 
 [[example]]
 name = "page_basics"
+path = "examples/camoufox/page_basics.rs"
 required-features = ["camoufox"]
 
 [[example]]
 name = "page_extras"
+path = "examples/camoufox/page_extras.rs"
 required-features = ["camoufox"]
 
 [[example]]
 name = "extras_demo"
+path = "examples/camoufox/extras_demo.rs"
 required-features = ["camoufox"]
 
 [[example]]
 name = "relative_shadow"
+path = "examples/camoufox/relative_shadow.rs"
+required-features = ["camoufox"]
+
+# Camoufox `tab.wait().new_tab()`:可信点击 target=_blank → 捕获弹窗为新 Tab(对标 PW expect_popup)。
+[[example]]
+name = "new_tab"
+path = "examples/camoufox/new_tab.rs"
 required-features = ["camoufox"]
 
 [[example]]
 name = "ele_extras"
+path = "examples/camoufox/ele_extras.rs"
 required-features = ["camoufox"]
 
 [[example]]
 name = "actions_drag"
+path = "examples/camoufox/actions_drag.rs"
+required-features = ["camoufox"]
+
+[[example]]
+name = "form_input"
+path = "examples/camoufox/form_input.rs"
 required-features = ["camoufox"]
 
 [[example]]
 name = "form_fill"
+path = "examples/camoufox/form_fill.rs"
 required-features = ["camoufox"]
 
 [[example]]
 name = "file_upload"
+path = "examples/camoufox/file_upload.rs"
 required-features = ["camoufox"]
 
 [[example]]
 name = "screencast"
+path = "examples/camoufox/screencast.rs"
 required-features = ["camoufox"]
 
 [[example]]
 name = "download_manager"
+path = "examples/camoufox/download_manager.rs"
+required-features = ["camoufox"]
+
+# ═════════ 反检测(承上 examples/antidetect/,Camoufox 系)═════════
+[[example]]
+name = "anti_detect"
+path = "examples/antidetect/anti_detect.rs"
 required-features = ["camoufox"]
 
 [[example]]
+name = "stealth_check"
+path = "examples/antidetect/stealth_check.rs"
+required-features = ["camoufox"]
+
+# ═════════ 过 Cloudflare 盾(examples/cloudflare/)═════════
+[[example]]
+name = "cf_check"
+path = "examples/cloudflare/cf_check.rs"
+required-features = ["camoufox"]
+
+[[example]]
+name = "exa_cf"
+path = "examples/cloudflare/exa_cf.rs"
+required-features = ["cdp"]
+
+# ═════════ 网络监听 / 拦截 / console / ws(examples/network/)═════════
+[[example]]
+name = "concurrent_listen"
+path = "examples/network/concurrent_listen.rs"
+required-features = ["camoufox"]
+
+[[example]]
+name = "intercept"
+path = "examples/network/intercept.rs"
+required-features = ["camoufox"]
+
+[[example]]
+name = "intercept_window"
+path = "examples/network/intercept_window.rs"
+required-features = ["camoufox"]
+
+[[example]]
+name = "listen_handle"
+path = "examples/network/listen_handle.rs"
+required-features = ["camoufox"]
+
+[[example]]
+name = "console_listen"
+path = "examples/network/console_listen.rs"
+required-features = ["camoufox"]
+
+[[example]]
+name = "ws_listen"
+path = "examples/network/ws_listen.rs"
+required-features = ["camoufox"]
+
+[[example]]
+name = "ws_connect"
+path = "examples/network/ws_connect.rs"
+required-features = ["camoufox"]
+
+# ═════════ 并发池 / 代理健康(examples/pool/)═════════
+[[example]]
 name = "proxy_health"
+path = "examples/pool/proxy_health.rs"
 required-features = ["camoufox"]
 
 [[example]]
 name = "pool_crawl"
+path = "examples/pool/pool_crawl.rs"
 required-features = ["camoufox"]
 
+# ═════════ HTTP 会话 / TLS 指纹 / 采集(examples/session/)═════════
 [[example]]
 name = "session_mode"
+path = "examples/session/session_mode.rs"
 required-features = ["camoufox"]
 
 # Session 浏览器 TLS/JA3/JA4 指纹(wreq + BoringSSL),JA3 实测对比自验证。
 [[example]]
 name = "session_tls"
+path = "examples/session/session_tls.rs"
 required-features = ["impersonate"]
 
 [[example]]
 name = "web_page_scrape"
+path = "examples/session/web_page_scrape.rs"
 required-features = ["camoufox"]
 
+# ═════════ 吐环境·指纹(承上 examples/env/)═════════
 [[example]]
 name = "dump_env_fingerprint"
+path = "examples/env/dump_env_fingerprint.rs"
 required-features = ["camoufox"]
 
+# ═════════ 站点实战采集(examples/sites/)═════════
 [[example]]
 name = "douyin_listen"
+path = "examples/sites/douyin_listen.rs"
 required-features = ["camoufox"]
 
 [[example]]
 name = "douyin_listen_long"
+path = "examples/sites/douyin_listen_long.rs"
 required-features = ["camoufox"]
 
 [[example]]
 name = "douyin_capture"
+path = "examples/sites/douyin_capture.rs"
 required-features = ["camoufox"]
 
 [[example]]
 name = "douyin_dump_env"
+path = "examples/sites/douyin_dump_env.rs"
 required-features = ["camoufox"]
 
 [[example]]
 name = "bilibili_listen_long"
+path = "examples/sites/bilibili_listen_long.rs"
 required-features = ["camoufox"]
 
+# 路飞学城(luffycity)播放页:CDP 监听抓 polyv secure JSON + HLS m3u8 + 课程接口(让浏览器解密,库只监听)。
+[[example]]
+name = "luffycity_capture"
+path = "examples/sites/luffycity_capture.rs"
+required-features = ["cdp"]
+
+# 路飞学城(luffycity)下载:不逆 polyv DRM —— 导航前注入 MSE hook,在 SourceBuffer.appendBuffer 处
+# 截获 hls.js 解密后的明文 fMP4,高倍速播放过完时间线后用 ffmpeg remux 成可播放 mp4。
+[[example]]
+name = "luffycity_download"
+path = "examples/sites/luffycity_download.rs"
+required-features = ["cdp"]
+
+# 路飞学城(luffycity)纯协议下载:零浏览器、零 JS/WASM —— 直接逆 polyv v11 DRM,标准 MD5/AES 解密
+# (secure JSON → .pdx 真 m3u8 → playsafe 32B key 解包 → .ts AES 解密 → ffmpeg 合 mp4)。无需 feature。
+[[example]]
+name = "luffycity_protocol"
+path = "examples/sites/luffycity_protocol.rs"
+
+# ═════════ 验证码·滑块诊断(承上 examples/slider/)═════════
 [[example]]
 name = "geetest_diag"
+path = "examples/slider/geetest_diag.rs"
 required-features = ["camoufox"]
 
 [[example]]
 name = "geetest_probe"
+path = "examples/slider/geetest_probe.rs"
 required-features = ["camoufox"]
 
+# 验证码·OCR 诊断(承上 examples/ocr/)。
 [[example]]
 name = "ocr_probe"
+path = "examples/ocr/ocr_probe.rs"
 required-features = ["camoufox"]
 
+# ═════════ Windows 验证包(examples/windows/)═════════
 [[example]]
 name = "win_smoke"
+path = "examples/windows/win_smoke.rs"
 required-features = ["camoufox"]
 
 [[example]]
 name = "win_diag"
+path = "examples/windows/win_diag.rs"
 required-features = ["camoufox"]
 
 [[example]]
 name = "win_cf_test"
+path = "examples/windows/win_cf_test.rs"
 required-features = ["camoufox"]
 
 [[example]]
 name = "win_bilibili_test"
+path = "examples/windows/win_bilibili_test.rs"
 required-features = ["camoufox"]
 
 [target."cfg(unix)".dependencies]

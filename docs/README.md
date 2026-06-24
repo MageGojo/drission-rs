@@ -14,6 +14,8 @@
 | [API映射.md](API映射.md) | **DrissionPage(Python)→ drission(Rust)** 逐条 API 对照表,覆盖启动、页面、元素、定位、监听、拦截、滑块、动作链、iframe 等 | 从 DrissionPage 迁移、想快速查等价写法的人 |
 | [并发池.md](并发池.md) | `BrowserPool` / 代理池 / 指纹池 / 断点续抓 的设计:两层指纹约束、轮换策略、健康自愈、Checkpoint、踩坑记录 | 做高并发规模化采集的人 |
 | [长监听与滑动.md](长监听与滑动.md) | 长会话持续监听(后台抽取 + 流式 API,不丢包)+ 输入驱动翻页(`press_key`/`wheel`)的设计 | 需要连续抓取 SPA 翻页签名(如抖音 feed)的人 |
+| [标配补齐.md](标配补齐.md) | 对标 Playwright/Puppeteer/DrissionPage 的通用能力:PDF/MHTML/set_content、HAR 录制+回放、expose_function、媒体·网络·CPU 模拟、移动端设备预设、权限/storage、wait 补齐(及两端可行性) | 想要"开箱即用"的浏览器标配能力的人 |
+| [录制与无障碍.md](录制与无障碍.md) | 录制→生成可运行 Rust 代码(codegen/recorder,对标 PW codegen)+ 无障碍 `role "name"` 语义树快照(a11y,抗改版断言 / 喂 LLM) | 想录操作出代码、或用语义树做断言/喂 LLM 的人 |
 
 > 更新历史见 [`CHANGELOG.md`](../CHANGELOG.md);贡献指南见 [`CONTRIBUTING.md`](../CONTRIBUTING.md);
 > 安全策略见 [`SECURITY.md`](../SECURITY.md)。

@@ -507,8 +507,24 @@ pub struct ClickWord {
     pub bank: Option<SampleBank>,
 }
 
-/// 字形模板信号在指派中的权重(`combo = ocr_affinity + 权重 × 模板相似度`)。模板纠正 OCR 的确信误读。
+/// 字形模板信号在指派中的(满)权重(`combo = ocr_affinity + 权重 × gate × 模板相似度`)。
 const TEMPLATE_WEIGHT: f32 = 1.5;
+/// 模板**置信门控**上/下阈值:OCR 该框 top 亲和度 ≥ HI ⇒ 模板权重 0(完全信 OCR);≤ LO ⇒ 满权重
+/// (完全放手模板);之间线性。见 [`template_gate`]。
+/// 阈值取**较高**(0.6/0.2):易盾艺术字 OCR 多在 0.00–0.10 纯噪声,**不能**被它当「OCR 有信心」而压掉
+/// 真样本模板(实测 0.09 噪声把模板压到 0.11× → 目标被挤到假阳性框,故意调高门槛只在 OCR 真自信(≥0.6)时才信 OCR)。
+const TEMPLATE_GATE_HI: f32 = 0.60;
+const TEMPLATE_GATE_LO: f32 = 0.20;
+
+/// 由「OCR 对某框的 top 亲和度」算模板门控权重 ∈ `[0,1]`(0=完全信 OCR、1=完全放手模板)。
+/// 让真样本模板**只在 OCR 读不出(≈0)时**主导,绝不推翻确信且多半正确的 OCR —— 避免里程碑 79
+/// 自评里 always-on 融合把清晰字拖偏的回归。
+fn template_gate(ocr_top: f32) -> f32 {
+    if TEMPLATE_GATE_HI <= TEMPLATE_GATE_LO {
+        return 1.0;
+    }
+    ((TEMPLATE_GATE_HI - ocr_top) / (TEMPLATE_GATE_HI - TEMPLATE_GATE_LO)).clamp(0.0, 1.0)
+}
 
 impl ClickWord {
     /// 加载检测 + 识别两个模型(首次会下载),自动探测系统 CJK 字体(渲染模板)与 `DRISSION_GLYPH_SAMPLES`
@@ -659,6 +675,13 @@ impl ClickWord {
             .detect(image)?
             .into_iter()
             .filter(|b| !exclude.iter().any(|r| box_center_in(b, r)))
+            // 丢弃**非字形检测框**:汉字框近似方形,排除细条/小点假阳性(如图边竖条、桅杆、纹理)——
+            // 否则它们会被指派去承接某目标字(实测易盾点选把目标点到 8px 宽的边缘条上 → 必失败)。
+            .filter(|b| {
+                let (w, h) = (b.width().max(1), b.height().max(1));
+                let aspect = (w as f32 / h as f32).max(h as f32 / w as f32);
+                w >= 10 && h >= 10 && aspect <= 3.0
+            })
             .collect();
         let mut aff: Vec<Vec<f32>> = Vec::with_capacity(boxes.len());
         let mut tpl: Vec<Vec<f32>> = Vec::with_capacity(boxes.len());
@@ -700,14 +723,20 @@ impl ClickWord {
                 vec![0.0; chars.len()]
             });
         }
-        // 融合:combo = OCR亲和度 + 权重 × 模板相似度,在 combo 上做全局最优指派(模板纠正确信误读)。
+        // 融合:combo = OCR亲和度 + **置信门控**权重 × 模板相似度,在 combo 上做全局最优指派。
+        // 门控:按「OCR 对该框的 top 亲和度」衰减模板权重——OCR 已自信(≥HI)就别让模板翻案(权重 0),
+        // 只有 OCR≈0(艺术字读不出,≤LO)才放手让真样本模板主导(权重 = TEMPLATE_WEIGHT)。
+        // 依据:离线留一法自评(`examples/clickword_eval`)显示清晰字的受约束 OCR 已 ~97%,一味 always-on
+        // 叠加模板反把「确信且正确」的 OCR 拖偏;门控既保住易框、又保留 OCR≈0 时模板救场(里程碑 78 实证)。
         let combo: Vec<Vec<f32>> = aff
             .iter()
             .zip(&tpl)
             .map(|(a, t)| {
+                let ocr_top = a.iter().copied().fold(0.0f32, f32::max);
+                let gate = template_gate(ocr_top);
                 a.iter()
                     .zip(t)
-                    .map(|(&av, &tv)| av + TEMPLATE_WEIGHT * tv)
+                    .map(|(&av, &tv)| av + TEMPLATE_WEIGHT * gate * tv)
                     .collect()
             })
             .collect();
@@ -1357,6 +1386,24 @@ mod tests {
         assert_eq!(load_charset_file(&p3).unwrap(), vec!["", "甲", "乙"]);
         for p in [p1, p2, p3] {
             let _ = std::fs::remove_file(p);
+        }
+    }
+
+    #[test]
+    fn template_gate_suppresses_when_ocr_confident() {
+        // OCR 自信(≥HI)→ 模板权重 0;OCR≈0(≤LO)→ 满权重 1;之间单调递减且夹在 [0,1]。
+        assert_eq!(template_gate(0.99), 0.0);
+        assert_eq!(template_gate(TEMPLATE_GATE_HI), 0.0);
+        assert_eq!(template_gate(0.0), 1.0);
+        assert_eq!(template_gate(TEMPLATE_GATE_LO), 1.0);
+        let mid = template_gate((TEMPLATE_GATE_HI + TEMPLATE_GATE_LO) / 2.0);
+        assert!((mid - 0.5).abs() < 1e-5);
+        // 单调:置信越高门控越小。
+        assert!(template_gate(0.05) > template_gate(0.15));
+        // 永远夹在 [0,1]。
+        for c in [-1.0, 0.0, 0.1, 0.5, 2.0] {
+            let g = template_gate(c);
+            assert!((0.0..=1.0).contains(&g));
         }
     }
 
