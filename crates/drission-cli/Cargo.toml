@@ -1,0 +1,37 @@
+[package]
+name = "drission-cli"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["极数本源 (apizero.cn)"]
+description = "drs: CLI and MCP runtime for drission browser automation"
+repository = "https://github.com/MageGojo/drission-rs"
+license-file = "../../LICENSE"
+
+[[bin]]
+name = "drs"
+path = "src/main.rs"
+
+[features]
+default = ["cdp"]
+cdp = ["drission/cdp"]
+camoufox = ["drission/camoufox"]
+ocr = ["drission/ocr"]
+slider = ["drission/slider"]
+impersonate = ["drission/impersonate"]
+signer = ["drission/signer"]
+
+[dependencies]
+anyhow = "1.0.100"
+base64 = "0.22.1"
+clap = { version = "4.5.53", features = ["derive", "env"] }
+directories = "6.0.0"
+drission = { path = "../..", default-features = false }
+rand = "0.8.5"
+rmcp = { version = "2.1.0", default-features = false, features = ["server", "macros", "transport-io"] }
+schemars = { version = "1.1.0", features = ["derive"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+tokio = { version = "1.52.3", features = ["full"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }

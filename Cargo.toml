@@ -7,7 +7,7 @@ rust-version = "1.85"
 # main.rs 本就不会被当示例,这里再加一道保险,杜绝把资源/子目录误判为示例)。
 autoexamples = false
 authors = ["极数本源 (apizero.cn)"]
-description = "Rust 反检测浏览器自动化 + 内置验证码识别:ddddocr 离线 OCR 与图片滑块缺口距离(极验/顶象),默认 Camoufox/Firefox、自动过 Cloudflare 盾、高并发爬虫与 XHR 监听拦截,DrissionPage 风格 API。Anti-detect browser automation in Rust with built-in ddddocr captcha OCR + slider-gap (GeeTest) solving, Camoufox, Cloudflare bypass — a Rust DrissionPage."
+description = "Rust 反检测浏览器自动化 + 内置验证码识别:ddddocr 离线 OCR 与图片滑块缺口距离(极验/顶象),默认 Google Chrome/CDP、可选 Camoufox/Firefox、自动过 Cloudflare 盾、高并发爬虫与 XHR 监听拦截,DrissionPage 风格 API。Anti-detect browser automation in Rust with built-in ddddocr captcha OCR + slider-gap solving, Chrome/CDP by default, optional Camoufox, Cloudflare bypass — a Rust DrissionPage."
 documentation = "https://docs.rs/drission"
 homepage = "https://apizero.cn"
 repository = "https://github.com/MageGojo/drission-rs"
@@ -34,6 +34,10 @@ exclude = [
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+
+[workspace]
+members = [".", "crates/drission-cli"]
+resolver = "2"
 
 [features]
 # 后端选择。默认 = 纯 Chromium/CDP(最精简,不含 Camoufox 代码);Camoufox 全 opt-in。
@@ -94,6 +98,9 @@ aes = "0.8"
 cbc = { version = "0.1", features = ["alloc", "block-padding"] }
 base64 = "0.22"
 hex = "0.4"
+# 仅供逆向实战示例(examples/reverse/re_rrmj_replay.rs:复现 x-ca-sign = HmacSHA256 → base64)。dev-only。
+hmac = "0.12"
+sha2 = "0.10"
 
 # ── 示例 feature 门控 ──────────────────────────────────────────────────────────
 # 默认后端是纯 CDP;用 Camoufox `Browser`/`Page` 的示例必须声明 `required-features=["camoufox"]`,
@@ -162,6 +169,109 @@ name = "cdp_recorder"
 path = "examples/cdp/cdp_recorder.rs"
 required-features = ["cdp"]
 
+# ═════════ 教学(examples/learn/)═════════
+# 上手 + 进阶 Rust 知识「活教材」:离线(set_content)分 9 课,边用库边讲 async/所有权/Arc/生命周期/Send。
+[[example]]
+name = "learn_basics"
+path = "examples/learn/learn_basics.rs"
+required-features = ["cdp"]
+
+# 实战第 ② 课:爬 B 站热门视频封面(联网)——边做业务边学 struct/迭代器/并发下载/文件 IO。
+[[example]]
+name = "bilibili_covers"
+path = "examples/learn/bilibili_covers.rs"
+required-features = ["cdp"]
+
+# ═════════ 主动逆向(examples/reverse/,见 docs/逆向增强.md)═════════
+# ① XHR 断点 + 调用栈:定位「请求在哪发起 / 签名在哪生成」+ 断点上下文读私有变量。
+[[example]]
+name = "re_xhr_break"
+path = "examples/reverse/re_xhr_break.rs"
+required-features = ["cdp"]
+
+# ② 脚本源码 dump + 全文搜索 + 美化:把站点 JS 全 dump 落盘、grep 签名字样。
+[[example]]
+name = "re_scripts"
+path = "examples/reverse/re_scripts.rs"
+required-features = ["cdp"]
+
+# ③ JS Hook / crypto tap:hook 常见 sink,命中回传参数 + 调用栈;偷 key/iv/明文。
+[[example]]
+name = "re_hook"
+path = "examples/reverse/re_hook.rs"
+required-features = ["cdp"]
+
+# ④ 反「无限 debugger」:defuse setInterval(debugger) / Function("debugger")()。
+[[example]]
+name = "re_anti_debug"
+path = "examples/reverse/re_anti_debug.rs"
+required-features = ["cdp"]
+
+# ⑤ 抓包 → impersonate 重放闭环:浏览器抓请求 → cookie 交接 → 改字段重放验真(需浏览器 TLS 指纹)。
+[[example]]
+name = "re_replay"
+path = "examples/reverse/re_replay.rs"
+required-features = ["cdp", "impersonate"]
+
+# 真站验证:用 ④ anti_anti_debug 实测反调试强站(对照 defuse 前后的 Debugger.paused 次数)。
+[[example]]
+name = "re_verify"
+path = "examples/reverse/re_verify.rs"
+required-features = ["cdp"]
+
+# 真站端到端(侦察):③ crypto tap + ⑤ 抓包,偷 api.rrmj.plus 的 x-ca-sign 签名串与 key。
+[[example]]
+name = "re_rrmj"
+path = "examples/reverse/re_rrmj.rs"
+required-features = ["cdp"]
+
+# 真站端到端(复现+重放):Rust 复算 HmacSHA256 x-ca-sign,Session 重放验真(需浏览器 TLS 指纹)。
+[[example]]
+name = "re_rrmj_replay"
+path = "examples/reverse/re_rrmj_replay.rs"
+required-features = ["cdp", "impersonate"]
+
+# 通用逆向探针(零站点硬编码):对任意 URL 跑 ②脚本 / ③hook / ④反调试度量 / ⑤抓包。
+[[example]]
+name = "re_probe"
+path = "examples/reverse/re_probe.rs"
+required-features = ["cdp"]
+
+# YouTube base.js 签名/n 参数:② dump base.js 美化源码 + 定位 sig/n 解扰函数(① 断点见 re_yt_sig2)。
+[[example]]
+name = "re_yt_sig"
+path = "examples/reverse/re_yt_sig.rs"
+required-features = ["cdp"]
+
+# YouTube n 参数:① 在 base.js n 处理处下断点,断点上下文运行解扰 + dump 源码。
+[[example]]
+name = "re_yt_sig2"
+path = "examples/reverse/re_yt_sig2.rs"
+required-features = ["cdp"]
+
+# YouTube n 参数诊断:摸清 headless 起播 / n 形态 / 能否从 ytInitialPlayerResponse 直接拿乱序 n。
+[[example]]
+name = "re_yt_diag"
+path = "examples/reverse/re_yt_diag.rs"
+required-features = ["cdp"]
+
+# YouTube 端到端:① 断点抠出统一 VM 的「直链构建器 y2」(sig+nsig 一把梭)→ 拼真实 googlevideo 直链 → 下载 + ffprobe 验真。
+[[example]]
+name = "re_yt_play"
+path = "examples/reverse/re_yt_play.rs"
+required-features = ["cdp"]
+
+# YouTube 纯协议·脱浏览器:reqwest 抓 base.js → 内嵌 QuickJS(signer)补环境跑整份 → 自算 n/sig 直链 → 下载 + ffprobe。
+[[example]]
+name = "re_yt_protocol"
+path = "examples/reverse/re_yt_protocol.rs"
+required-features = ["signer"]
+
+# YouTube 通用命令行下载器:InnerTube(TV客户端免pot拿全分轨)+ QuickJS 算 sig/n + 选清晰度/进度条/ffmpeg合并/pot透传。
+[[example]]
+name = "yt_dl"
+path = "examples/reverse/yt_dl.rs"
+required-features = ["signer", "cdp"]
 # ═════════ 反检测 / 指纹(examples/antidetect/)═════════
 # 指纹探针:dump 全面指纹 JSON,有头/无头 diff 出无头破绽(反检测诊断工具)。
 [[example]]
@@ -293,7 +403,7 @@ path = "examples/ocr/apizero_login.rs"
 required-features = ["camoufox", "ocr"]
 
 # ═════════ Camoufox 后端页面/元素/交互(examples/camoufox/)═════════
-# 需 --features camoufox(Browser/Page/Tab/Pool/Session/吐环境/过盾…)。
+# 需 --no-default-features --features camoufox(Browser/Page/Tab/Pool/Session/吐环境/过盾…)。
 [[example]]
 name = "quickstart"
 path = "examples/camoufox/quickstart.rs"
@@ -383,8 +493,39 @@ path = "examples/cloudflare/cf_check.rs"
 required-features = ["camoufox"]
 
 [[example]]
+name = "cf_flow_capture"
+path = "examples/cloudflare/cf_flow_capture.rs"
+required-features = ["camoufox"]
+
+[[example]]
+name = "cf_jsd_recon"
+path = "examples/cloudflare/cf_jsd_recon.rs"
+required-features = ["camoufox"]
+
+[[example]]
 name = "exa_cf"
 path = "examples/cloudflare/exa_cf.rs"
+required-features = ["cdp"]
+
+[[example]]
+name = "cf_turnstile_recon"
+path = "examples/cloudflare/cf_turnstile_recon.rs"
+required-features = ["cdp"]
+
+[[example]]
+name = "cf_turnstile_dump"
+path = "examples/cloudflare/cf_turnstile_dump.rs"
+required-features = ["cdp"]
+
+[[example]]
+name = "cf_turnstile_e2e"
+path = "examples/cloudflare/cf_turnstile_e2e.rs"
+required-features = ["cdp"]
+
+# 混合方案·浏览器侧:只过盾铸 token(mint=新鲜未消费 token+导全 cookie;capture=抓 verify/signin 完整请求形状)。
+[[example]]
+name = "cf_turnstile_hybrid"
+path = "examples/cloudflare/cf_turnstile_hybrid.rs"
 required-features = ["cdp"]
 
 # ═════════ 网络监听 / 拦截 / console / ws(examples/network/)═════════
@@ -482,6 +623,18 @@ required-features = ["camoufox"]
 name = "bilibili_listen_long"
 path = "examples/sites/bilibili_listen_long.rs"
 required-features = ["camoufox"]
+
+# 湖北省人民政府「政府文件」公开列表:动态翻页 + 逐条进详情页抽正文/发文字号/来源并导出 CSV。
+[[example]]
+name = "hubei_zfwj_csv"
+path = "examples/sites/hubei_zfwj_csv.rs"
+required-features = ["cdp"]
+
+# 湖北省人民政府「政府文件」纯协议版:SessionPage 抓挑战页 + 本地 JS 引擎解 challenge,不启动浏览器。
+[[example]]
+name = "hubei_zfwj_protocol"
+path = "examples/sites/hubei_zfwj_protocol.rs"
+required-features = ["camoufox", "signer"]
 
 # 路飞学城(luffycity)播放页:CDP 监听抓 polyv secure JSON + HLS m3u8 + 课程接口(让浏览器解密,库只监听)。
 [[example]]

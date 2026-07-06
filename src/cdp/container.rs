@@ -190,7 +190,10 @@ mod tests {
     #[test]
     fn linux_forced_option_wins() {
         if cfg!(target_os = "linux") {
-            assert!(should_spoof(false, Some(true)), "显式 true 强制开,忽略 stealth");
+            assert!(
+                should_spoof(false, Some(true)),
+                "显式 true 强制开,忽略 stealth"
+            );
             assert!(!should_spoof(true, Some(false)), "显式 false 强制关");
         }
     }
@@ -203,8 +206,14 @@ mod tests {
         assert!(r.contains("ANGLE") && r.contains("Mesa") && r.contains("Intel"));
         assert!(!r.contains("SwiftShader") && !r.contains("llvmpipe"));
         // 显式参数优先。
-        assert_eq!(spoof_vendor(Some("Google Inc. (NVIDIA)")), "Google Inc. (NVIDIA)");
-        assert_eq!(spoof_renderer(Some("ANGLE (NVIDIA, ...)")), "ANGLE (NVIDIA, ...)");
+        assert_eq!(
+            spoof_vendor(Some("Google Inc. (NVIDIA)")),
+            "Google Inc. (NVIDIA)"
+        );
+        assert_eq!(
+            spoof_renderer(Some("ANGLE (NVIDIA, ...)")),
+            "ANGLE (NVIDIA, ...)"
+        );
     }
 
     #[test]

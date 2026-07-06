@@ -90,7 +90,10 @@ struct Row {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let n: usize = std::env::var("N").ok().and_then(|s| s.parse().ok()).unwrap_or(3);
+    let n: usize = std::env::var("N")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(3);
     let headful = std::env::var("HEADFUL").as_deref() == Ok("1");
     // 默认**同 OS 变体**(保真 UA/WebGL,换指纹不被识破、Turnstile 友好);PERSONA=1 才用跨 OS 画像(伪装,配代理用)。
     let persona = std::env::var("PERSONA").as_deref() == Ok("1");
@@ -114,8 +117,14 @@ async fn main() -> Result<()> {
 
     println!(
         "模式: {} | 浏览器数: {}(+1 复跑) | headless: {} | 承载页: {}\n第三方库: FingerprintJS v4 (openfpcdn.io)\n",
-        if persona { "跨 OS 画像(伪装 UA/platform/WebGL)" } else { "同 OS 变体(保真 UA/WebGL,Turnstile 友好)" },
-        n, !headful, url
+        if persona {
+            "跨 OS 画像(伪装 UA/platform/WebGL)"
+        } else {
+            "同 OS 变体(保真 UA/WebGL,Turnstile 友好)"
+        },
+        n,
+        !headful,
+        url
     );
 
     let base = ChromiumOptions::new().headless(!headful);
@@ -132,7 +141,10 @@ async fn main() -> Result<()> {
             None => raw,
         };
         print_one(label, &v);
-        rows.push(Row { label: label.clone(), fp: v });
+        rows.push(Row {
+            label: label.clone(),
+            fp: v,
+        });
         let _ = browser.quit().await;
         // 浏览器间稍等,降低同机并发对网络/句柄的压力。
         tokio::time::sleep(Duration::from_millis(300)).await;
@@ -155,7 +167,11 @@ fn print_one(label: &str, v: &Value) {
     println!("  screen   : {}", s(v, "screen"));
     println!("  timezone : {}", s(v, "tz"));
     println!("  langs    : {}", s(v, "langs"));
-    println!("  hw/mem   : {} cores / {} GB", v.get("hc").unwrap_or(&Value::Null), v.get("dm").unwrap_or(&Value::Null));
+    println!(
+        "  hw/mem   : {} cores / {} GB",
+        v.get("hc").unwrap_or(&Value::Null),
+        v.get("dm").unwrap_or(&Value::Null)
+    );
     println!("  UA       : {}", s(v, "ua"));
     println!("  platform : {}", s(v, "platform"));
     println!();
@@ -171,29 +187,55 @@ fn verdict(rows: &[Row]) {
             !id.is_empty() && !id.starts_with("ERR")
         })
         .collect();
-    if valid.iter().any(|r| s(&r.fp, "visitorId").starts_with("ERR")) {
-        println!("⚠ 有浏览器未取到 FingerprintJS visitorId(看上面的 ERR:…);canvas/webgl 哈希仍可作证。");
+    if valid
+        .iter()
+        .any(|r| s(&r.fp, "visitorId").starts_with("ERR"))
+    {
+        println!(
+            "⚠ 有浏览器未取到 FingerprintJS visitorId(看上面的 ERR:…);canvas/webgl 哈希仍可作证。"
+        );
     }
 
     // 不同画像(排除复跑)两两不同?
     let distinct: Vec<&Row> = rows.iter().filter(|r| r.label != "#1-复跑").collect();
-    let ids: Vec<&str> = distinct.iter().map(|r| s(&r.fp, "visitorId")).filter(|i| !i.is_empty() && !i.starts_with("ERR")).collect();
+    let ids: Vec<&str> = distinct
+        .iter()
+        .map(|r| s(&r.fp, "visitorId"))
+        .filter(|i| !i.is_empty() && !i.starts_with("ERR"))
+        .collect();
     let mut uniq = ids.clone();
     uniq.sort_unstable();
     uniq.dedup();
     let all_diff = !ids.is_empty() && uniq.len() == ids.len();
     println!(
         "① 各浏览器 visitorId 两两不同 : {}  ({} 个有效 → {} 个唯一)",
-        if all_diff { "✅ 是(指纹确实换了)" } else { "❌ 否" },
-        ids.len(), uniq.len()
+        if all_diff {
+            "✅ 是(指纹确实换了)"
+        } else {
+            "❌ 否"
+        },
+        ids.len(),
+        uniq.len()
     );
 
     // canvas 也两两不同?(我们直接改它,最能说明问题)
-    let cv: Vec<&str> = distinct.iter().map(|r| s(&r.fp, "canvas")).filter(|c| *c != "?" && *c != "err").collect();
-    let mut cu = cv.clone(); cu.sort_unstable(); cu.dedup();
+    let cv: Vec<&str> = distinct
+        .iter()
+        .map(|r| s(&r.fp, "canvas"))
+        .filter(|c| *c != "?" && *c != "err")
+        .collect();
+    let mut cu = cv.clone();
+    cu.sort_unstable();
+    cu.dedup();
     println!(
         "② 各浏览器 canvas 哈希两两不同: {}  ({} 个 → {} 个唯一)",
-        if !cv.is_empty() && cu.len() == cv.len() { "✅ 是" } else { "❌ 否" }, cv.len(), cu.len()
+        if !cv.is_empty() && cu.len() == cv.len() {
+            "✅ 是"
+        } else {
+            "❌ 否"
+        },
+        cv.len(),
+        cu.len()
     );
 
     // 稳定性:#1 与 #1-复跑 的 visitorId 相同?
@@ -204,8 +246,13 @@ fn verdict(rows: &[Row]) {
         let same = !ia.is_empty() && !ia.starts_with("ERR") && ia == ib;
         println!(
             "③ 同一画像复跑 visitorId 稳定 : {}  (#1={} / 复跑={})",
-            if same { "✅ 是(同身份可复现,非乱跳)" } else { "❌ 否" },
-            short(ia), short(ib)
+            if same {
+                "✅ 是(同身份可复现,非乱跳)"
+            } else {
+                "❌ 否"
+            },
+            short(ia),
+            short(ib)
         );
     }
     println!("\n第三方可视化验证(用同一份指纹手动打开看):");
@@ -216,5 +263,9 @@ fn verdict(rows: &[Row]) {
 }
 
 fn short(s: &str) -> String {
-    if s.len() > 12 { format!("{}…", &s[..12]) } else { s.to_string() }
+    if s.len() > 12 {
+        format!("{}…", &s[..12])
+    } else {
+        s.to_string()
+    }
 }

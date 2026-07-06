@@ -8,17 +8,39 @@
 
 ---
 
+## AI 优先入口:先用 `drs` CLI / MCP,再写 Rust API
+
+如果任务是“让 AI 操作网页 / 观察页面 / 抓接口 / 截图 / 提取文本”,优先使用同仓库 CLI:
+
+```bash
+cargo install --path crates/drission-cli --bin drs
+drs serve --backend cdp --headless
+drs --json open https://example.com
+drs --json ax --json
+drs --json listen wait --count 3 --timeout-ms 5000
+```
+
+需要接入 MCP 客户端时用:
+
+```bash
+drs mcp --backend cdp --headless
+```
+
+`drs` 输出统一为 `{ "ok": true, "data": ... }` / `{ "ok": false, "error": ... }`,适合 Agent 直接解析。只有在需要定制复杂流程、并发池、协议逆向、验证码闭环或把能力嵌入业务服务时,再按下面规则编写 Rust 程序。
+
+---
+
 ## 0. 最重要:选后端 + feature/构建规则(这步错了,代码一定跑不起来)
 
 `drission` 是**双后端**库,统一接口(`Browser`/`Tab`/`Element`/`Page`…)按 feature 切换实现:
 
 | 你要做的事 | 选哪个 feature | Cargo.toml | 运行 / 构建命令 |
 |---|---|---|---|
-| 驱动 **Google Chrome**(CDP,默认,最贴近 DrissionPage) | `cdp`(**默认开**) | `drission = "0.2"` | `cargo run`(无需 feature) |
+| 驱动 **Google Chrome**(CDP,默认,最贴近 DrissionPage) | `cdp`(**默认开**) | `drission = "0.3"` | `cargo run`(无需 feature) |
 | **Camoufox/Firefox 反检测**内核 + 过盾/吐环境/池/Session | `camoufox` | `features=["camoufox"]` | `cargo run --no-default-features --features camoufox` |
 | **字符验证码 OCR / 点选验证码**(检测+识别) | `ocr` | `features=["ocr"]` | `cargo run --features ocr`(cdp 默认在) |
 | **图片滑块**缺口(极验/顶象) | `slider`(自带 camoufox) | `features=["slider"]` | `cargo run --no-default-features --features slider` |
-| **Session 浏览器 TLS/JA3 指纹** | `impersonate`(自带 camoufox) | `features=["impersonate"]` | `cargo run --features impersonate` |
+| **Session 浏览器 TLS/JA3 指纹** | `impersonate`(自带 camoufox) | `features=["impersonate"]` | `cargo run --example session_tls --features impersonate` |
 | **纯算签名**(内嵌 QuickJS,无浏览器) | `signer` | `features=["signer"]` | `cargo build --features signer` |
 
 ### ⚠️ 铁律(AI 必须遵守,否则编译失败)
@@ -28,7 +50,9 @@
    会与 Camoufox 代码期望的类型冲突(编译报错或跑成 cdp 后端)。**单后端**才正确。
 2. **`ocr` / `signer` 是后端无关的**,可直接叠加在默认 cdp 上(`--features ocr`,不要 `--no-default-features`)。
    点选验证码(`ClickWord`/`Det`/`human_click`)就用 `--features ocr`(或 `--features cdp,ocr`)。
-3. **`slider` / `impersonate` 会自动带入 camoufox**;用 `--no-default-features --features slider`(或 `impersonate`)。
+3. **`slider` 会自动带入 camoufox**;页面/浏览器后端示例用 `--no-default-features --features slider`。
+   **`impersonate` 也会带入 camoufox**,但它主要服务 `SessionPage`;跑指定 `session_tls` 示例可直接
+   `--features impersonate`。批量检查或运行 Camoufox 页面示例时,仍按单后端规则带 `--no-default-features`。
 4. 一切从 `use drission::prelude::*;` 开始。不要去 `use` 内部模块路径。
 5. 所有 IO 方法都是 **`async`**,要 `.await?`;返回值用 `drission::Result<T>`。运行时用 `#[tokio::main]`。
 6. 文件路径(上传/截图保存)用**绝对路径**。
@@ -265,13 +289,14 @@ dump.export_project("./site-env", EnvScope::All)?;
 7. **`apply_pointer_stealth` 是 camoufox 专属**(滑块/点选**导航前**调,补 Juggler 合成事件的空 `pointerType`);
    **CDP 后端没有也不需要**(`Input.dispatchMouseEvent` 原生带 `pointerType`)。`tab.wait().secs(f64)` 也是 camoufox 专属,
    CDP 等待用 `tokio::time::sleep` 或 `wait().ele_displayed/doc_loaded`(两后端都有)。
-8. **构建命令**:camoufox/slider/impersonate 系一律 `--no-default-features`(见第 0 节铁律)。
+8. **构建命令**:Camoufox 页面示例和 slider 示例一律 `--no-default-features`;`session_tls` 这种纯 Session
+   impersonate 示例可直接 `--features impersonate`(见第 0 节铁律)。
 
 ---
 
 ## 10. 完整实战:易盾点选验证码端到端(可直接改用)
 
-`Cargo.toml`: `drission = { version = "0.2", features = ["ocr"] }`(默认 cdp + ocr)
+`Cargo.toml`: `drission = { version = "0.3", features = ["ocr"] }`(默认 cdp + ocr)
 运行:`cargo run --features ocr`
 
 ```rust

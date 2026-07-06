@@ -169,8 +169,7 @@ impl Wait {
             let Some(session_id) = ev.params["sessionId"].as_str().map(str::to_string) else {
                 continue;
             };
-            let tab =
-                Tab::from_attached(conn, target_id, ctx, session_id, events, dl, dur).await?;
+            let tab = Tab::from_attached(conn, target_id, ctx, session_id, events, dl, dur).await?;
             return Ok(Some(tab));
         }
     }

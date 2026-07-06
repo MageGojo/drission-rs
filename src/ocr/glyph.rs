@@ -387,7 +387,8 @@ mod tests {
 
     #[test]
     fn save_labeled_dedupes_and_routes_by_char() {
-        let dir = std::env::temp_dir().join(format!("drission_bank_{}", content_hash(b"unique-seed")));
+        let dir =
+            std::env::temp_dir().join(format!("drission_bank_{}", content_hash(b"unique-seed")));
         let _ = std::fs::remove_dir_all(&dir);
         // 第一次写入返回路径且落到 `{字}/` 子目录;同图第二次去重返回 None。
         let png = b"\x89PNG\r\n\x1a\n-fake-but-stable-bytes";
@@ -398,7 +399,11 @@ mod tests {
         assert_eq!(p.parent().unwrap().file_name().unwrap(), "特");
         assert!(SampleBank::save_labeled(&dir, '特', png).unwrap().is_none());
         // 不同图 → 不同文件名(不去重)。
-        assert!(SampleBank::save_labeled(&dir, '特', b"other-bytes").unwrap().is_some());
+        assert!(
+            SampleBank::save_labeled(&dir, '特', b"other-bytes")
+                .unwrap()
+                .is_some()
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 

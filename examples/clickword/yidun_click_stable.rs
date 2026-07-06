@@ -102,7 +102,10 @@ impl BgView {
 
 #[tokio::main]
 async fn main() -> drission::Result<()> {
-    let headless = matches!(std::env::var("HL").ok().as_deref(), Some("1") | Some("true"));
+    let headless = matches!(
+        std::env::var("HL").ok().as_deref(),
+        Some("1") | Some("true")
+    );
     let out_dir = std::env::var_os("YIDUN_OUT")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| {
@@ -215,7 +218,9 @@ async fn main() -> drission::Result<()> {
         let challenge = match wait_challenge(&tab, Duration::from_secs(8)).await {
             Some(c) => Some(c),
             None => {
-                println!("[yidun] 图在但未抓到 api/get(首图 get 早于监听?)——当场换图逼出可抓的 get,再等一次…");
+                println!(
+                    "[yidun] 图在但未抓到 api/get(首图 get 早于监听?)——当场换图逼出可抓的 get,再等一次…"
+                );
                 trusted_refresh(&tab).await;
                 tokio::time::sleep(Duration::from_millis(800)).await;
                 let _ = open_and_confirm(&tab, false).await;
@@ -247,7 +252,10 @@ async fn main() -> drission::Result<()> {
         let cap = match fetch_image(&bg_url).await {
             Ok(b) if b.len() > 1000 => b,
             other => {
-                println!("[yidun] 拉取 bg 失败({:?})——记为「不稳定」,刷新重试", other.map(|b| b.len()));
+                println!(
+                    "[yidun] 拉取 bg 失败({:?})——记为「不稳定」,刷新重试",
+                    other.map(|b| b.len())
+                );
                 outcomes.push(Outcome::ImageUnstable);
                 if attempt < tries {
                     trusted_refresh(&tab).await;
@@ -279,8 +287,14 @@ async fn main() -> drission::Result<()> {
         }];
         let hits = cw.solve_excluding(&cap, &targets, &exclude)?;
         for h in &hits {
-            let tpl = h.template.map(|t| format!(" tpl={t:.2}")).unwrap_or_default();
-            println!("[yidun]   「{}」 aff={:.2}{tpl} 图内点({},{})", h.target, h.affinity, h.point.0, h.point.1);
+            let tpl = h
+                .template
+                .map(|t| format!(" tpl={t:.2}"))
+                .unwrap_or_default();
+            println!(
+                "[yidun]   「{}」 aff={:.2}{tpl} 图内点({},{})",
+                h.target, h.affinity, h.point.0, h.point.1
+            );
         }
         let min_aff = hits
             .iter()
@@ -350,9 +364,17 @@ async fn main() -> drission::Result<()> {
         // ⑥ 图内像素分数 → 绝对页面点(用实时 rect,跨平台/缩放一致)。
         let fracs: Vec<(f64, f64)> = hits
             .iter()
-            .map(|h| (h.point.0 as f64 / cap_w.max(1.0), h.point.1 as f64 / cap_h.max(1.0)))
+            .map(|h| {
+                (
+                    h.point.0 as f64 / cap_w.max(1.0),
+                    h.point.1 as f64 / cap_h.max(1.0),
+                )
+            })
             .collect();
-        let points: Vec<(f64, f64)> = fracs.iter().map(|&(fx, fy)| view.map_frac(fx, fy)).collect();
+        let points: Vec<(f64, f64)> = fracs
+            .iter()
+            .map(|&(fx, fy)| view.map_frac(fx, fy))
+            .collect();
         for (h, &(cx, cy)) in hits.iter().zip(&points) {
             println!("[yidun] 拟人点击「{}」→ 页面({cx:.0},{cy:.0})", h.target);
         }
@@ -382,7 +404,9 @@ async fn main() -> drission::Result<()> {
 
         match &chk {
             None => {
-                println!("[yidun] ✗ 未捕获 check(点击未被接收——没点在可点击层)——**不是**「过不了易盾」");
+                println!(
+                    "[yidun] ✗ 未捕获 check(点击未被接收——没点在可点击层)——**不是**「过不了易盾」"
+                );
                 outcomes.push(Outcome::ClickNotSubmitted);
             }
             Some(b) => {
@@ -508,10 +532,18 @@ async fn resolve_bg_view(tab: &ChromiumTab) -> BgView {
     // iframe 兜底:挑战常被塞进 iframe,顶层 querySelector 读不到 → 用库 `content_frame` + `frame.ele`
     //   读帧内 bg-img 的 `rect`/`attr`,叠加 iframe 元素的视口偏移得绝对视口坐标。
     for sel in IFRAME_SELECTORS {
-        let Ok(ifr) = tab.ele(sel).await else { continue };
-        let Ok(irect) = ifr.rect().await else { continue };
-        let Ok(frame) = ifr.content_frame().await else { continue };
-        let Ok(bg) = frame.ele(BG_SEL).await else { continue };
+        let Ok(ifr) = tab.ele(sel).await else {
+            continue;
+        };
+        let Ok(irect) = ifr.rect().await else {
+            continue;
+        };
+        let Ok(frame) = ifr.content_frame().await else {
+            continue;
+        };
+        let Ok(bg) = frame.ele(BG_SEL).await else {
+            continue;
+        };
         if !bg.is_displayed().await.unwrap_or(false) {
             continue;
         }
@@ -562,7 +594,11 @@ async fn wait_challenge(tab: &ChromiumTab, timeout: Duration) -> Option<(String,
         match tab.listen().wait(Some(Duration::from_millis(300))).await {
             Ok(Some(p)) => {
                 if diag {
-                    println!("[yidun]   监听包 {} status={}", short(&p.url, 60), p.response.status);
+                    println!(
+                        "[yidun]   监听包 {} status={}",
+                        short(&p.url, 60),
+                        p.response.status
+                    );
                 }
                 if p.url.contains("/get")
                     && let Some(c) = parse_yidun_get(&p.response.body)
@@ -663,7 +699,8 @@ fn save_overlay(cap: &[u8], hits: &[ClickHit], out_dir: &std::path::Path, attemp
         for (i, h) in hits.iter().enumerate() {
             draw_marker(&mut rgba, h.point.0 as i32, h.point.1 as i32, colors[i % 4]);
         }
-        rgba.save(out_dir.join(format!("overlay_{attempt}.png"))).ok();
+        rgba.save(out_dir.join(format!("overlay_{attempt}.png")))
+            .ok();
     }
 }
 
@@ -755,7 +792,10 @@ fn tail(s: &str, n: usize) -> String {
 
 /// 读 u32 环境变量(缺/非法则默认)。
 fn env_u32(key: &str, default: u32) -> u32 {
-    std::env::var(key).ok().and_then(|s| s.parse().ok()).unwrap_or(default)
+    std::env::var(key)
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(default)
 }
 
 /// 截断长字符串便于打印。
@@ -776,7 +816,11 @@ fn draw_marker(img: &mut image::RgbaImage, cx: i32, cy: i32, color: [u8; 4]) {
     for s in 0..steps {
         let t = (s as f32) * std::f32::consts::TAU / steps as f32;
         for rr in (r - 1)..=r {
-            put(img, cx + (rr as f32 * t.cos()) as i32, cy + (rr as f32 * t.sin()) as i32);
+            put(
+                img,
+                cx + (rr as f32 * t.cos()) as i32,
+                cy + (rr as f32 * t.sin()) as i32,
+            );
         }
     }
     for dy in -1..=1 {

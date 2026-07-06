@@ -45,7 +45,7 @@ cargo build  --example env_signer --features signer
 | `session/` | HTTP 会话双模 / TLS·JA3 指纹 / WebPage 采集 |
 | `env/` | 吐环境(补环境)/ 纯算签名 |
 | `pool/` | 高并发池 / 代理健康 |
-| `sites/` | 站点实战采集(抖音 / B 站,长监听翻页签名) |
+| `sites/` | 站点实战采集(抖音 / B 站 / 政府公开数据,长监听翻页签名与 CSV 导出) |
 | `windows/` | Windows 专项(在 Windows 上运行的验证包) |
 
 ## 大道至简:`Page` 一行起步(对标 DrissionPage `ChromiumPage`,需 `--no-default-features --features camoufox`)
@@ -63,6 +63,24 @@ page.quit().await?;
 
 `page` 通过 `Deref` 拥有**全部 `Tab` 方法**(`ele`/`run_js`/`listen`/`actions`/`dump_env`…)。需要多标签 /
 接管 / 并发池等更底层控制时,仍可用 `Browser` + `Tab`(`Page` 是附加门面,不替代它们)。
+
+---
+
+## 🎓 教学「活教材」(learn/,默认 cdp,边用库边学 Rust)
+
+> 面向「想学 Rust + 学会用本库」的人:每个示例都在**真实使用库**的同时,把关键 Rust 概念讲到位(注释即教程)。
+
+| 示例 | 说明 | 需要 |
+|---|---|---|
+| [learn_basics](learn/learn_basics.rs) | **第 ① 课(完全离线)**:`set_content` 灌页,分 9 课讲 async/`?` · 所有权 · Arc 共享句柄 · Vec/迭代 · Option · 借用参数 · 闭包 move+并发 · 生命周期 `'a` · Send/`!Send` | 🔌 |
+| [bilibili_covers](learn/bilibili_covers.rs) | **第 ② 课(实战·联网)**:爬 B 站热门视频封面——等渲染/滚动懒加载 → `eles`+`attr`+`text` 抓卡片 → URL 清洗去重 → **`tokio` 并发下载(spawn+分批限流)** → 落盘 + `scrape::write_json` 导清单。学 struct/迭代器/并发/文件 IO | 🌐 |
+
+```bash
+cargo run --example learn_basics                 # 离线,随便跑
+cargo run --example bilibili_covers              # 联网爬 B 站热门封面(默认抓 10 张)
+cargo run --example bilibili_covers -- "https://www.bilibili.com/v/popular/all" 8   # 指定页 + 数量
+HL=0 cargo run --example bilibili_covers         # 有头,看着它跑
+```
 
 ---
 
@@ -105,6 +123,8 @@ page.quit().await?;
 | [douyin_listen](sites/douyin_listen.rs) | 抓抖音 `aweme/detail` 响应(一次) | 🌐 |
 | [douyin_listen_long](sites/douyin_listen_long.rs) | 连续抓「下一个视频」各自的签名 detail(后台抽取不丢包 + `press_key` 翻页) | 🌐 |
 | [bilibili_listen_long](sites/bilibili_listen_long.rs) | bilibili 多 P 视频页连续抓每分集 playurl 签名(wbi `w_rid`/`wts`) | 🌐 |
+| [hubei_zfwj_csv](sites/hubei_zfwj_csv.rs) | 湖北省人民政府「政府文件」公开列表:动态翻页,逐条进详情页抽正文/发文字号/来源并导出 CSV | 🌐 · cdp |
+| [hubei_zfwj_protocol](sites/hubei_zfwj_protocol.rs) | 湖北省政府文件纯协议版:SessionPage 抓挑战页,本地 JS 引擎解 challenge 后抓列表/详情并导出 CSV | 🌐 · camoufox,signer |
 
 ## 验证码·字符 OCR(ocr/,`--features ocr`)
 

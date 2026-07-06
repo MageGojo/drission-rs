@@ -205,8 +205,16 @@ async fn main() -> drission::Result<()> {
     let url = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "https://www.luffycity.com/play/35167".into());
-    let headless = !matches!(std::env::var("HL").ok().as_deref(), Some("0") | Some("false"));
-    let id = url.trim_end_matches('/').rsplit('/').next().unwrap_or("video").to_string();
+    let headless = !matches!(
+        std::env::var("HL").ok().as_deref(),
+        Some("0") | Some("false")
+    );
+    let id = url
+        .trim_end_matches('/')
+        .rsplit('/')
+        .next()
+        .unwrap_or("video")
+        .to_string();
 
     let out = std::env::current_dir()?.join("captures").join("luffycity");
     std::fs::create_dir_all(&out)?;
@@ -248,7 +256,8 @@ async fn main() -> drission::Result<()> {
     let mut nudges = 0u32;
     loop {
         let raw = tab.run_js(POLL_JS).await.unwrap_or(Value::Null);
-        let st: Value = serde_json::from_str(raw.as_str().unwrap_or("{}")).unwrap_or_else(|_| json!({}));
+        let st: Value =
+            serde_json::from_str(raw.as_str().unwrap_or("{}")).unwrap_or_else(|_| json!({}));
         let dur = st["dur"].as_f64().unwrap_or(0.0);
         let bend = st["bend"].as_f64().unwrap_or(0.0);
         let ct = st["ct"].as_f64().unwrap_or(0.0);
@@ -318,7 +327,11 @@ async fn main() -> drission::Result<()> {
         let mime = t["mime"].as_str().unwrap_or("");
         println!(
             "  轨道#{i}  {}  {}  分块={}",
-            if mime.is_empty() { "(未知 mime)" } else { mime },
+            if mime.is_empty() {
+                "(未知 mime)"
+            } else {
+                mime
+            },
             human(bytes),
             t["chunks"].as_u64().unwrap_or(0)
         );
@@ -340,7 +353,11 @@ async fn main() -> drission::Result<()> {
         }
         let path = out.join(format!("track{i}.mp4"));
         std::fs::write(&path, &buf)?;
-        println!("    → 落盘 {} ({})", path.display(), human(buf.len() as u64));
+        println!(
+            "    → 落盘 {} ({})",
+            path.display(),
+            human(buf.len() as u64)
+        );
         track_files.push(path);
     }
 
@@ -354,7 +371,12 @@ async fn main() -> drission::Result<()> {
     // 为何音频不 copy:MSE 截到的 fMP4 音频分片直接 `-c copy` 会被 ffmpeg 判成 0 packet 丢弃
     //（解码却正常,疑似 hls.js 音频 init 段的 edit-list/priming quirk);重编码 AAC 体积小、损失可忽略。
     let final_mp4 = out.join(format!("{id}.mp4"));
-    let mut args: Vec<String> = vec!["-y".into(), "-hide_banner".into(), "-loglevel".into(), "warning".into()];
+    let mut args: Vec<String> = vec![
+        "-y".into(),
+        "-hide_banner".into(),
+        "-loglevel".into(),
+        "warning".into(),
+    ];
     for f in &track_files {
         args.push("-i".into());
         args.push(f.to_string_lossy().into_owned());
@@ -363,12 +385,23 @@ async fn main() -> drission::Result<()> {
         args.push("-map".into());
         args.push(idx.to_string());
     }
-    args.extend(["-c:v".into(), "copy".into(), "-c:a".into(), "aac".into(), "-b:a".into(), "128k".into()]);
+    args.extend([
+        "-c:v".into(),
+        "copy".into(),
+        "-c:a".into(),
+        "aac".into(),
+        "-b:a".into(),
+        "128k".into(),
+    ]);
     args.push("-movflags".into());
     args.push("+faststart".into());
     args.push(final_mp4.to_string_lossy().into_owned());
 
-    println!("\nffmpeg 合并 {} 条轨道(视频 copy + 音频 aac)→ {}", track_files.len(), final_mp4.display());
+    println!(
+        "\nffmpeg 合并 {} 条轨道(视频 copy + 音频 aac)→ {}",
+        track_files.len(),
+        final_mp4.display()
+    );
     let status = Command::new("ffmpeg").args(&args).status();
     let ok = matches!(status, Ok(s) if s.success());
     if !ok && track_files.len() > 1 {
@@ -378,13 +411,26 @@ async fn main() -> drission::Result<()> {
             .max_by_key(|p| std::fs::metadata(p).map(|m| m.len()).unwrap_or(0))
             .cloned()
             .unwrap_or_else(|| track_files[0].clone());
-        println!("  多轨合并失败,退回只 remux 最大轨道 {} …", biggest.display());
+        println!(
+            "  多轨合并失败,退回只 remux 最大轨道 {} …",
+            biggest.display()
+        );
         let _ = Command::new("ffmpeg")
             .args([
-                "-y", "-hide_banner", "-loglevel", "warning",
-                "-i", &biggest.to_string_lossy(),
-                "-c:v", "copy", "-c:a", "aac", "-b:a", "128k",
-                "-movflags", "+faststart",
+                "-y",
+                "-hide_banner",
+                "-loglevel",
+                "warning",
+                "-i",
+                &biggest.to_string_lossy(),
+                "-c:v",
+                "copy",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "128k",
+                "-movflags",
+                "+faststart",
                 &final_mp4.to_string_lossy(),
             ])
             .status();
@@ -398,9 +444,15 @@ async fn main() -> drission::Result<()> {
         // 用 ffprobe(若有)报告时长/分辨率,核对完整性。
         if let Ok(o) = Command::new("ffprobe")
             .args([
-                "-v", "error", "-show_entries", "format=duration",
-                "-show_entries", "stream=codec_type,codec_name,width,height",
-                "-of", "default=noprint_wrappers=1", &final_mp4.to_string_lossy(),
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-show_entries",
+                "stream=codec_type,codec_name,width,height",
+                "-of",
+                "default=noprint_wrappers=1",
+                &final_mp4.to_string_lossy(),
             ])
             .output()
         {
@@ -414,7 +466,9 @@ async fn main() -> drission::Result<()> {
         println!("最终视频   : ❌ 生成失败(轨道文件仍在 {})", out.display());
     }
     println!("中间产物   : track*.mp4(原始 fMP4,可删)");
-    println!("说明       : 全程未碰 polyv 密钥/算法 —— 浏览器内 hls.js 解密后,在 MSE append 处截获明文 fMP4。");
+    println!(
+        "说明       : 全程未碰 polyv 密钥/算法 —— 浏览器内 hls.js 解密后,在 MSE append 处截获明文 fMP4。"
+    );
     println!("==================================================");
 
     browser.quit().await?;

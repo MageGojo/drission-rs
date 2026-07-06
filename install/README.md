@@ -42,6 +42,13 @@ cargo add drission
 cargo run
 ```
 
+开发本仓库内置的 `drs` CLI / MCP 入口:
+
+```bash
+cargo install --path crates/drission-cli --bin drs
+drs serve --backend cdp --headless
+```
+
 ## 进阶 / 可选的 C 编译环境
 
 以下功能依赖 C 工具链编译,**体验默认功能用不到**,需要时再装:

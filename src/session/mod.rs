@@ -30,6 +30,7 @@ use serde_json::Value;
 
 use crate::browser::{Cookie, CookieParam, StaticElement, Tab};
 use crate::launcher::Proxy;
+use crate::net::DataPacket;
 use crate::{Error, Result};
 
 mod http;
@@ -170,14 +171,10 @@ impl SessionPage {
 
     /// 发请求并手动跟随重定向(每跳都带上匹配 cookie、抓取 Set-Cookie)。
     ///
-    /// 后端无关:把"请求头列表 + 可选体"交给 [`HttpBackend::send_once`],拿回 [`RawResponse`]
-    /// 再走 cookie / 重定向逻辑——纯 reqwest 与 wreq 指纹后端共用这一条循环。
+    /// 体预处理成 `(正文, 可选 Content-Type)` 后,把「用户额外头」作为 base headers 交给
+    /// [`run_loop`](Self::run_loop)(自动补 cookie / Content-Type)。
     async fn request(&mut self, method: &str, url: &str, body: Option<PostData>) -> Result<bool> {
-        let mut current =
-            reqwest::Url::parse(url).map_err(|e| Error::Other(format!("非法 URL {url}: {e}")))?;
-        let mut method = method.to_string();
-        // 体预处理一次:(正文, 可选 Content-Type)。
-        let mut body: Option<(String, Option<String>)> = match body {
+        let body: Option<(String, Option<String>)> = match body {
             Some(PostData::Form(f)) => Some((
                 form_encode(&f),
                 Some("application/x-www-form-urlencoded".to_string()),
@@ -189,16 +186,47 @@ impl SessionPage {
             Some(PostData::Raw(s, ct)) => Some((s, ct)),
             None => None,
         };
+        let base = self.extra_headers.clone();
+        self.run_loop(method.to_string(), url, body, base, true)
+            .await
+    }
+
+    /// 逐跳请求循环(后端无关、`request`/`replay` 共用):每跳用 `base_headers`,按需补 cookie /
+    /// Content-Type,抓 Set-Cookie,跟随重定向,最终把响应落进 `last_*`。
+    ///
+    /// `add_jar_cookie=true` 时:当前 headers **不含** `Cookie` 才从 jar 注入(故重放可保留抓包原始
+    /// Cookie、不重复)。`body` = `(正文, 可选 Content-Type)`;仅当 headers 无 `Content-Type` 才补。
+    async fn run_loop(
+        &mut self,
+        method: String,
+        url: &str,
+        body: Option<(String, Option<String>)>,
+        base_headers: Vec<(String, String)>,
+        add_jar_cookie: bool,
+    ) -> Result<bool> {
+        let mut current =
+            reqwest::Url::parse(url).map_err(|e| Error::Other(format!("非法 URL {url}: {e}")))?;
+        let mut method = method;
+        let mut body = body;
         let mut hops = 0usize;
 
         loop {
-            // 每跳构造请求头:用户额外头 + cookie + Content-Type。
-            let mut headers = self.extra_headers.clone();
-            if let Some(cookie) = self.jar.header_for(&current) {
-                headers.push(("Cookie".to_string(), cookie));
+            let mut headers = base_headers.clone();
+            let has_cookie = headers
+                .iter()
+                .any(|(k, _)| k.eq_ignore_ascii_case("cookie"));
+            if add_jar_cookie && !has_cookie {
+                if let Some(cookie) = self.jar.header_for(&current) {
+                    headers.push(("Cookie".to_string(), cookie));
+                }
             }
             if let Some((_, Some(ct))) = &body {
-                headers.push(("Content-Type".to_string(), ct.clone()));
+                let has_ct = headers
+                    .iter()
+                    .any(|(k, _)| k.eq_ignore_ascii_case("content-type"));
+                if !has_ct {
+                    headers.push(("Content-Type".to_string(), ct.clone()));
+                }
             }
             let body_str = body.as_ref().map(|(b, _)| b.as_str());
 
@@ -242,6 +270,29 @@ impl SessionPage {
             self.last_headers = resp.headers;
             self.last_body = resp.body;
             return Ok((200..=299).contains(&code));
+        }
+    }
+
+    /// **抓包 → 重放闭环**:把 [`tab.listen()`](crate::cdp::ChromiumTab::listen) 抓到的
+    /// [`DataPacket`] 转成可重放的请求——链式 `set`/`set_header`/`url`/`body` 覆盖字段后 `send()`,
+    /// 复现签名后**立即验真**。走本会话既有 cookie / 重定向 / `impersonate`(wreq TLS/JA3 指纹)循环。
+    ///
+    /// 自动剔除逐跳头(host/content-length/connection/accept-encoding 等)与 HTTP/2 伪头,
+    /// 保留签名头等业务头与原始 Cookie(jar 不重复注入)。
+    ///
+    /// ```ignore
+    /// // 浏览器抓到带签名的请求 → 改时间戳重签重放验真:
+    /// let pkt = tab.listen().wait(None).await?.unwrap();
+    /// let ok = sess.replay(&pkt).set("t", &now_ms).set_header("x-ca-sign", &new_sign).send().await?;
+    /// println!("{} {}", sess.status(), ok);
+    /// ```
+    pub fn replay(&mut self, packet: &DataPacket) -> ReplayBuilder<'_> {
+        ReplayBuilder {
+            session: self,
+            method: packet.method.clone(),
+            url: packet.url.clone(),
+            headers: replay_filter_headers(&packet.request.headers),
+            body: packet.request.post_data.clone(),
         }
     }
 
@@ -375,6 +426,157 @@ impl SessionPage {
         }
         Ok(())
     }
+}
+
+// ── 抓包重放 builder ─────────────────────────────────────────────────────────
+
+/// [`SessionPage::replay`] 返回的链式重放构建器。覆盖字段后 `send()` 发送(走会话的 cookie /
+/// 重定向 / `impersonate` 循环)。
+pub struct ReplayBuilder<'a> {
+    session: &'a mut SessionPage,
+    method: String,
+    /// 完整 URL(含 query)。
+    url: String,
+    headers: Vec<(String, String)>,
+    body: Option<String>,
+}
+
+impl ReplayBuilder<'_> {
+    /// 覆盖请求方法(默认沿用抓包的)。
+    pub fn method(mut self, method: impl Into<String>) -> Self {
+        self.method = method.into();
+        self
+    }
+
+    /// 覆盖完整 URL。
+    pub fn url(mut self, url: impl Into<String>) -> Self {
+        self.url = url.into();
+        self
+    }
+
+    /// 覆盖请求体(POST/PUT 等)。
+    pub fn body(mut self, body: impl Into<String>) -> Self {
+        self.body = Some(body.into());
+        self
+    }
+
+    /// upsert 一个**请求头**(同名覆盖,大小写不敏感)——改签名头等。
+    pub fn set_header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
+        let name = name.into();
+        let value = value.into();
+        if let Some(slot) = self
+            .headers
+            .iter_mut()
+            .find(|(k, _)| k.eq_ignore_ascii_case(&name))
+        {
+            slot.1 = value;
+        } else {
+            self.headers.push((name, value));
+        }
+        self
+    }
+
+    /// 删一个请求头(大小写不敏感)。
+    pub fn remove_header(mut self, name: &str) -> Self {
+        self.headers.retain(|(k, _)| !k.eq_ignore_ascii_case(name));
+        self
+    }
+
+    /// upsert URL 里的一个 **query 参数**(同名覆盖)——重放最常见的「改 t= 时间戳重签」。
+    /// 值原样拼接(调用方自行 URL 编码;时间戳/数字无需编码)。
+    pub fn set_query(mut self, key: &str, value: &str) -> Self {
+        self.url = upsert_query(&self.url, key, value);
+        self
+    }
+
+    /// [`set_query`](Self::set_query) 的别名(对齐设计稿 `replay(pkt).set("t", now)` 写法)。
+    pub fn set(self, key: &str, value: &str) -> Self {
+        self.set_query(key, value)
+    }
+
+    /// 发送重放请求,结果落进会话 `last_*`(`status()`/`text()`/`json()` 取),成功(2xx)返回 `true`。
+    pub async fn send(self) -> Result<bool> {
+        let ReplayBuilder {
+            session,
+            method,
+            url,
+            headers,
+            body,
+        } = self;
+        // 重放体不强加 Content-Type(原始头里若有就用,run_loop 也不会重复补)。
+        let body = body.map(|b| (b, None));
+        session.run_loop(method, &url, body, headers, true).await
+    }
+}
+
+/// 过滤重放请求头:剔除逐跳/自动管理头(host/content-length/connection/accept-encoding 等)与
+/// HTTP/2 伪头(`:authority` 等),保留签名头、Cookie 等业务头(由后端按 URL 重新设置那些被剔除的)。
+fn replay_filter_headers(headers: &[(String, String)]) -> Vec<(String, String)> {
+    headers
+        .iter()
+        .filter(|(k, _)| {
+            let low = k.to_ascii_lowercase();
+            !low.starts_with(':')
+                && !matches!(
+                    low.as_str(),
+                    "host"
+                        | "content-length"
+                        | "connection"
+                        | "proxy-connection"
+                        | "keep-alive"
+                        | "transfer-encoding"
+                        | "upgrade"
+                        | "accept-encoding"
+                )
+        })
+        .cloned()
+        .collect()
+}
+
+/// 在 URL 上 upsert 一个 query 参数(存在则改值,不存在则追加)。值原样拼接。
+fn upsert_query(url: &str, key: &str, value: &str) -> String {
+    let (base, frag) = match url.split_once('#') {
+        Some((b, f)) => (b, Some(f)),
+        None => (url, None),
+    };
+    let (path, query) = match base.split_once('?') {
+        Some((p, q)) => (p, q),
+        None => (base, ""),
+    };
+    let mut pairs: Vec<(String, String)> = query
+        .split('&')
+        .filter(|s| !s.is_empty())
+        .map(|kv| match kv.split_once('=') {
+            Some((k, v)) => (k.to_string(), v.to_string()),
+            None => (kv.to_string(), String::new()),
+        })
+        .collect();
+    if let Some(slot) = pairs.iter_mut().find(|(k, _)| k == key) {
+        slot.1 = value.to_string();
+    } else {
+        pairs.push((key.to_string(), value.to_string()));
+    }
+    let q = pairs
+        .iter()
+        .map(|(k, v)| {
+            if v.is_empty() {
+                k.clone()
+            } else {
+                format!("{k}={v}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("&");
+    let mut out = if q.is_empty() {
+        path.to_string()
+    } else {
+        format!("{path}?{q}")
+    };
+    if let Some(f) = frag {
+        out.push('#');
+        out.push_str(f);
+    }
+    out
 }
 
 // ── 自管理 cookie jar ───────────────────────────────────────────────────────
@@ -647,6 +849,54 @@ mod tests {
 
     fn url(u: &str) -> reqwest::Url {
         reqwest::Url::parse(u).unwrap()
+    }
+
+    #[test]
+    fn upsert_query_add_update_and_keep_fragment() {
+        // 无 query → 追加。
+        assert_eq!(upsert_query("https://x/a", "t", "1"), "https://x/a?t=1");
+        // 已有其它参数 → 追加(保序)。
+        assert_eq!(
+            upsert_query("https://x/a?b=2", "t", "1"),
+            "https://x/a?b=2&t=1"
+        );
+        // 已有同名 → 改值(就地,不重复)。
+        assert_eq!(
+            upsert_query("https://x/a?t=0&b=2", "t", "9"),
+            "https://x/a?t=9&b=2"
+        );
+        // 保留 fragment。
+        assert_eq!(
+            upsert_query("https://x/a?b=2#frag", "t", "1"),
+            "https://x/a?b=2&t=1#frag"
+        );
+        // 无值参数原样(不强加 =)。
+        assert_eq!(
+            upsert_query("https://x/a?flag", "t", "1"),
+            "https://x/a?flag&t=1"
+        );
+    }
+
+    #[test]
+    fn replay_filter_drops_hop_and_pseudo_headers() {
+        let raw = vec![
+            (":authority".to_string(), "x.com".to_string()),
+            ("Host".to_string(), "x.com".to_string()),
+            ("Content-Length".to_string(), "10".to_string()),
+            ("Accept-Encoding".to_string(), "gzip, br".to_string()),
+            ("X-Ca-Sign".to_string(), "abc".to_string()),
+            ("Cookie".to_string(), "s=1".to_string()),
+        ];
+        let kept = replay_filter_headers(&raw);
+        let names: Vec<String> = kept.iter().map(|(k, _)| k.to_ascii_lowercase()).collect();
+        // 业务头/Cookie 保留。
+        assert!(names.contains(&"x-ca-sign".to_string()));
+        assert!(names.contains(&"cookie".to_string()));
+        // 逐跳/伪头/自动头剔除。
+        assert!(!names.iter().any(|n| n.starts_with(':')));
+        assert!(!names.contains(&"host".to_string()));
+        assert!(!names.contains(&"content-length".to_string()));
+        assert!(!names.contains(&"accept-encoding".to_string()));
     }
 
     #[test]

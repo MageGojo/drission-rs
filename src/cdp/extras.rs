@@ -403,7 +403,11 @@ impl ChromiumTab {
 impl ChromiumSetTab {
     /// 模拟媒体类型与特性(`Emulation.setEmulatedMedia`)。`media` 如 `"print"`/`"screen"`;
     /// `features` 如 `[("prefers-color-scheme","dark")]`。
-    pub async fn emulate_media(&self, media: Option<&str>, features: &[(&str, &str)]) -> Result<()> {
+    pub async fn emulate_media(
+        &self,
+        media: Option<&str>,
+        features: &[(&str, &str)],
+    ) -> Result<()> {
         let feats: Vec<Value> = features
             .iter()
             .map(|(n, v)| json!({ "name": n, "value": v }))
@@ -419,7 +423,8 @@ impl ChromiumSetTab {
     /// 模拟深色 / 浅色模式(`prefers-color-scheme`)。
     pub async fn emulate_dark(&self, dark: bool) -> Result<()> {
         let v = if dark { "dark" } else { "light" };
-        self.emulate_media(None, &[("prefers-color-scheme", v)]).await
+        self.emulate_media(None, &[("prefers-color-scheme", v)])
+            .await
     }
 
     async fn ensure_network(&self) -> Result<()> {
@@ -952,7 +957,10 @@ async fn har_pump(core: Arc<CdpCore>, capture_bodies: bool, state: Arc<Mutex<Har
         }
         match ev.method.as_str() {
             "Network.requestWillBeSent" => {
-                let id = ev.params["requestId"].as_str().unwrap_or_default().to_string();
+                let id = ev.params["requestId"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string();
                 if id.is_empty() {
                     continue;
                 }
@@ -984,7 +992,10 @@ async fn har_pump(core: Arc<CdpCore>, capture_bodies: bool, state: Arc<Mutex<Har
                 }
             }
             "Network.loadingFinished" | "Network.loadingFailed" => {
-                let id = ev.params["requestId"].as_str().unwrap_or_default().to_string();
+                let id = ev.params["requestId"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string();
                 if id.is_empty() {
                     continue;
                 }
@@ -1164,7 +1175,10 @@ impl ChromiumTab {
     ) -> Result<HarPlayer> {
         let table = build_route_table(log.value(), opts.ignore_query);
         self.core
-            .send("Fetch.enable", json!({ "patterns": [{ "urlPattern": "*" }] }))
+            .send(
+                "Fetch.enable",
+                json!({ "patterns": [{ "urlPattern": "*" }] }),
+            )
             .await?;
         let task = tokio::spawn(har_replay_pump(
             self.core.conn.clone(),
@@ -1264,7 +1278,10 @@ fn route_key(method: &str, url: &str, ignore_query: bool) -> String {
 }
 
 /// 从 HAR JSON 建 `路由键 → 响应` 表(同键保留首次出现)。
-fn build_route_table(har: &Value, ignore_query: bool) -> std::collections::HashMap<String, RespSpec> {
+fn build_route_table(
+    har: &Value,
+    ignore_query: bool,
+) -> std::collections::HashMap<String, RespSpec> {
     let mut map = std::collections::HashMap::new();
     let Some(entries) = har["log"]["entries"].as_array() else {
         return map;
@@ -1289,11 +1306,14 @@ fn build_route_table(har: &Value, ignore_query: bool) -> std::collections::HashM
         } else {
             text.as_bytes().to_vec()
         };
-        map.insert(key, RespSpec {
-            status,
-            headers,
-            body,
-        });
+        map.insert(
+            key,
+            RespSpec {
+                status,
+                headers,
+                body,
+            },
+        );
     }
     map
 }
@@ -1428,7 +1448,10 @@ mod tests {
         let h = json!({ "Content-Type": "text/html", "X-N": 5 });
         let arr = headers_to_har(&h);
         assert_eq!(arr.len(), 2);
-        assert!(arr.iter().all(|e| e.get("name").is_some() && e.get("value").is_some()));
+        assert!(
+            arr.iter()
+                .all(|e| e.get("name").is_some() && e.get("value").is_some())
+        );
     }
 
     #[test]
@@ -1472,7 +1495,10 @@ mod tests {
             route_key("get", "http://x/a?b=1", false),
             "GET\u{0}http://x/a?b=1"
         );
-        assert_eq!(route_key("GET", "http://x/a?b=1", true), "GET\u{0}http://x/a");
+        assert_eq!(
+            route_key("GET", "http://x/a?b=1", true),
+            "GET\u{0}http://x/a"
+        );
     }
 
     #[test]

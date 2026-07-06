@@ -51,10 +51,32 @@ A single `tokio` async API gives you, at once:
 see [`install/`](install/) — macOS: double-click `install-mac.command`; Windows: double-click `install-windows.bat`. Then `cargo add drission`.
 **Prerequisite**: Chrome / Edge installed (point to it via `CHROME_BIN`); OCR examples auto-download the model to cache on first run.
 
+## 🤖 `drs` CLI / MCP (AI Agent entry point)
+
+This repository now ships the `drs` command-line runtime and a stdio MCP server, so AI agents and automation scripts can drive a real browser through stable JSON:
+
+```bash
+cargo install --path crates/drission-cli --bin drs
+drs serve --backend cdp --headless
+drs --json open https://example.com
+drs ax --outline
+drs mcp --backend cdp --headless
+```
+
+The CLI lives in the same workspace but keeps its own dependencies, so ordinary `drission` library users do not inherit `clap`, `rmcp`, or daemon/runtime dependencies. See [`docs/CLI.md`](docs/CLI.md).
+
 ---
 
 ## 🆕 New in v0.3.1
 
+> **Development (Unreleased)** — standard browser features plus AI-facing runtime:
+>
+> - **`drs` CLI / MCP (AI Agent runtime)**: new workspace package `drission-cli`, binary `drs`. It supports `drs serve` as a local daemon, stable `drs --json` output, page observation/actions/network listen/screenshots/Cloudflare pass commands, and `drs mcp` as a stdio MCP server. Details: [`docs/CLI.md`](docs/CLI.md).
+> - **Recorder → Rust codegen**: `tab.recorder()` records page operations and emits runnable DrissionPage-style Rust code, covering click/fill/check/select/key/hover/drag/iframe/multi-tab flows.
+> - **Accessibility snapshots**: `tab.ax_tree()` / `ax_snapshot()` compress a page into a `role "name"` semantic tree for robust assertions or LLM context.
+> - **Runtime fingerprint snapshot**: dump UA / platform / timezone / screen / WebGL / canvas signals to verify the browser persona actually changed.
+> - **CDP standard-feature fill-in**: PDF / MHTML / `set_content` / HAR record + replay / `expose_function` / media, network and CPU emulation / mobile device presets / permissions / storage helpers / `wait().new_tab`. See [`docs/标配补齐.md`](docs/标配补齐.md) and [`docs/录制与无障碍.md`](docs/录制与无障碍.md).
+>
 > Full history in [CHANGELOG.md](CHANGELOG.md). **v0.3.1** focuses on **Windows real-machine click / bypass precision** and **headless anti-detect authenticity**:
 >
 > - **Windows high-DPI click alignment**: force `device-scale=1`, fixing the physical-pixel offset under 125% / 150% scaling that made Cloudflare Turnstile / click-word captchas "unclickable".
@@ -173,8 +195,11 @@ println!("move {:.0}px, confidence {:.2}", gap.displace, gap.confidence);
 [dependencies]
 drission = "0.3"                                           # default = Chromium / CDP (Google Chrome)
 
-# Want the Camoufox anti-detect engine + all high-level capabilities? enable camoufox:
-# drission = { version = "0.3", features = ["camoufox", "ocr", "slider", "signer", "impersonate"] }
+# Want the Camoufox anti-detect engine + all high-level capabilities? disable default cdp, then enable camoufox:
+# drission = { version = "0.3", default-features = false, features = ["camoufox", "ocr", "slider", "signer", "impersonate"] }
+#
+# Want default CDP plus OCR / signer only:
+# drission = { version = "0.3", features = ["ocr", "signer"] }
 ```
 
 | feature | capability | deps | default |
@@ -210,7 +235,7 @@ async fn main() -> drission::Result<()> {
 }
 ```
 
-**Camoufox anti-detect engine** (`--features camoufox`) — auto-downloaded, with shield bypass / env-dump / pool / slider and all high-level capabilities:
+**Camoufox anti-detect engine** (`--no-default-features --features camoufox`) — auto-downloaded, with shield bypass / env-dump / pool / slider and all high-level capabilities:
 
 ```rust
 use drission::prelude::*;
@@ -232,15 +257,15 @@ async fn main() -> drission::Result<()> {
 }
 ```
 
-Examples (Camoufox-based examples need `--features camoufox`):
+Examples (Camoufox-based examples need a single-backend `--no-default-features` build):
 
 ```bash
 cargo run --example cdp_demo                                  # default Chromium / CDP backend (Google Chrome)
-cargo run --example quickstart    --features camoufox         # Camoufox minimal loop
-cargo run --example pool_crawl    --features camoufox         # high-concurrency pool + proxy/fingerprint rotation + resume
-cargo run --example ocr_captcha   --features camoufox,ocr     # captcha OCR
-cargo run --example geetest_slide --features slider           # GeeTest slider (slider pulls in camoufox)
-cargo run --example dx_slide      --features slider           # Dingxiang slider-gap recognition (HL=0 to see the UI)
+cargo run --example quickstart    --no-default-features --features camoufox      # Camoufox minimal loop
+cargo run --example pool_crawl    --no-default-features --features camoufox      # high-concurrency pool + proxy/fingerprint rotation + resume
+cargo run --example ocr_captcha   --no-default-features --features camoufox,ocr  # captcha OCR
+cargo run --example geetest_slide --no-default-features --features slider        # GeeTest slider (slider pulls in camoufox)
+cargo run --example dx_slide      --no-default-features --features slider        # Dingxiang slider-gap recognition (HL=0 to see the UI)
 cargo run --example env_signer    --features signer           # embedded-QuickJS pure-script signing (no Node)
 ```
 
@@ -251,7 +276,7 @@ See the full [Examples index (48+)](examples/README.md).
 ## 🖥️ Supported platforms & browsers
 
 - **Platforms**: macOS (arm64, primary) · Linux · **Windows (stable)** — CDP launches the local browser directly; the Camoufox backend uses named-pipe transport.
-- **Browser**: **Google Chrome by default** (also Edge / Brave / Chromium / Electron, CDP) with smart path detection (Windows registry `App Paths` + user-level `%LOCALAPPDATA%` + `PATH`, mirroring DrissionPage). Optional [Camoufox](https://github.com/daijro/camoufox) (anti-detect Firefox fork, `--features camoufox`, **auto-downloaded** on first run).
+- **Browser**: **Google Chrome by default** (also Edge / Brave / Chromium / Electron, CDP) with smart path detection (Windows registry `App Paths` + user-level `%LOCALAPPDATA%` + `PATH`, mirroring DrissionPage). Optional [Camoufox](https://github.com/daijro/camoufox) (anti-detect Firefox fork, use `default-features = false, features = ["camoufox"]`, **auto-downloaded** on first run).
 - **Protocol**: the Chromium backend speaks **CDP** (Chrome DevTools Protocol); Camoufox speaks Firefox's **Juggler** (this library implements its own async Juggler client on `tokio`).
 - **Rust**: ≥ 1.85 (edition 2024).
 
@@ -266,7 +291,7 @@ A: The API is deliberately aligned with DrissionPage, so migrating from Python D
 A: No. Character OCR runs **offline** with ddddocr pretrained models + pure-Rust inference; slider-gap distance is a local image algorithm. Only the model is auto-downloaded once to cache.
 
 **Q: Does it support Chrome? Which browser is the default?**
-A: **Google Chrome is the default** (Chromium / CDP backend, out of the box; also Edge / Brave / Chromium / Electron). The local Chrome path is auto-detected (`CHROME_BIN` / `DRISSION_CHROME` → install paths → **Windows registry `App Paths`** → `PATH`, mirroring DrissionPage); if not found, pin it via `ChromiumBrowser::launch_with(path, headless)`. For the Firefox anti-detect engine, enable `--features camoufox`.
+A: **Google Chrome is the default** (Chromium / CDP backend, out of the box; also Edge / Brave / Chromium / Electron). The local Chrome path is auto-detected (`CHROME_BIN` / `DRISSION_CHROME` → install paths → **Windows registry `App Paths`** → `PATH`, mirroring DrissionPage); if not found, pin it via `ChromiumBrowser::launch_with(path, headless)`. For the Firefox anti-detect engine, disable default cdp and enable `camoufox`.
 
 **Q: Can it pass Cloudflare?**
 A: Yes. `tab.pass_cloudflare()` supports interactive trusted Turnstile clicks and non-interactive auto-pass.

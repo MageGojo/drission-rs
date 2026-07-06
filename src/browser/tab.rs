@@ -1220,7 +1220,10 @@ impl Tab {
     /// 把页面压成 `role "name"` 语义树,用于抗改版断言或喂 LLM。与 CDP 后端 `ax_snapshot()` 同实现、
     /// 结果一致(Camoufox 无 CDP 的 `Accessibility` 域,故不提供 `ax_tree()` 原生版)。
     pub async fn ax_snapshot(&self) -> Result<crate::a11y::AxTree> {
-        let v = self.core.evaluate(crate::a11y::AX_SNAPSHOT_JS, true).await?;
+        let v = self
+            .core
+            .evaluate(crate::a11y::AX_SNAPSHOT_JS, true)
+            .await?;
         Ok(crate::a11y::build_from_snapshot(&v))
     }
 

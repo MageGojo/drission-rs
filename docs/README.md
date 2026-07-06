@@ -12,6 +12,7 @@
 |---|---|---|
 | [设计.md](设计.md) | 自顶向下分层架构、Juggler 协议选型、异步并发模型、启动引导、监听/拦截/过盾接线、截图录像、WS 接管、吐环境、CDP 后端 | 想理解内部实现 / 参与贡献的人 |
 | [API映射.md](API映射.md) | **DrissionPage(Python)→ drission(Rust)** 逐条 API 对照表,覆盖启动、页面、元素、定位、监听、拦截、滑块、动作链、iframe 等 | 从 DrissionPage 迁移、想快速查等价写法的人 |
+| [CLI.md](CLI.md) | `drs` CLI / MCP 使用说明:daemon、JSON 输出、AI Agent 调用、stdio MCP 工具、OCR 命令 | 想让 AI 或脚本直接操作浏览器的人 |
 | [并发池.md](并发池.md) | `BrowserPool` / 代理池 / 指纹池 / 断点续抓 的设计:两层指纹约束、轮换策略、健康自愈、Checkpoint、踩坑记录 | 做高并发规模化采集的人 |
 | [长监听与滑动.md](长监听与滑动.md) | 长会话持续监听(后台抽取 + 流式 API,不丢包)+ 输入驱动翻页(`press_key`/`wheel`)的设计 | 需要连续抓取 SPA 翻页签名(如抖音 feed)的人 |
 | [标配补齐.md](标配补齐.md) | 对标 Playwright/Puppeteer/DrissionPage 的通用能力:PDF/MHTML/set_content、HAR 录制+回放、expose_function、媒体·网络·CPU 模拟、移动端设备预设、权限/storage、wait 补齐(及两端可行性) | 想要"开箱即用"的浏览器标配能力的人 |

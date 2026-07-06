@@ -121,14 +121,17 @@ fn decrypt_key_v11(key32: &[u8], mh: i64, token_id: &str) -> Result<Vec<u8>> {
 
 /// 生成 polyv 客户端 pid:`<毫秒时间戳>X<随机数>`。
 fn gen_pid() -> String {
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
     let rand = 1_000_000 + (now.subsec_nanos() as u64 % 1_000_000);
     format!("{}X{}", now.as_millis(), rand)
 }
 
 /// 在 URL 上设置/覆盖若干 query 参数(已存在的同名键被替换)。
 fn set_query(base: &str, params: &[(&str, &str)]) -> Result<String> {
-    let mut url = reqwest::Url::parse(base).map_err(|e| Error::msg(format!("URL 解析失败: {e}")))?;
+    let mut url =
+        reqwest::Url::parse(base).map_err(|e| Error::msg(format!("URL 解析失败: {e}")))?;
     let keys: Vec<&str> = params.iter().map(|(k, _)| *k).collect();
     let kept: Vec<(String, String)> = url
         .query_pairs()
@@ -158,7 +161,9 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt().with_env_filter("warn").init();
 
     let section = std::env::args().nth(1).unwrap_or_else(|| "35167".into());
-    let quality_env = std::env::var("QUALITY").ok().and_then(|s| s.parse::<usize>().ok());
+    let quality_env = std::env::var("QUALITY")
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok());
 
     let out = std::env::current_dir()?.join("captures").join("luffycity");
     let work = out.join(format!("protocol_{section}"));
@@ -196,8 +201,14 @@ async fn main() -> Result<()> {
 
     // ── [1] secure JSON → 播放器配置 ────────────────────────────────────────────
     let secure_url = format!("https://player.polyv.net/secure/{vid}.json");
-    let secure: Value = headers(client.get(&secure_url)).send().await?.json().await?;
-    let body_hex = secure["body"].as_str().ok_or_else(|| Error::msg("secure 无 body"))?;
+    let secure: Value = headers(client.get(&secure_url))
+        .send()
+        .await?
+        .json()
+        .await?;
+    let body_hex = secure["body"]
+        .as_str()
+        .ok_or_else(|| Error::msg("secure 无 body"))?;
     let uri_hash = md5_hex(vid.as_bytes());
     let enc = hex::decode(body_hex).map_err(|e| Error::msg(format!("secure body 非 hex: {e}")))?;
     let dec_b64 = aes_cbc_dec(uri_hash[..16].as_bytes(), uri_hash[16..32].as_bytes(), &enc)?;
@@ -209,7 +220,9 @@ async fn main() -> Result<()> {
 
     let seed = vj["seed"].as_i64().unwrap_or(0);
     if seed == 0 {
-        return Err(Error::msg("该视频未加密(seed=0),直接取 mp4 即可,本例只处理 HLS 加密"));
+        return Err(Error::msg(
+            "该视频未加密(seed=0),直接取 mp4 即可,本例只处理 HLS 加密",
+        ));
     }
     if !vj["hlsPrivate"].is_null() {
         return Err(Error::msg(format!(
@@ -218,11 +231,15 @@ async fn main() -> Result<()> {
             vj["hlsPrivate"]
         )));
     }
-    let seed_const = vj["seed_const"].as_i64().ok_or_else(|| Error::msg("配置无 seed_const"))?;
+    let seed_const = vj["seed_const"]
+        .as_i64()
+        .ok_or_else(|| Error::msg("配置无 seed_const"))?;
     let title = vj["title"].as_str().unwrap_or(lesson);
     let hls302 = vj["hls302"].as_str().unwrap_or("");
     let hls_list = if hls302 == "1" {
-        vj.get("hls2pc").and_then(Value::as_array).or_else(|| vj.get("hls2").and_then(Value::as_array))
+        vj.get("hls2pc")
+            .and_then(Value::as_array)
+            .or_else(|| vj.get("hls2").and_then(Value::as_array))
     } else {
         vj.get("hls").and_then(Value::as_array)
     }
@@ -230,9 +247,17 @@ async fn main() -> Result<()> {
     if hls_list.is_empty() {
         return Err(Error::msg("hls 清单为空"));
     }
-    let qi = quality_env.unwrap_or(hls_list.len() - 1).min(hls_list.len() - 1);
-    let manifest_url = hls_list[qi].as_str().ok_or_else(|| Error::msg("hls 清单项非字符串"))?;
-    println!("\n[1] 配置    : 《{title}》 seed_const={seed_const} 清晰度档={}/{}", qi + 1, hls_list.len());
+    let qi = quality_env
+        .unwrap_or(hls_list.len() - 1)
+        .min(hls_list.len() - 1);
+    let manifest_url = hls_list[qi]
+        .as_str()
+        .ok_or_else(|| Error::msg("hls 清单项非字符串"))?;
+    println!(
+        "\n[1] 配置    : 《{title}》 seed_const={seed_const} 清晰度档={}/{}",
+        qi + 1,
+        hls_list.len()
+    );
 
     // ── [2] .pdx → 真实 m3u8 ────────────────────────────────────────────────────
     let pdx_key = md5_hex(format!("{HLS_CONST_V1112}{seed_const}").as_bytes());
@@ -242,7 +267,11 @@ async fn main() -> Result<()> {
     )?;
     let pdx: Value = headers(client.get(&pdx_url)).send().await?.json().await?;
     let pdx_ct = B64
-        .decode(pdx["body"].as_str().ok_or_else(|| Error::msg(".pdx 无 body"))?)
+        .decode(
+            pdx["body"]
+                .as_str()
+                .ok_or_else(|| Error::msg(".pdx 无 body"))?,
+        )
         .map_err(|e| Error::msg(format!(".pdx body 非 base64: {e}")))?;
     let m3u8 = aes_cbc_dec(pdx_key[1..17].as_bytes(), &HLS_IV_V1112, &pdx_ct)?;
     let m3u8 = String::from_utf8_lossy(&m3u8).into_owned();
@@ -256,7 +285,10 @@ async fn main() -> Result<()> {
             for attr in rest.split(',') {
                 if let Some(u) = attr.strip_prefix("URI=") {
                     key_uri = Some(u.trim_matches('"').to_string());
-                } else if let Some(v) = attr.strip_prefix("IV=0x").or_else(|| attr.strip_prefix("IV=0X")) {
+                } else if let Some(v) = attr
+                    .strip_prefix("IV=0x")
+                    .or_else(|| attr.strip_prefix("IV=0X"))
+                {
                     iv = hex::decode(v.trim()).ok();
                 }
             }
@@ -266,7 +298,11 @@ async fn main() -> Result<()> {
     }
     let key_uri = key_uri.ok_or_else(|| Error::msg("m3u8 无 #EXT-X-KEY URI"))?;
     let iv = iv.ok_or_else(|| Error::msg("m3u8 无 IV"))?;
-    println!("[2] m3u8    : {} 个分片  IV={}", ts_urls.len(), hex::encode(&iv));
+    println!(
+        "[2] m3u8    : {} 个分片  IV={}",
+        ts_urls.len(),
+        hex::encode(&iv)
+    );
 
     // ── [3] playsafe key(32B)→ 真 16B key ─────────────────────────────────────
     let mut ku = reqwest::Url::parse(&key_uri).map_err(|e| Error::msg(format!("key URI: {e}")))?;
@@ -279,29 +315,38 @@ async fn main() -> Result<()> {
             key32.len()
         )));
     }
-    let token_id = token.rsplit('-').next().unwrap_or("").get(1..).unwrap_or("");
+    let token_id = token
+        .rsplit('-')
+        .next()
+        .unwrap_or("")
+        .get(1..)
+        .unwrap_or("");
     let real_key = decrypt_key_v11(&key32, seed_const, token_id)?;
     save(&work, "key.bin", &real_key)?;
-    println!("[3] key     : 32B 包裹 → 真 16B key {}", hex::encode(&real_key));
+    println!(
+        "[3] key     : 32B 包裹 → 真 16B key {}",
+        hex::encode(&real_key)
+    );
 
     // ── [4] 下载 + 解密所有 .ts(并发),顺序拼接 ─────────────────────────────────
     println!("\n[4] 下载解密 {} 个分片(并发 16)...", ts_urls.len());
     let total = ts_urls.len();
-    let mut frags: Vec<(usize, Vec<u8>)> = stream::iter(ts_urls.into_iter().enumerate().map(|(i, u)| {
-        let client = client.clone();
-        let key = real_key.clone();
-        let iv = iv.clone();
-        async move {
-            let enc = headers(client.get(&u)).send().await?.bytes().await?;
-            let dec = aes_cbc_dec(&key, &iv, &enc)?;
-            Ok::<(usize, Vec<u8>), Error>((i, dec))
-        }
-    }))
-    .buffer_unordered(16)
-    .collect::<Vec<_>>()
-    .await
-    .into_iter()
-    .collect::<Result<Vec<_>>>()?;
+    let mut frags: Vec<(usize, Vec<u8>)> =
+        stream::iter(ts_urls.into_iter().enumerate().map(|(i, u)| {
+            let client = client.clone();
+            let key = real_key.clone();
+            let iv = iv.clone();
+            async move {
+                let enc = headers(client.get(&u)).send().await?.bytes().await?;
+                let dec = aes_cbc_dec(&key, &iv, &enc)?;
+                Ok::<(usize, Vec<u8>), Error>((i, dec))
+            }
+        }))
+        .buffer_unordered(16)
+        .collect::<Vec<_>>()
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>>>()?;
     frags.sort_by_key(|(i, _)| *i);
 
     let merged_ts = out.join(format!("{section}.protocol.ts"));
@@ -313,14 +358,28 @@ async fn main() -> Result<()> {
         }
     }
     let ts_bytes: u64 = std::fs::metadata(&merged_ts).map(|m| m.len()).unwrap_or(0);
-    println!("    拼接     : {}/{} 分片 → {} ({:.2} MB)", frags.len(), total, merged_ts.display(), ts_bytes as f64 / 1e6);
+    println!(
+        "    拼接     : {}/{} 分片 → {} ({:.2} MB)",
+        frags.len(),
+        total,
+        merged_ts.display(),
+        ts_bytes as f64 / 1e6
+    );
 
     // ── ffmpeg remux 成 mp4(分片是原始 TS,-c copy 即可;无 ffmpeg 则保留 .ts)──────
     let final_mp4 = out.join(format!("{section}.protocol.mp4"));
     let ff = Command::new("ffmpeg")
         .args([
-            "-y", "-hide_banner", "-loglevel", "warning", "-i",
-            &merged_ts.to_string_lossy(), "-c", "copy", "-movflags", "+faststart",
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "warning",
+            "-i",
+            &merged_ts.to_string_lossy(),
+            "-c",
+            "copy",
+            "-movflags",
+            "+faststart",
             &final_mp4.to_string_lossy(),
         ])
         .status();
@@ -329,16 +388,28 @@ async fn main() -> Result<()> {
     match ff {
         Ok(s) if s.success() && final_mp4.exists() => {
             let sz = std::fs::metadata(&final_mp4).map(|m| m.len()).unwrap_or(0);
-            println!("最终视频   : ✅ {} ({:.2} MB)", final_mp4.display(), sz as f64 / 1e6);
+            println!(
+                "最终视频   : ✅ {} ({:.2} MB)",
+                final_mp4.display(),
+                sz as f64 / 1e6
+            );
             let _ = std::fs::remove_file(&merged_ts);
             report_probe(&final_mp4);
         }
         _ => {
-            println!("最终视频   : ✅ {}(未找到 ffmpeg,保留可直接播放的 TS)", merged_ts.display());
+            println!(
+                "最终视频   : ✅ {}(未找到 ffmpeg,保留可直接播放的 TS)",
+                merged_ts.display()
+            );
         }
     }
-    println!("中间产物   : {}/(video_config.json / playlist.m3u8 / key.bin)", work.display());
-    println!("说明       : 全程无 Chrome、无 JS 引擎、无 WASM —— 直接逆 polyv v11 的 MD5/AES 链路解密。");
+    println!(
+        "中间产物   : {}/(video_config.json / playlist.m3u8 / key.bin)",
+        work.display()
+    );
+    println!(
+        "说明       : 全程无 Chrome、无 JS 引擎、无 WASM —— 直接逆 polyv v11 的 MD5/AES 链路解密。"
+    );
     println!("===========================================================");
     Ok(())
 }
@@ -347,9 +418,15 @@ async fn main() -> Result<()> {
 fn report_probe(path: &PathBuf) {
     if let Ok(o) = Command::new("ffprobe")
         .args([
-            "-v", "error", "-show_entries", "format=duration",
-            "-show_entries", "stream=codec_type,codec_name,width,height",
-            "-of", "default=noprint_wrappers=1", &path.to_string_lossy(),
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-show_entries",
+            "stream=codec_type,codec_name,width,height",
+            "-of",
+            "default=noprint_wrappers=1",
+            &path.to_string_lossy(),
         ])
         .output()
         && o.status.success()

@@ -136,7 +136,9 @@ async fn main() -> drission::Result<()> {
 
         if dump {
             let truth_idx = cand.iter().position(|c| c == truth).unwrap_or(0);
-            let tpl_top_i = (0..tpl.len()).max_by(|&a, &b| tpl[a].total_cmp(&tpl[b])).unwrap_or(0);
+            let tpl_top_i = (0..tpl.len())
+                .max_by(|&a, &b| tpl[a].total_cmp(&tpl[b]))
+                .unwrap_or(0);
             println!(
                 "[dump] {file}  「{truth}」  「{}」{:.2}  {:.2}  「{}」{:.2}  gate={:.2}",
                 p_ocr, ocr_top, aff[truth_idx], cand[tpl_top_i], tpl[tpl_top_i], gate
@@ -168,8 +170,17 @@ async fn main() -> drission::Result<()> {
         }
     }
 
-    let pct = |k: usize| if n == 0 { 0.0 } else { 100.0 * k as f32 / n as f32 };
-    println!("════════════════ 结果(N={n} · {} 选 1)════════════════", cand.len());
+    let pct = |k: usize| {
+        if n == 0 {
+            0.0
+        } else {
+            100.0 * k as f32 / n as f32
+        }
+    };
+    println!(
+        "════════════════ 结果(N={n} · {} 选 1)════════════════",
+        cand.len()
+    );
     println!("纯 OCR             {ocr_ok:>3}/{n}  ({:.1}%)", pct(ocr_ok));
     println!("仅字形模板         {tpl_ok:>3}/{n}  ({:.1}%)", pct(tpl_ok));
     println!(
@@ -199,13 +210,19 @@ async fn main() -> drission::Result<()> {
     }
 
     if !rescued.is_empty() {
-        println!("\n门控融合纠正了纯 OCR 的误读({} 例,正是第二信号的价值):", rescued.len());
+        println!(
+            "\n门控融合纠正了纯 OCR 的误读({} 例,正是第二信号的价值):",
+            rescued.len()
+        );
         for (f, t, o) in &rescued {
             println!("  {f}: 真「{t}」· 纯OCR误判「{o}」→ 门控融合纠正 ✓");
         }
     }
     if !gated_wrong.is_empty() {
-        println!("\n门控融合仍判错({} 例 → 攒样本 / 自训的重点目标):", gated_wrong.len());
+        println!(
+            "\n门控融合仍判错({} 例 → 攒样本 / 自训的重点目标):",
+            gated_wrong.len()
+        );
         for (f, t, p) in &gated_wrong {
             println!("  {f}: 真「{t}」→ 判「{p}」");
         }

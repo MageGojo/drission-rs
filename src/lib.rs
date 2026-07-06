@@ -94,7 +94,10 @@ pub mod prelude {
     pub use crate::keys::{KeyInput, Keys};
     pub use crate::locator::{Query, parse as parse_locator};
     pub use crate::net::{DataPacket, ListenFilter, RequestData, ResponseData, ResumeOptions};
-    pub use crate::scrape::{records_to_csv, records_to_json, rows_to_csv, write_csv, write_json};
+    pub use crate::scrape::{
+        TableOptions, print_table, print_table_with_options, records_to_csv, records_to_json,
+        rows_to_csv, rows_to_table, rows_to_table_with_options, write_csv, write_json,
+    };
     pub use crate::static_element::StaticElement;
 
     // ════════════════════════════════════════════════════════════════════
@@ -109,6 +112,13 @@ pub mod prelude {
     /// 作 canonical(两后端并存时这两个名归 camoufox,cdp 用 `Chromium*` 显式名)。
     #[cfg(feature = "cdp")]
     pub use crate::cdp::ChromiumPool as Pool;
+    /// CDP「主动逆向」能力类型(调试器/调用栈/脚本源码/Hook;Chromium 专有,仅 cdp 后端)。
+    /// 详见 `docs/逆向增强.md`。
+    #[cfg(feature = "cdp")]
+    pub use crate::cdp::{
+        CallFrame, ChildTarget, ChromiumDebugger, ChromiumHook, ChromiumScripts, HookHit,
+        HookSession, PausedStack, ScriptInfo, ScriptMatch, beautify_js,
+    };
     #[cfg(feature = "cdp")]
     pub use crate::cdp::{
         CdpIntercept as Intercept, CdpInterceptedRequest as InterceptedRequest,
@@ -117,9 +127,8 @@ pub mod prelude {
         ChromiumElementRect as ElementRect, ChromiumElementWait as ElementWait,
         ChromiumFrame as Frame, ChromiumOptions as BrowserOptions, ChromiumPage as Page,
         ChromiumRecorder as Recorder, ChromiumScreencast as Screencast, ChromiumScroll as Scroll,
-        ChromiumSetTab as SetTab,
-        ChromiumShadowRoot as ShadowRoot, ChromiumTab as Tab, ChromiumWait as Wait,
-        ChromiumWindow as Window, ChromiumWsListener as WsListener,
+        ChromiumSetTab as SetTab, ChromiumShadowRoot as ShadowRoot, ChromiumTab as Tab,
+        ChromiumWait as Wait, ChromiumWindow as Window, ChromiumWsListener as WsListener,
     };
     #[cfg(all(feature = "cdp", not(feature = "camoufox")))]
     pub use crate::cdp::{
@@ -218,7 +227,9 @@ pub mod prelude {
     #[cfg(any(feature = "camoufox", feature = "cdp"))]
     pub use crate::pool::{Checkpoint, RetryPolicy, RotateStrategy};
     #[cfg(feature = "camoufox")]
-    pub use crate::session::{BrowserProfile, PostData, SessionOptions, SessionPage};
+    pub use crate::session::{
+        BrowserProfile, PostData, ReplayBuilder, SessionOptions, SessionPage,
+    };
     #[cfg(feature = "camoufox")]
     pub use crate::web_page::{PageMode, WebPage};
 

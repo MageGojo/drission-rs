@@ -121,7 +121,10 @@ impl AxTree {
 
     /// 按**角色**精确检索(如 `"button"`)。
     pub fn find_by_role(&self, role: &str) -> Vec<&AxNode> {
-        self.nodes().into_iter().filter(|n| n.role == role).collect()
+        self.nodes()
+            .into_iter()
+            .filter(|n| n.role == role)
+            .collect()
     }
 
     /// 按**可见名**子串检索(大小写敏感)。
@@ -170,7 +173,11 @@ pub fn build_from_cdp(result: &Value) -> AxTree {
         let properties = parse_cdp_props(&n["properties"]);
         let child_ids: Vec<String> = n["childIds"]
             .as_array()
-            .map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(str::to_string))
+                    .collect()
+            })
             .unwrap_or_default();
         for c in &child_ids {
             has_parent.insert(c.clone(), true);
@@ -255,8 +262,8 @@ fn ax_field(field: &Value) -> String {
 /// 解析 CDP AX `properties`:`[{name, value:{value}}]` → 仅保留若干**关键状态**(避免噪声)。
 fn parse_cdp_props(props: &Value) -> BTreeMap<String, String> {
     const KEEP: &[&str] = &[
-        "checked", "disabled", "expanded", "focused", "selected", "pressed", "required",
-        "level", "invalid",
+        "checked", "disabled", "expanded", "focused", "selected", "pressed", "required", "level",
+        "invalid",
     ];
     let mut out = BTreeMap::new();
     if let Some(arr) = props.as_array() {
@@ -442,7 +449,10 @@ mod tests {
         ]});
         let t = build_from_cdp(&r);
         // checked=true 保留;disabled=false 略去;live 不在白名单。
-        assert_eq!(t.root.properties.get("checked").map(String::as_str), Some("true"));
+        assert_eq!(
+            t.root.properties.get("checked").map(String::as_str),
+            Some("true")
+        );
         assert!(!t.root.properties.contains_key("disabled"));
         assert!(!t.root.properties.contains_key("live"));
     }
@@ -488,7 +498,10 @@ mod tests {
         assert_eq!(t.root.children.len(), 2);
         let tb = &t.root.children[0];
         assert_eq!(tb.value.as_deref(), Some("bob"));
-        assert_eq!(tb.properties.get("disabled").map(String::as_str), Some("true"));
+        assert_eq!(
+            tb.properties.get("disabled").map(String::as_str),
+            Some("true")
+        );
     }
 
     #[test]

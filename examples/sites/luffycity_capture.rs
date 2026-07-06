@@ -45,7 +45,10 @@ async fn main() -> drission::Result<()> {
     let url = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "https://www.luffycity.com/play/35167".into());
-    let headless = !matches!(std::env::var("HL").ok().as_deref(), Some("0") | Some("false"));
+    let headless = !matches!(
+        std::env::var("HL").ok().as_deref(),
+        Some("0") | Some("false")
+    );
 
     let out = std::env::current_dir()?.join("captures").join("luffycity");
     std::fs::create_dir_all(&out)?;
@@ -246,12 +249,15 @@ async fn main() -> drission::Result<()> {
     if let Value::Object(_) = &course_outline {
         println!(
             "课程大纲   : {} 章 / {} 节,总时长 {}",
-            course_outline["chapter_count"], course_outline["section_count"],
+            course_outline["chapter_count"],
+            course_outline["section_count"],
             course_outline["total_video_time"].as_str().unwrap_or("?")
         );
     }
     match (&polyv_vid, &polyv_secure_url) {
-        (Some(vid), Some(_)) => println!("polyv vid  : {vid}（secure JSON 加密体 → polyv_secure.json）"),
+        (Some(vid), Some(_)) => {
+            println!("polyv vid  : {vid}（secure JSON 加密体 → polyv_secure.json）")
+        }
         _ => println!("polyv vid  : ❌ 未抓到 secure JSON"),
     }
     if auth_info.is_object() {
@@ -264,7 +270,10 @@ async fn main() -> drission::Result<()> {
     if playlist_urls.is_empty() {
         println!("播放列表   : ❌ 未抓到 .pdx/.m3u8（视频未起播）");
     } else {
-        println!("播放列表   : ✅ {} 个 polyv .pdx(= 加密 m3u8)", playlist_urls.len());
+        println!(
+            "播放列表   : ✅ {} 个 polyv .pdx(= 加密 m3u8)",
+            playlist_urls.len()
+        );
         for u in playlist_urls.iter().take(3) {
             println!("            {}", u.chars().take(130).collect::<String>());
         }
@@ -276,7 +285,9 @@ async fn main() -> drission::Result<()> {
     println!("视频分片   : {} 个 .ts(加密,URL 已记录)", ts_urls.len());
     println!("\n产物       : summary.json / course_outline.json / playlist_*.pdx / requests.jsonl");
     println!("说明       : polyv 的 .pdx 与 .ts 仍是 polyv 加密;浏览器内 hls.js 已自解播放。");
-    println!("            纯监听即拿到【课程全内容 + 完整可播清单(列表/密钥/分片)】,无需自己解密。");
+    println!(
+        "            纯监听即拿到【课程全内容 + 完整可播清单(列表/密钥/分片)】,无需自己解密。"
+    );
     println!("==================================================");
 
     browser.quit().await?;
@@ -288,7 +299,11 @@ fn extract_vid(url: &str) -> String {
     url.rsplit('/')
         .next()
         .and_then(|f| f.split('?').next())
-        .map(|f| f.trim_end_matches("_d.json").trim_end_matches(".json").to_string())
+        .map(|f| {
+            f.trim_end_matches("_d.json")
+                .trim_end_matches(".json")
+                .to_string()
+        })
         .unwrap_or_default()
 }
 

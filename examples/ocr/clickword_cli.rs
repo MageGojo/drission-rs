@@ -35,7 +35,13 @@ async fn main() -> drission::Result<()> {
         for (i, (b, _png)) in crops.iter().enumerate() {
             let (cx, cy) = b.center();
             rows.push([
-                i as i64, cx as i64, cy as i64, b.x1 as i64, b.y1 as i64, b.x2 as i64, b.y2 as i64,
+                i as i64,
+                cx as i64,
+                cy as i64,
+                b.x1 as i64,
+                b.y1 as i64,
+                b.x2 as i64,
+                b.y2 as i64,
                 (b.score * 100.0) as i64,
             ]);
         }
@@ -45,16 +51,25 @@ async fn main() -> drission::Result<()> {
                 r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7]
             );
         }
-        println!("{}", serde_json::to_string(&rows).unwrap_or_else(|_| "[]".into()));
+        println!(
+            "{}",
+            serde_json::to_string(&rows).unwrap_or_else(|_| "[]".into())
+        );
         return Ok(());
     }
 
     // 调试:DEBUG=1 时 dump 所有检测框 + 每个框对各目标字的 OCR 亲和度 / 模板相似度矩阵(定位误配根因)。
     if std::env::var("DEBUG").is_ok() {
         let chars: Vec<char> = targets.iter().filter_map(|s| s.chars().next()).collect();
-        eprintln!("[debug] 目标字: {chars:?}  样本库={}", if cw.bank.is_some() { "有" } else { "无" });
+        eprintln!(
+            "[debug] 目标字: {chars:?}  样本库={}",
+            if cw.bank.is_some() { "有" } else { "无" }
+        );
         if let Ok(crops) = cw.crops(&bytes) {
-            eprintln!("[debug] 检测到 {} 个框(框 x1,y1-x2,y2 score | 各目标 aff/tpl):", crops.len());
+            eprintln!(
+                "[debug] 检测到 {} 个框(框 x1,y1-x2,y2 score | 各目标 aff/tpl):",
+                crops.len()
+            );
             let dump_dir = std::env::var("DEBUG_CROPS").ok();
             for (i, (b, png)) in crops.iter().enumerate() {
                 if let Some(d) = &dump_dir {
@@ -64,10 +79,22 @@ async fn main() -> drission::Result<()> {
                 let mut parts = Vec::new();
                 for (j, ch) in chars.iter().enumerate() {
                     let a = aff.get(j).copied().unwrap_or(0.0);
-                    let t = cw.bank.as_ref().and_then(|bk| bk.similarity_image(png, *ch).ok()).unwrap_or(0.0);
+                    let t = cw
+                        .bank
+                        .as_ref()
+                        .and_then(|bk| bk.similarity_image(png, *ch).ok())
+                        .unwrap_or(0.0);
                     parts.push(format!("{ch}:aff{a:.2}/tpl{t:.2}"));
                 }
-                eprintln!("  #{i} ({},{}-{},{}) c{:.2} | {}", b.x1, b.y1, b.x2, b.y2, b.score, parts.join("  "));
+                eprintln!(
+                    "  #{i} ({},{}-{},{}) c{:.2} | {}",
+                    b.x1,
+                    b.y1,
+                    b.x2,
+                    b.y2,
+                    b.score,
+                    parts.join("  ")
+                );
             }
         }
     }
@@ -75,12 +102,18 @@ async fn main() -> drission::Result<()> {
     // 诊断:逐字命中(亲和度)到 stderr。
     if let Ok(hits) = cw.solve(&bytes, &targets) {
         for h in &hits {
-            eprintln!("  「{}」 aff={:.2} 点({},{})", h.target, h.affinity, h.point.0, h.point.1);
+            eprintln!(
+                "  「{}」 aff={:.2} 点({},{})",
+                h.target, h.affinity, h.point.0, h.point.1
+            );
         }
     }
     // 按目标顺序的点击中心点(原图像素)。
     let points = cw.points_for(&bytes, &targets).unwrap_or_default();
     let pts: Vec<[u32; 2]> = points.iter().map(|&(x, y)| [x, y]).collect();
-    println!("{}", serde_json::to_string(&pts).unwrap_or_else(|_| "[]".into()));
+    println!(
+        "{}",
+        serde_json::to_string(&pts).unwrap_or_else(|_| "[]".into())
+    );
     Ok(())
 }

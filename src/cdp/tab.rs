@@ -907,6 +907,34 @@ impl ChromiumTab {
         CdpListen::new(self.core.clone())
     }
 
+    /// **调试器句柄**(逆向「主动定位」重武器):XHR/事件断点 + 调用栈 + 断点上下文求值/局部变量 +
+    /// resume/step + blackbox。详见 [`ChromiumDebugger`](crate::cdp::ChromiumDebugger)。
+    /// **注意**:会开 `Debugger.enable`(反检测取舍),按需用、用完即停。
+    pub fn debugger(&self) -> crate::cdp::ChromiumDebugger {
+        crate::cdp::ChromiumDebugger::new(self.core.clone())
+    }
+
+    /// **脚本源码句柄**:dump 全部 JS、全文搜索签名字样、纯 Rust 美化混淆代码。
+    /// 详见 [`ChromiumScripts`](crate::cdp::ChromiumScripts)。会开 `Debugger.enable`(反检测取舍)。
+    pub fn scripts(&self) -> crate::cdp::ChromiumScripts {
+        crate::cdp::ChromiumScripts::new(self.core.clone())
+    }
+
+    /// **JS Hook 工具箱句柄**(crypto tap):一键 hook 常见 sink,命中回传参数 + 调用栈;
+    /// hook `crypto.subtle`/`CryptoJS` 直接偷 key/iv/明文。详见 [`ChromiumHook`](crate::cdp::ChromiumHook)。
+    /// 复用 `expose_function` 同款基建(`Runtime.enable` + `addBinding`,反检测取舍)。
+    pub fn hook(&self) -> crate::cdp::ChromiumHook {
+        crate::cdp::ChromiumHook::new(self.core.clone())
+    }
+
+    /// **反「无限 debugger」**:导航前注入 defuse 脚本,致残 `setInterval(debugger)` /
+    /// `Function("debugger")()` 等反调试,使断点跟栈不被打断。**在导航前调用**。
+    /// 等价 [`tab.debugger().anti_anti_debug()`](crate::cdp::ChromiumDebugger::anti_anti_debug),
+    /// 但**不开 `Debugger` 域**(自包含、零反检测代价)。
+    pub async fn anti_anti_debug(&self) -> Result<()> {
+        self.debugger().anti_anti_debug().await
+    }
+
     /// 请求拦截句柄(对标 DP 拦截增强):`start`/`next`/`stop`,请求级 `resume`/`fulfill`/`abort`。
     pub fn intercept(&self) -> CdpIntercept {
         CdpIntercept::new(self.core.clone())

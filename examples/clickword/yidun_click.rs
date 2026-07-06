@@ -154,10 +154,7 @@ async fn main() -> drission::Result<()> {
     }
     // WebGL 自检:验证「补环境」是否生效(Docker/Xvfb 默认会是 SwiftShader/llvmpipe 且可能 ok=false,
     // 库的容器补环境应令 ok=true 且 renderer 显示为常见 Linux 桌面 GPU)。
-    if let Ok(v) = tab
-        .run_js(WEBGL_PROBE_JS)
-        .await
-    {
+    if let Ok(v) = tab.run_js(WEBGL_PROBE_JS).await {
         println!(
             "[yidun] WebGL ok={} vendor={} renderer={}",
             v["ok"], v["vendor"], v["renderer"]

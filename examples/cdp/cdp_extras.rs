@@ -55,19 +55,28 @@ async fn main() -> drission::Result<()> {
     let dark = tab
         .run_js("matchMedia('(prefers-color-scheme: dark)').matches")
         .await?;
-    check!(dark.as_bool() == Some(true), "emulate_dark → matchMedia dark (实得 {dark})");
+    check!(
+        dark.as_bool() == Some(true),
+        "emulate_dark → matchMedia dark (实得 {dark})"
+    );
     tab.set().emulate_dark(false).await?;
 
     // ── ③ localStorage 便捷读写 ───────────────────────────────────────────
     tab.get(&format!("{base}/")).await?; // 需真实 origin 才有 storage
     tab.set().local_storage_set("k", "v123").await?;
     let got = tab.set().local_storage_get("k").await?;
-    check!(got.as_deref() == Some("v123"), "localStorage roundtrip (实得 {got:?})");
+    check!(
+        got.as_deref() == Some("v123"),
+        "localStorage roundtrip (实得 {got:?})"
+    );
     let none = tab.set().local_storage_get("missing").await?;
     check!(none.is_none(), "localStorage 缺失键 == None");
 
     // ── ④ network_idle ────────────────────────────────────────────────────
-    let idle = tab.wait().network_idle(0.3, Some(Duration::from_secs(5))).await?;
+    let idle = tab
+        .wait()
+        .network_idle(0.3, Some(Duration::from_secs(5)))
+        .await?;
     check!(idle, "network_idle 在超时内达成");
     let out = tab.ele("#out").await?.text().await?;
     check!(out == "got:extras", "页面 fetch 完成 → #out == {out}");
@@ -104,9 +113,16 @@ async fn main() -> drission::Result<()> {
     // ── ⑧ HAR 录制(落盘)──────────────────────────────────────────────────
     let rec = tab.har_record().await?;
     tab.get(&format!("{base}/")).await?;
-    let _ = tab.wait().network_idle(0.3, Some(Duration::from_secs(5))).await?;
+    let _ = tab
+        .wait()
+        .network_idle(0.3, Some(Duration::from_secs(5)))
+        .await?;
     let har = rec.stop().await?;
-    check!(har.entry_count() > 0, "HAR 录到条目(实得 {})", har.entry_count());
+    check!(
+        har.entry_count() > 0,
+        "HAR 录到条目(实得 {})",
+        har.entry_count()
+    );
     let har_path = std::env::temp_dir().join("drission_extras.har");
     har.save(&har_path).await?;
     check!(har_path.exists(), "HAR 落盘成功");
@@ -122,18 +138,26 @@ async fn main() -> drission::Result<()> {
     // 重新灌一个干净文档让 stub 在新文档生效,再调用。
     tab.set_content("<h1>expose</h1>").await?;
     let r = tab.run_js("window.addRust(2,3)").await?;
-    check!(r.as_f64() == Some(5.0), "expose_function addRust(2,3)==5 (实得 {r})");
+    check!(
+        r.as_f64() == Some(5.0),
+        "expose_function addRust(2,3)==5 (实得 {r})"
+    );
 
     // ── ⑩ offline 离线模拟 ────────────────────────────────────────────────
     tab.set().offline(true).await?;
     let off = tab
         .run_js("fetch('/api/data').then(()=>'ok').catch(()=>'blocked')")
         .await?;
-    check!(off.as_str() == Some("blocked"), "offline → fetch 被阻断 (实得 {off})");
+    check!(
+        off.as_str() == Some("blocked"),
+        "offline → fetch 被阻断 (实得 {off})"
+    );
     tab.set().offline(false).await?;
 
     // ── ⑪ HAR 回放(用第 ⑧ 步录的 har 重放;未命中 Abort → 可证明路由生效)────────
-    let player = tab.route_from_har_log(&har, &HarReplayOptions::default()).await?;
+    let player = tab
+        .route_from_har_log(&har, &HarReplayOptions::default())
+        .await?;
     tab.get(&format!("{base}/")).await?; // "/" 在 HAR 中 → 由 HAR 满足
     let t = tab.ele("#t").await?.text().await?;
     check!(t == "标配补齐", "HAR 回放命中 → #t == {t}");

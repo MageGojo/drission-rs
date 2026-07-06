@@ -31,8 +31,13 @@ const BG_PROBE_JS: &str = r#"(()=>{const e=document.querySelector('.yidun_bg-img
 
 #[tokio::main]
 async fn main() -> drission::Result<()> {
-    let headless = matches!(std::env::var("HL").ok().as_deref(), Some("1") | Some("true"));
-    let out_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target").join("yidun");
+    let headless = matches!(
+        std::env::var("HL").ok().as_deref(),
+        Some("1") | Some("true")
+    );
+    let out_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join("yidun");
     std::fs::create_dir_all(&out_dir).ok();
     let trace_path = out_dir.join("trace.txt");
     let mut log = String::new();
@@ -51,16 +56,24 @@ async fn main() -> drission::Result<()> {
     tokio::time::sleep(Duration::from_secs(5)).await;
 
     // 广谱监听:把易盾相关域全收(get/check/up/图片),便于看清提交链路全貌。
-    tab.listen().start(&["dun.163", "ir-sdk", "nosdn", "127.net", "126.net"]).await?;
+    tab.listen()
+        .start(&["dun.163", "ir-sdk", "nosdn", "127.net", "126.net"])
+        .await?;
 
     // 触发 + 等点选图出现 + 主动换一次(逼出监听已就绪后的 get)。
     let _ = tab.run_js(TRIGGER_JS).await;
     tokio::time::sleep(Duration::from_secs(2)).await;
     for s in ["css:.yidun_control", "css:.yidun_tips", "css:.yidun"] {
-        if let Ok(e) = tab.ele(s).await && e.click().await.is_ok() { break; }
+        if let Ok(e) = tab.ele(s).await
+            && e.click().await.is_ok()
+        {
+            break;
+        }
     }
     wait_bg_shown(&tab, Duration::from_secs(10)).await;
-    if let Ok(e) = tab.ele("css:.yidun_refresh").await { let _ = e.click().await; }
+    if let Ok(e) = tab.ele("css:.yidun_refresh").await {
+        let _ = e.click().await;
+    }
     tokio::time::sleep(Duration::from_millis(800)).await;
     wait_bg_shown(&tab, Duration::from_secs(8)).await;
 
@@ -78,8 +91,14 @@ async fn main() -> drission::Result<()> {
         .filter(|c| ('\u{4e00}'..='\u{9fff}').contains(c))
         .map(|c| c.to_string())
         .collect();
-    println!("[trace] get: front=「{front}」 token={} bg={}", short(&token, 24), short(&bg_url, 70));
-    log.push_str(&format!("=== api/v3/get ===\nfront={front}\ntoken={token}\nbg={bg_url}\n\n"));
+    println!(
+        "[trace] get: front=「{front}」 token={} bg={}",
+        short(&token, 24),
+        short(&bg_url, 70)
+    );
+    log.push_str(&format!(
+        "=== api/v3/get ===\nfront={front}\ntoken={token}\nbg={bg_url}\n\n"
+    ));
 
     // 识别 + 拟人轨迹点击(产生一次真实 check 提交)。
     if let Ok(cap) = fetch_image(&bg_url).await
@@ -93,7 +112,9 @@ async fn main() -> drission::Result<()> {
             tab.mouse_move(c.0, c.1).await.ok();
             tokio::time::sleep(Duration::from_millis(300)).await;
         }
-        if let Ok(view) = tab.image_view(".yidun_bg-img, img.yidun_bg-img, .yidun_bgimg").await
+        if let Ok(view) = tab
+            .image_view(".yidun_bg-img, img.yidun_bg-img, .yidun_bgimg")
+            .await
             && view.w > 1.0
         {
             let points: Vec<(f64, f64)> = hits
@@ -105,17 +126,27 @@ async fn main() -> drission::Result<()> {
                     )
                 })
                 .collect();
-            println!("[trace] 命中 {}/{},拟人轨迹点击触发 check…", hits.len(), targets.len());
+            println!(
+                "[trace] 命中 {}/{},拟人轨迹点击触发 check…",
+                hits.len(),
+                targets.len()
+            );
             tab.human_click(&points).await?;
         }
     }
     tokio::time::sleep(Duration::from_secs(3)).await;
 
     // 收集所有抓到的包,dump 关键请求(URL 全量 + postData 全量 + 关键响应体)。
-    let pkts = tab.listen().wait_count(200, Some(Duration::from_secs(4))).await?;
+    let pkts = tab
+        .listen()
+        .wait_count(200, Some(Duration::from_secs(4)))
+        .await?;
     tab.listen().stop().await.ok();
 
-    println!("\n[trace] ====== 抓到 {} 个包,dump 关键请求 ======", pkts.len());
+    println!(
+        "\n[trace] ====== 抓到 {} 个包,dump 关键请求 ======",
+        pkts.len()
+    );
     for p in &pkts {
         let is_get = p.url.contains("/api/v3/get");
         let is_check = p.url.contains("/api/v3/check") || p.url.contains("/check");
@@ -123,7 +154,13 @@ async fn main() -> drission::Result<()> {
         if !(is_get || is_check || is_up) {
             continue;
         }
-        let tag = if is_check { "CHECK" } else if is_up { "UP" } else { "GET" };
+        let tag = if is_check {
+            "CHECK"
+        } else if is_up {
+            "UP"
+        } else {
+            "GET"
+        };
         let mut block = format!("\n=== [{tag}] {} {} ===\n", p.method, p.url);
         // 把 query 拆成参数逐行(check 的轨迹/点击数据多半在这)。
         if let Some(q) = p.url.split_once('?').map(|(_, q)| q) {
@@ -135,11 +172,19 @@ async fn main() -> drission::Result<()> {
             }
         }
         if let Some(pd) = &p.request.post_data {
-            block.push_str(&format!("-- postData (len={}) --\n  {}\n", pd.len(), short(pd, 400)));
+            block.push_str(&format!(
+                "-- postData (len={}) --\n  {}\n",
+                pd.len(),
+                short(pd, 400)
+            ));
         }
         let body = p.response.body.trim();
         if !body.is_empty() {
-            block.push_str(&format!("-- response (len={}) --\n  {}\n", body.len(), short(body, 300)));
+            block.push_str(&format!(
+                "-- response (len={}) --\n  {}\n",
+                body.len(),
+                short(body, 300)
+            ));
         }
         println!("{block}");
         log.push_str(&block);
@@ -214,7 +259,10 @@ fn parse_get(body: &str) -> Option<(String, String, String)> {
     let b = body.rfind('}')?;
     let v: serde_json::Value = serde_json::from_str(&body[a..=b]).ok()?;
     let d = &v["data"];
-    let bg = d["bg"].get(0).and_then(|x| x.as_str()).or_else(|| d["bg"].as_str())?;
+    let bg = d["bg"]
+        .get(0)
+        .and_then(|x| x.as_str())
+        .or_else(|| d["bg"].as_str())?;
     Some((
         bg.to_string(),
         d["front"].as_str().unwrap_or("").to_string(),

@@ -154,7 +154,8 @@ async fn main() -> drission::Result<()> {
         "录到 Select(#lang = rs)"
     );
     check!(
-        acts.iter().any(|a| matches!(a, RecordedAction::Hover { selector, .. } if selector == "#menu")),
+        acts.iter()
+            .any(|a| matches!(a, RecordedAction::Hover { selector, .. } if selector == "#menu")),
         "录到 Hover(#menu)"
     );
     check!(
@@ -162,11 +163,14 @@ async fn main() -> drission::Result<()> {
         "录到 iframe 内 Fill(#inframe, frame=#ifr)"
     );
     check!(
-        acts.iter().any(|a| matches!(a, RecordedAction::Drag { from, to, .. } if from == "#src" && to == "#dst")),
+        acts.iter().any(
+            |a| matches!(a, RecordedAction::Drag { from, to, .. } if from == "#src" && to == "#dst")
+        ),
         "录到 Drag(#src → #dst)"
     );
     check!(
-        acts.iter().any(|a| matches!(a, RecordedAction::Click { selector, .. } if selector == "#go")),
+        acts.iter()
+            .any(|a| matches!(a, RecordedAction::Click { selector, .. } if selector == "#go")),
         "录到 Click(#go)"
     );
     check!(
@@ -177,13 +181,18 @@ async fn main() -> drission::Result<()> {
     // ── 生成可运行 Rust,核对关键行(含 frame 限定 + 多标签 + 拖拽链)─────────
     let code = script.to_rust();
     println!("\n──────── 生成的 Rust 代码 ────────\n{code}────────────────────────────────\n");
-    check!(code.contains("use drission::prelude::*;"), "代码含 prelude 引入");
+    check!(
+        code.contains("use drission::prelude::*;"),
+        "代码含 prelude 引入"
+    );
     check!(
         code.contains("tab.input(\"@name:q\", \"rust\").await?;"),
         "代码含 input 行"
     );
     check!(
-        code.contains("tab.get_frame(\"#ifr\").await?.ele(\"#inframe\").await?.input(\"框内\").await?;"),
+        code.contains(
+            "tab.get_frame(\"#ifr\").await?.ele(\"#inframe\").await?.input(\"框内\").await?;"
+        ),
         "代码含 iframe 限定 input 行"
     );
     check!(
@@ -197,20 +206,35 @@ async fn main() -> drission::Result<()> {
 
     // ── ② 无障碍快照:DOM 派生(跨后端)+ CDP 原生 ───────────────────────
     let snap = tab.ax_snapshot().await?;
-    println!("──────── ax_snapshot 大纲(DOM 派生)────────\n{}", snap.to_outline());
+    println!(
+        "──────── ax_snapshot 大纲(DOM 派生)────────\n{}",
+        snap.to_outline()
+    );
     check!(snap.count() > 3, "快照节点数 > 3(实得 {})", snap.count());
     check!(
         snap.find_by_name("提交").iter().any(|n| n.role == "button"),
         "快照里有 button \"提交\""
     );
-    check!(!snap.find_by_role("checkbox").is_empty(), "快照里有 checkbox");
+    check!(
+        !snap.find_by_role("checkbox").is_empty(),
+        "快照里有 checkbox"
+    );
 
     let tree = tab.ax_tree().await?;
-    println!("──────── ax_tree 大纲(CDP 原生)────────\n{}", tree.to_outline());
+    println!(
+        "──────── ax_tree 大纲(CDP 原生)────────\n{}",
+        tree.to_outline()
+    );
     let buttons = tab.ax_find("button").await?;
-    check!(!buttons.is_empty(), "原生树有 button(实得 {})", buttons.len());
     check!(
-        tree.find_by_role("heading").iter().any(|h| h.name.contains("登录")),
+        !buttons.is_empty(),
+        "原生树有 button(实得 {})",
+        buttons.len()
+    );
+    check!(
+        tree.find_by_role("heading")
+            .iter()
+            .any(|h| h.name.contains("登录")),
         "原生树有 heading \"登录\""
     );
 

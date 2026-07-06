@@ -165,21 +165,45 @@ impl RecordedAction {
                 None => format!("{tabvar}.click({}).await?;", lit(selector)),
                 Some(_) => format!("{}.click().await?;", ele_expr(tabvar, selector, frame)),
             },
-            RecordedAction::Fill { selector, text, frame } => match frame {
+            RecordedAction::Fill {
+                selector,
+                text,
+                frame,
+            } => match frame {
                 None => format!("{tabvar}.input({}, {}).await?;", lit(selector), lit(text)),
                 Some(_) => {
-                    format!("{}.input({}).await?;", ele_expr(tabvar, selector, frame), lit(text))
+                    format!(
+                        "{}.input({}).await?;",
+                        ele_expr(tabvar, selector, frame),
+                        lit(text)
+                    )
                 }
             },
-            RecordedAction::Check { selector, checked, frame } => {
-                format!("{}.set_checked({}).await?;", ele_expr(tabvar, selector, frame), checked)
+            RecordedAction::Check {
+                selector,
+                checked,
+                frame,
+            } => {
+                format!(
+                    "{}.set_checked({}).await?;",
+                    ele_expr(tabvar, selector, frame),
+                    checked
+                )
             }
-            RecordedAction::Select { selector, value, frame } => format!(
+            RecordedAction::Select {
+                selector,
+                value,
+                frame,
+            } => format!(
                 "{}.select_value({}).await?;",
                 ele_expr(tabvar, selector, frame),
                 lit(value)
             ),
-            RecordedAction::Press { selector, key, frame } => format!(
+            RecordedAction::Press {
+                selector,
+                key,
+                frame,
+            } => format!(
                 "{}.input_keys(&[KeyInput::key({})]).await?;",
                 ele_expr(tabvar, selector, frame),
                 key_expr(key)
@@ -230,8 +254,16 @@ impl RecordedScript {
         if let Some(last) = self.actions.last_mut() {
             match (&last, &action) {
                 (
-                    RecordedAction::Fill { selector: a, frame: fa, .. },
-                    RecordedAction::Fill { selector: b, frame: fb, .. },
+                    RecordedAction::Fill {
+                        selector: a,
+                        frame: fa,
+                        ..
+                    },
+                    RecordedAction::Fill {
+                        selector: b,
+                        frame: fb,
+                        ..
+                    },
                 ) if a == b && fa == fb => {
                     *last = action;
                     return;
@@ -242,8 +274,14 @@ impl RecordedScript {
                     return;
                 }
                 (
-                    RecordedAction::Hover { selector: a, frame: fa },
-                    RecordedAction::Hover { selector: b, frame: fb },
+                    RecordedAction::Hover {
+                        selector: a,
+                        frame: fa,
+                    },
+                    RecordedAction::Hover {
+                        selector: b,
+                        frame: fb,
+                    },
                 ) if a == b && fa == fb => {
                     return;
                 }
@@ -257,7 +295,13 @@ impl RecordedScript {
     pub fn to_rust_body(&self) -> String {
         let mut lines: Vec<String> = Vec::new();
         let mut tab_idx = 1usize;
-        let curvar = |i: usize| if i == 1 { "tab".to_string() } else { format!("tab_{i}") };
+        let curvar = |i: usize| {
+            if i == 1 {
+                "tab".to_string()
+            } else {
+                format!("tab_{i}")
+            }
+        };
         for a in &self.actions {
             match a {
                 RecordedAction::NewTab => {
@@ -345,35 +389,62 @@ mod tests {
     #[test]
     fn each_action_to_rust_line() {
         assert_eq!(
-            RecordedAction::Navigate { url: "https://x.test/a".into() }.to_rust_line("tab"),
+            RecordedAction::Navigate {
+                url: "https://x.test/a".into()
+            }
+            .to_rust_line("tab"),
             "tab.get(\"https://x.test/a\").await?;"
         );
         assert_eq!(
-            RecordedAction::Click { selector: "#go".into(), frame: None }.to_rust_line("tab"),
+            RecordedAction::Click {
+                selector: "#go".into(),
+                frame: None
+            }
+            .to_rust_line("tab"),
             "tab.click(\"#go\").await?;"
         );
         assert_eq!(
-            RecordedAction::Fill { selector: "@name:q".into(), text: "rust".into(), frame: None }
-                .to_rust_line("tab"),
+            RecordedAction::Fill {
+                selector: "@name:q".into(),
+                text: "rust".into(),
+                frame: None
+            }
+            .to_rust_line("tab"),
             "tab.input(\"@name:q\", \"rust\").await?;"
         );
         assert_eq!(
-            RecordedAction::Check { selector: "#agree".into(), checked: true, frame: None }
-                .to_rust_line("tab"),
+            RecordedAction::Check {
+                selector: "#agree".into(),
+                checked: true,
+                frame: None
+            }
+            .to_rust_line("tab"),
             "tab.ele(\"#agree\").await?.set_checked(true).await?;"
         );
         assert_eq!(
-            RecordedAction::Select { selector: "#lang".into(), value: "rs".into(), frame: None }
-                .to_rust_line("tab"),
+            RecordedAction::Select {
+                selector: "#lang".into(),
+                value: "rs".into(),
+                frame: None
+            }
+            .to_rust_line("tab"),
             "tab.ele(\"#lang\").await?.select_value(\"rs\").await?;"
         );
         assert_eq!(
-            RecordedAction::Press { selector: "@name:q".into(), key: "Enter".into(), frame: None }
-                .to_rust_line("tab"),
+            RecordedAction::Press {
+                selector: "@name:q".into(),
+                key: "Enter".into(),
+                frame: None
+            }
+            .to_rust_line("tab"),
             "tab.ele(\"@name:q\").await?.input_keys(&[KeyInput::key(Keys::ENTER)]).await?;"
         );
         assert_eq!(
-            RecordedAction::Hover { selector: "#menu".into(), frame: None }.to_rust_line("tab"),
+            RecordedAction::Hover {
+                selector: "#menu".into(),
+                frame: None
+            }
+            .to_rust_line("tab"),
             "tab.ele(\"#menu\").await?.hover().await?;"
         );
     }
@@ -395,8 +466,11 @@ mod tests {
     #[test]
     fn frame_qualified_actions() {
         assert_eq!(
-            RecordedAction::Click { selector: "#in".into(), frame: Some("#ifr".into()) }
-                .to_rust_line("tab"),
+            RecordedAction::Click {
+                selector: "#in".into(),
+                frame: Some("#ifr".into())
+            }
+            .to_rust_line("tab"),
             "tab.get_frame(\"#ifr\").await?.ele(\"#in\").await?.click().await?;"
         );
         assert_eq!(
@@ -413,8 +487,12 @@ mod tests {
     #[test]
     fn unknown_key_falls_back_to_literal() {
         assert_eq!(
-            RecordedAction::Press { selector: "#x".into(), key: "F5".into(), frame: None }
-                .to_rust_line("tab"),
+            RecordedAction::Press {
+                selector: "#x".into(),
+                key: "F5".into(),
+                frame: None
+            }
+            .to_rust_line("tab"),
             "tab.ele(\"#x\").await?.input_keys(&[KeyInput::key(\"F5\")]).await?;"
         );
     }
@@ -429,50 +507,95 @@ mod tests {
     fn from_event_parses_each_type() {
         assert_eq!(
             RecordedAction::from_event(&json!({"type":"navigate","url":"https://x/"})),
-            Some(RecordedAction::Navigate { url: "https://x/".into() })
+            Some(RecordedAction::Navigate {
+                url: "https://x/".into()
+            })
         );
         assert_eq!(
-            RecordedAction::from_event(&json!({"type":"fill","selector":"#q","value":"hi","frame":"#f"})),
-            Some(RecordedAction::Fill { selector: "#q".into(), text: "hi".into(), frame: Some("#f".into()) })
+            RecordedAction::from_event(
+                &json!({"type":"fill","selector":"#q","value":"hi","frame":"#f"})
+            ),
+            Some(RecordedAction::Fill {
+                selector: "#q".into(),
+                text: "hi".into(),
+                frame: Some("#f".into())
+            })
         );
         assert_eq!(
             RecordedAction::from_event(&json!({"type":"hover","selector":"#m"})),
-            Some(RecordedAction::Hover { selector: "#m".into(), frame: None })
+            Some(RecordedAction::Hover {
+                selector: "#m".into(),
+                frame: None
+            })
         );
         assert_eq!(
             RecordedAction::from_event(&json!({"type":"drag","from":"#a","to":"#b"})),
-            Some(RecordedAction::Drag { from: "#a".into(), to: "#b".into(), frame: None })
+            Some(RecordedAction::Drag {
+                from: "#a".into(),
+                to: "#b".into(),
+                frame: None
+            })
         );
         assert_eq!(
             RecordedAction::from_event(&json!({"type":"newtab"})),
             Some(RecordedAction::NewTab)
         );
         // drag 缺端点 → None。
-        assert_eq!(RecordedAction::from_event(&json!({"type":"drag","from":"#a"})), None);
+        assert_eq!(
+            RecordedAction::from_event(&json!({"type":"drag","from":"#a"})),
+            None
+        );
         assert_eq!(RecordedAction::from_event(&json!({"type":"scroll"})), None);
     }
 
     #[test]
     fn push_collapses_fill_navigate_hover() {
         let mut s = RecordedScript::new();
-        s.push(RecordedAction::Navigate { url: "https://x/".into() });
-        s.push(RecordedAction::Navigate { url: "https://x/".into() });
-        s.push(RecordedAction::Fill { selector: "#q".into(), text: "r".into(), frame: None });
-        s.push(RecordedAction::Fill { selector: "#q".into(), text: "rust".into(), frame: None });
-        s.push(RecordedAction::Hover { selector: "#m".into(), frame: None });
-        s.push(RecordedAction::Hover { selector: "#m".into(), frame: None });
+        s.push(RecordedAction::Navigate {
+            url: "https://x/".into(),
+        });
+        s.push(RecordedAction::Navigate {
+            url: "https://x/".into(),
+        });
+        s.push(RecordedAction::Fill {
+            selector: "#q".into(),
+            text: "r".into(),
+            frame: None,
+        });
+        s.push(RecordedAction::Fill {
+            selector: "#q".into(),
+            text: "rust".into(),
+            frame: None,
+        });
+        s.push(RecordedAction::Hover {
+            selector: "#m".into(),
+            frame: None,
+        });
+        s.push(RecordedAction::Hover {
+            selector: "#m".into(),
+            frame: None,
+        });
         assert_eq!(s.len(), 3);
         assert_eq!(
             s.actions[1],
-            RecordedAction::Fill { selector: "#q".into(), text: "rust".into(), frame: None }
+            RecordedAction::Fill {
+                selector: "#q".into(),
+                text: "rust".into(),
+                frame: None
+            }
         );
     }
 
     #[test]
     fn full_program_has_scaffold_and_body() {
         let mut s = RecordedScript::new();
-        s.push(RecordedAction::Navigate { url: "https://x/".into() });
-        s.push(RecordedAction::Click { selector: "#go".into(), frame: None });
+        s.push(RecordedAction::Navigate {
+            url: "https://x/".into(),
+        });
+        s.push(RecordedAction::Click {
+            selector: "#go".into(),
+            frame: None,
+        });
         let code = s.to_rust();
         assert!(code.contains("use drission::prelude::*;"));
         assert!(code.contains("Browser::launch(BrowserOptions::new().headless(false))"));
@@ -484,9 +607,15 @@ mod tests {
     #[test]
     fn multi_tab_switches_variable() {
         let mut s = RecordedScript::new();
-        s.push(RecordedAction::Click { selector: "#open".into(), frame: None });
+        s.push(RecordedAction::Click {
+            selector: "#open".into(),
+            frame: None,
+        });
         s.push(RecordedAction::NewTab);
-        s.push(RecordedAction::Click { selector: "#in-popup".into(), frame: None });
+        s.push(RecordedAction::Click {
+            selector: "#in-popup".into(),
+            frame: None,
+        });
         let body = s.to_rust_body();
         assert!(body.contains("    tab.click(\"#open\").await?;"));
         assert!(body.contains("let tab_2 = tab.wait().new_tab(None).await?"));
@@ -504,7 +633,11 @@ mod tests {
     #[test]
     fn json_roundtrip() {
         let mut s = RecordedScript::new();
-        s.push(RecordedAction::Press { selector: "#q".into(), key: "Enter".into(), frame: None });
+        s.push(RecordedAction::Press {
+            selector: "#q".into(),
+            key: "Enter".into(),
+            frame: None,
+        });
         s.push(RecordedAction::NewTab);
         let j = s.to_json();
         let back: Vec<RecordedAction> = serde_json::from_str(&j).unwrap();

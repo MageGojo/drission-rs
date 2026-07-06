@@ -51,6 +51,13 @@ async fn main() -> drission::Result<()> {
         .headless(headless)
         .full_ua_metadata(full_ch)
         .window_size(1280, 800);
+    // CF_PROXY=http://127.0.0.1:7890 → 走住宅出口(与纯协议实验同 IP,apples-to-apples 消歧)
+    if let Ok(p) = std::env::var("CF_PROXY") {
+        if !p.is_empty() {
+            println!("[*] 走代理出口: {p}");
+            opts = opts.proxy(p);
+        }
+    }
     if hidden {
         opts = opts
             .add_arg("--window-position=-32000,-32000")

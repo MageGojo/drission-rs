@@ -7,6 +7,9 @@
 /docs/需求.md
 **/*.rs.bk
 .DS_Store
+.idea/
+# 本地整理区:一次性截图、抓包、吐环境快照、外部实验工程等,不随源码发布。
+/.local/
 *.log
 # 示例运行产物(可能含本机路径/测试数据,不入库不发布)
 /drission_*_result.json
@@ -14,6 +17,9 @@
 /*.png
 /*.jpg
 /yidun_*.png
+# Cloudflare 逆向/抓包类本地实验产物。
+/cf-protocol-poc/
+/cf_flow_capture.txt
 # 易盾点选样本采集产物(自训模型用的图片/CSV,体积大且属运行产物,不入库)
 /yidun_samples/
 # 自训模型脚手架(dddd_trainer 克隆 + venv + 标注工具/数据,纯开发产物,不入库)

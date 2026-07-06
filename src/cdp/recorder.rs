@@ -74,7 +74,11 @@ impl ChromiumRecorder {
         let _ = self
             .core
             .conn
-            .send("Target.setDiscoverTargets", json!({ "discover": true }), None)
+            .send(
+                "Target.setDiscoverTargets",
+                json!({ "discover": true }),
+                None,
+            )
             .await;
 
         let task = tokio::spawn(recorder_pump(self.core.clone(), self.state.clone()));
@@ -216,10 +220,9 @@ async fn recorder_pump(core: Arc<CdpCore>, state: Arc<Mutex<RecordedScript>>) {
                 }
                 let url = frame["url"].as_str().unwrap_or_default();
                 if is_recordable_url(url) {
-                    state
-                        .lock()
-                        .await
-                        .push(RecordedAction::Navigate { url: url.to_string() });
+                    state.lock().await.push(RecordedAction::Navigate {
+                        url: url.to_string(),
+                    });
                 }
             }
             _ => {}
@@ -229,7 +232,9 @@ async fn recorder_pump(core: Arc<CdpCore>, state: Arc<Mutex<RecordedScript>>) {
 
 /// 事件会话是否属于已知会话集。
 fn session_known(sid: &Option<String>, sessions: &HashSet<String>) -> bool {
-    sid.as_deref().map(|s| sessions.contains(s)).unwrap_or(false)
+    sid.as_deref()
+        .map(|s| sessions.contains(s))
+        .unwrap_or(false)
 }
 
 /// 附着到弹窗目标并武装录制(Page/Runtime enable + addBinding + 注入脚本)。返回其 sessionId。

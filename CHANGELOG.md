@@ -12,6 +12,10 @@
 
 ### 新增 Added
 
+- **`drs` CLI / MCP(AI Agent 入口)**:新增 workspace 子包 `crates/drission-cli`(`package = "drission-cli"`,
+  二进制 `drs`)。CLI 依赖独立,不污染核心库;默认 CDP/Chrome,可按 feature 切到 Camoufox 或启用 OCR。
+  支持 `drs serve` 本地 daemon、`drs --json` 统一响应、页面打开/标签/无障碍快照/HTML/文本/JS/截图/
+  点击输入/按键/等待/网络监听/Cloudflare pass,以及 `drs mcp` stdio MCP server。文档见 [`docs/CLI.md`](docs/CLI.md)。
 - **PDF 导出** `tab.print_to_pdf(&PdfOptions)` / `save_pdf`(`Page.printToPDF`,无头);**保存 MHTML**
   `tab.mhtml()` / `save_mhtml`(`Page.captureSnapshot`);**`set_content`** 直接灌 HTML(`Page.setDocumentContent`,回退 `document.write`)。
 - **媒体模拟** `tab.set().emulate_dark(bool)` / `emulate_media(media, features)`(深色 `prefers-color-scheme` / print / reduced-motion)。
