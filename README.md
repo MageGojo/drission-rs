@@ -66,9 +66,9 @@ CLI 子包与核心库同仓库、独立依赖,不会污染普通 `drission` 库
 
 ---
 
-## 🆕 最新版本 v0.3.1 新增
+## 🆕 最新版本 v0.3.2 新增
 
-> **开发中(Unreleased)** —— 对标 Playwright / Puppeteer / DrissionPage 的「标配补齐」+ 录制/无障碍:
+> **v0.3.2** —— 对标 Playwright / Puppeteer / DrissionPage 的「标配补齐」+ 录制/无障碍 + AI Agent 入口:
 >
 > - **`drs` CLI / MCP(AI Agent 入口)**:新增同仓库 workspace 子包 `drission-cli`,二进制 `drs`。支持 `drs serve` 本地 daemon、`drs --json` 稳定 JSON 协议、页面观察/动作/监听/截图/过盾命令,以及 `drs mcp` stdio MCP server;CLI 依赖独立,不污染核心 `drission` 库用户。详见 [`docs/CLI.md`](docs/CLI.md)。
 > - **录制 → 生成代码(codegen / recorder)**:`tab.recorder()` 录一遍页面操作 → 直接产**可运行 Rust**(DrissionPage 风格选择器),覆盖点击/输入/勾选/下拉/按键/悬停/拖拽/iframe/多标签。对标 Playwright `codegen`。
@@ -76,7 +76,7 @@ CLI 子包与核心库同仓库、独立依赖,不会污染普通 `drission` 库
 > - **实时指纹快照读取(fingerprint)**:`tab` 一次性 dump UA/平台/时区/屏幕/WebGL/canvas 等,用于验证「指纹确实换了」。
 > - **CDP 标配补齐**:PDF 导出 / MHTML / `set_content` / **HAR 录制+回放** / `expose_function` / 媒体·网络·CPU 模拟 / 移动端设备预设 / 运行时权限 / storage 便捷读写 / `wait().new_tab` 等。详见 [`docs/标配补齐.md`](docs/标配补齐.md)、[`docs/录制与无障碍.md`](docs/录制与无障碍.md)。
 >
-> 完整记录见 [CHANGELOG.md](CHANGELOG.md)。**v0.3.1** 聚焦 **Windows 实机点选 / 过盾精准度**与**无头反检测真实度**:
+> 完整记录见 [CHANGELOG.md](CHANGELOG.md)。上一版 **v0.3.1** 聚焦 **Windows 实机点选 / 过盾精准度**与**无头反检测真实度**:
 >
 > - **Windows 高 DPI 点击对齐**:强制 `device-scale=1`,修复 125% / 150% 缩放下合成点击按物理像素偏移导致的 Cloudflare Turnstile / 易盾点选「点不中」。
 > - **无头 GPU 自适应**:有真实 GPU 走硬件 ANGLE、无 GPU(VM / RDP)退 D3D11 WARP,WebGL 真实可用(避开 SwiftShader 软渲染破绽)。

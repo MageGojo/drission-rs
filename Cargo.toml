@@ -1,6 +1,6 @@
 [package]
 name = "drission"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2024"
 rust-version = "1.85"
 # 示例按能力分文件夹(examples/<分类>/),每个 [[example]] 显式声明 path;关掉自动发现(子目录无

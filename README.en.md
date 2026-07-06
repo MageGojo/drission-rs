@@ -67,9 +67,9 @@ The CLI lives in the same workspace but keeps its own dependencies, so ordinary 
 
 ---
 
-## 🆕 New in v0.3.1
+## 🆕 New in v0.3.2
 
-> **Development (Unreleased)** — standard browser features plus AI-facing runtime:
+> **v0.3.2** — standard browser features plus AI-facing runtime:
 >
 > - **`drs` CLI / MCP (AI Agent runtime)**: new workspace package `drission-cli`, binary `drs`. It supports `drs serve` as a local daemon, stable `drs --json` output, page observation/actions/network listen/screenshots/Cloudflare pass commands, and `drs mcp` as a stdio MCP server. Details: [`docs/CLI.md`](docs/CLI.md).
 > - **Recorder → Rust codegen**: `tab.recorder()` records page operations and emits runnable DrissionPage-style Rust code, covering click/fill/check/select/key/hover/drag/iframe/multi-tab flows.
@@ -77,7 +77,7 @@ The CLI lives in the same workspace but keeps its own dependencies, so ordinary 
 > - **Runtime fingerprint snapshot**: dump UA / platform / timezone / screen / WebGL / canvas signals to verify the browser persona actually changed.
 > - **CDP standard-feature fill-in**: PDF / MHTML / `set_content` / HAR record + replay / `expose_function` / media, network and CPU emulation / mobile device presets / permissions / storage helpers / `wait().new_tab`. See [`docs/标配补齐.md`](docs/标配补齐.md) and [`docs/录制与无障碍.md`](docs/录制与无障碍.md).
 >
-> Full history in [CHANGELOG.md](CHANGELOG.md). **v0.3.1** focuses on **Windows real-machine click / bypass precision** and **headless anti-detect authenticity**:
+> Full history in [CHANGELOG.md](CHANGELOG.md). The previous **v0.3.1** release focuses on **Windows real-machine click / bypass precision** and **headless anti-detect authenticity**:
 >
 > - **Windows high-DPI click alignment**: force `device-scale=1`, fixing the physical-pixel offset under 125% / 150% scaling that made Cloudflare Turnstile / click-word captchas "unclickable".
 > - **Headless GPU adaptive**: real GPU → hardware ANGLE, no GPU (VM / RDP) → D3D11 WARP, so WebGL stays real (avoids the SwiftShader software-render tell).

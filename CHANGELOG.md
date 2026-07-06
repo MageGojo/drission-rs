@@ -5,7 +5,7 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/),
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased]
+## [0.3.2] - 2026-07-06
 
 > **标配补齐**:对标 Playwright / Puppeteer / DrissionPage 的通用浏览器能力。这些能力为 **Chromium / CDP
 > 专有**(Firefox/Juggler 无对应),仅默认 CDP 后端提供。设计与两端可行性见 [`docs/标配补齐.md`](docs/标配补齐.md)。
@@ -266,7 +266,7 @@
 - **内置验证码 OCR**(ddddocr 模型 + tract 纯 Rust 推理)与**图片滑块缺口距离识别**(极验)。
 - 跨平台:macOS / Linux / Windows(命名管道传输)。
 
-[Unreleased]: https://github.com/MageGojo/drission-rs/compare/v0.3.1...HEAD
+[0.3.2]: https://github.com/MageGojo/drission-rs/compare/v0.3.1...HEAD
 [0.3.1]: https://github.com/MageGojo/drission-rs/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/MageGojo/drission-rs/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/MageGojo/drission-rs/compare/v0.1.1...v0.2.0
