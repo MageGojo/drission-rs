@@ -315,14 +315,24 @@ A: macOS (primary) · Linux · Windows (named-pipe transport working); Rust ≥ 
 
 ---
 
-## 🗺️ Roadmap
+## 🗺️ Shipped And Next
 
-- Captcha: click / text-click selection, arithmetic, slider behavior-trajectory modeling, OCR self-training
-  (`dddd_trainer`).
-- Deeper anti-detect fingerprint injection and "env restore" completeness (font enumeration, pixel-level canvas, WebRTC).
-- WS takeover with multi-client multiplexing, `wss://` TLS.
-- Static XPath subset expansion, more vendor slider / shield presets.
-- More complete Windows process lifecycle (Job Object fallback) and a Linux tested matrix.
+Already shipped:
+
+- Click / text-click captcha pipeline: `Det` boxes → per-box OCR → glyph-template second signal → globally optimal assignment → trusted clicks; NetEase/Yidun examples include collection, probing and stable-click flows.
+- Runtime OCR self-training integration: load and hot-swap `dddd_trainer` onnx + `charsets.json` outputs, with a documented workflow.
+- Generic slider gap detection and human-like motion: GeeTest v4 / Dingxiang examples, minimum-jerk tracks, closed-loop correction and trusted mouse events.
+- Anti-detect and env-restore coverage: CDP/Camoufox fingerprints, font enumeration, pixel-level canvas, WebRTC, plugins/mimeTypes, WebGL/audio replay.
+- Browser WS takeover: `BrowserServer` + `Browser::connect` support one active client, reconnects and token checks.
+- Static XPath 1.0 common subset, Windows Job Object process-tree cleanup, Linux Docker/musl/CI build matrix.
+
+Next:
+
+- Arithmetic captchas, more click/text-click vendor templates and sample libraries.
+- Slider / click behavior-trajectory modeling, moving behavior risk handling from heuristics toward reusable models.
+- True multi-client multiplexing for WS takeover and `wss://` TLS.
+- More static XPath axes/functions, plus more vendor slider / shield presets.
+- More real Linux cloud-vendor, distro and headed/headless test matrices.
 
 ---
 

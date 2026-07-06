@@ -316,13 +316,24 @@ A:macOS(主力)· Linux · Windows(命名管道传输已打通);Rust ≥ 1.85(ed
 
 ---
 
-## 🗺️ 路线图(未来)
+## 🗺️ 已完成与后续方向
 
-- 验证码:点选 / 文字点选、计算题、滑块行为轨迹模型化,OCR 自训模型接入(`dddd_trainer`)。
-- 更多反检测深指纹注入与「吐环境」补全(字体枚举、像素级 canvas、WebRTC)。
-- WS 接管多客户端多路复用、`wss://` TLS。
-- 静态 XPath 子集扩展、更多厂商滑块 / 盾预设。
-- 更完善的 Windows 进程生命周期(Job Object 兜底)与 Linux 实测矩阵。
+已落地能力:
+
+- 点选 / 文字点选链路:检测框(`Det`)→逐框 OCR→字形模板第二信号→全局最优指派→可信点击;易盾点选含采集、侦察、稳定版示例。
+- OCR 自训模型运行时接入:支持 `dddd_trainer` 产物的 onnx + `charsets.json` 加载、热替换与文档化流程。
+- 滑块通用缺口识别与拟人轨迹:GeeTest v4 / 顶象示例、最小 jerk 轨迹、闭环微调与可信鼠标事件。
+- 反检测与「吐环境」补全:CDP/Camoufox 指纹覆盖、字体枚举、像素级 canvas、WebRTC、plugins/mimeTypes、WebGL/audio 等录制回放。
+- WS 接管浏览器: `BrowserServer` + `Browser::connect` 已支持单活动客户端接管、断线重连、token 校验。
+- 静态 XPath 1.0 常用子集、Windows Job Object 进程树兜底、Linux Docker/musl/CI 构建矩阵。
+
+下一步增强:
+
+- 计算题验证码、更多点选/文字点选厂商模板与样本库。
+- 滑块 / 点选行为轨迹模型化,把行为风控从启发式推进到可复用模型。
+- WS 接管的真正多客户端多路复用与 `wss://` TLS。
+- 静态 XPath 更多 axes/functions,以及更多厂商滑块 / 盾预设。
+- 更多真实云厂商、发行版、桌面/无头环境的 Linux 实测矩阵。
 
 ---
 
