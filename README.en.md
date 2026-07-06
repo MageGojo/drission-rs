@@ -56,7 +56,7 @@ see [`install/`](install/) — macOS: double-click `install-mac.command`; Window
 This repository now ships the `drs` command-line runtime and a stdio MCP server, so AI agents and automation scripts can drive a real browser through stable JSON:
 
 ```bash
-cargo install --path crates/drission-cli --bin drs
+cargo install drission-cli --bin drs
 drs serve --backend cdp --headless
 drs --json open https://example.com
 drs ax --outline

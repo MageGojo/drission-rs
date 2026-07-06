@@ -55,7 +55,7 @@
 本仓库内置 `drs` 命令行与 stdio MCP server,适合让 AI 以稳定 JSON 协议驱动浏览器:
 
 ```bash
-cargo install --path crates/drission-cli --bin drs
+cargo install drission-cli --bin drs
 drs serve --backend cdp --headless
 drs --json open https://example.com
 drs ax --outline

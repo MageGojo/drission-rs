@@ -45,6 +45,8 @@ cargo run
 开发本仓库内置的 `drs` CLI / MCP 入口:
 
 ```bash
+cargo install drission-cli --bin drs
+# 或从当前仓库源码安装:
 cargo install --path crates/drission-cli --bin drs
 drs serve --backend cdp --headless
 ```

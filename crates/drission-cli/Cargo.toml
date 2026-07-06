@@ -26,7 +26,7 @@ anyhow = "1.0.100"
 base64 = "0.22.1"
 clap = { version = "4.5.53", features = ["derive", "env"] }
 directories = "6.0.0"
-drission = { path = "../..", default-features = false }
+drission = { version = "0.3.2", path = "../..", default-features = false }
 rand = "0.8.5"
 rmcp = { version = "2.1.0", default-features = false, features = ["server", "macros", "transport-io"] }
 schemars = { version = "1.1.0", features = ["derive"] }

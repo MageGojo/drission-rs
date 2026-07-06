@@ -13,7 +13,7 @@
 如果任务是“让 AI 操作网页 / 观察页面 / 抓接口 / 截图 / 提取文本”,优先使用同仓库 CLI:
 
 ```bash
-cargo install --path crates/drission-cli --bin drs
+cargo install drission-cli --bin drs
 drs serve --backend cdp --headless
 drs --json open https://example.com
 drs --json ax --json

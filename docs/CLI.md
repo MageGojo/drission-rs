@@ -4,17 +4,23 @@
 
 ## 安装
 
-开发期从本仓库安装:
+从 crates.io 安装:
 
 ```bash
-cargo install --path crates/drission-cli --bin drs
+cargo install drission-cli --bin drs
 ```
 
 默认构建 CDP/Chrome 后端。按需启用能力:
 
 ```bash
-cargo install --path crates/drission-cli --bin drs --features cdp,ocr
-cargo install --path crates/drission-cli --bin drs --no-default-features --features camoufox
+cargo install drission-cli --bin drs --features cdp,ocr
+cargo install drission-cli --bin drs --no-default-features --features camoufox
+```
+
+开发期从本仓库安装:
+
+```bash
+cargo install --path crates/drission-cli --bin drs
 ```
 
 ## Daemon 模式
