@@ -6,12 +6,12 @@
 //!
 //!   0) GET luffycity API            → auth_info(vid / token)
 //!   1) GET player.polyv.net/secure/<vid>.json(hex 密文)
-//!        key/iv = MD5(vid) 的 hex 前/后 16 字节 → AES-128-CBC → base64 解码 → 播放器配置 JSON
-//!        (含 seed_const 与 hls 清单)
+//!      key/iv = MD5(vid) 的 hex 前/后 16 字节 → AES-128-CBC → base64 解码 → 播放器配置 JSON
+//!      (含 seed_const 与 hls 清单)
 //!   2) GET <hls>.pdx(加密 m3u8 `{version,body:base64}`)
-//!        key = MD5(固定常量 + seed_const) 的 hex[1..17] → AES-128-CBC → 真实 m3u8(#EXT-X-KEY URI/IV + .ts)
+//!      key = MD5(固定常量 + seed_const) 的 hex[1..17] → AES-128-CBC → 真实 m3u8(#EXT-X-KEY URI/IV + .ts)
 //!   3) GET playsafe `/v1104/...key`(32B 包裹密钥)
-//!        v11 解包:MD5 加盐 + 凯撒位移 + 两次定长置换 + AES-128-CBC → 真实 16B AES key
+//!      v11 解包:MD5 加盐 + 凯撒位移 + 两次定长置换 + AES-128-CBC → 真实 16B AES key
 //!   4) 并发下载每个 .ts → AES-128-CBC(key, IV) 解密 → 顺序拼接 → ffmpeg remux 成 mp4
 //!
 //! polyv v11 算法逆向参考 DevLARLEY/PolyVGet(C#),本例移植其 v11 路径到 Rust。v11 分片仅标准 AES;
@@ -24,7 +24,7 @@
 //!
 //! 说明:示例针对免费试看小节(无需登录)。付费小节需在 API 请求带上已登录 Cookie 才能拿到 token。
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -211,7 +211,11 @@ async fn main() -> Result<()> {
         .ok_or_else(|| Error::msg("secure 无 body"))?;
     let uri_hash = md5_hex(vid.as_bytes());
     let enc = hex::decode(body_hex).map_err(|e| Error::msg(format!("secure body 非 hex: {e}")))?;
-    let dec_b64 = aes_cbc_dec(uri_hash[..16].as_bytes(), uri_hash[16..32].as_bytes(), &enc)?;
+    let dec_b64 = aes_cbc_dec(
+        &uri_hash.as_bytes()[..16],
+        &uri_hash.as_bytes()[16..32],
+        &enc,
+    )?;
     let json_bytes = B64
         .decode(String::from_utf8_lossy(&dec_b64).trim())
         .map_err(|e| Error::msg(format!("secure 内层非 base64: {e}")))?;
@@ -273,7 +277,7 @@ async fn main() -> Result<()> {
                 .ok_or_else(|| Error::msg(".pdx 无 body"))?,
         )
         .map_err(|e| Error::msg(format!(".pdx body 非 base64: {e}")))?;
-    let m3u8 = aes_cbc_dec(pdx_key[1..17].as_bytes(), &HLS_IV_V1112, &pdx_ct)?;
+    let m3u8 = aes_cbc_dec(&pdx_key.as_bytes()[1..17], &HLS_IV_V1112, &pdx_ct)?;
     let m3u8 = String::from_utf8_lossy(&m3u8).into_owned();
     save(&work, "playlist.m3u8", m3u8.as_bytes())?;
 
@@ -415,7 +419,7 @@ async fn main() -> Result<()> {
 }
 
 /// 若本机有 ffprobe,打印时长/分辨率核对完整性。
-fn report_probe(path: &PathBuf) {
+fn report_probe(path: &Path) {
     if let Ok(o) = Command::new("ffprobe")
         .args([
             "-v",

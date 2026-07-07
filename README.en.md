@@ -45,25 +45,38 @@ A single `tokio` async API gives you, at once:
 
 ---
 
-## 📦 No Rust installed? (get started without compiling)
+## 🤖 A browser MCP for Cursor / Codex (no Rust required)
 
-🦀 **Python / TS devs welcome**: don't want to install Rust by hand? Use the **one-click setup scripts** (China-mirror accelerated, **double-click**, with progress + auto-verify):
-see [`install/`](install/) — macOS: double-click `install-mac.command`; Windows: double-click `install-windows.bat`. Then `cargo add drission`.
-**Prerequisite**: Chrome / Edge installed (point to it via `CHROME_BIN`); OCR examples auto-download the model to cache on first run.
+AI assistants default to `curl` / `WebFetch` and get empty shells (or blocked) on login-gated, anti-bot, Cloudflare, or JS-rendered pages. Wire `drs` in as an MCP server and the agent drives a **persistent real browser** instead — opening the page, waiting for render, passing the shield, and returning structured data.
 
-## 🤖 `drs` CLI / MCP (AI Agent entry point)
+**One-liner to hand an AI:**
 
-This repository now ships the `drs` command-line runtime and a stdio MCP server, so AI agents and automation scripts can drive a real browser through stable JSON:
+> **Use the `drs` browser MCP from `MageGojo/drission-rs`**: run
+> `curl -fsSL https://raw.githubusercontent.com/MageGojo/drission-rs/main/install/drs-install.sh | sh` to install the CLI,
+> then `drs setup` to auto-configure the MCP server for Cursor / Codex. After that, for any hard-to-get web data
+> (login state / anti-bot / Cloudflare / dynamic rendering), always use `drs`'s `browser_extract`, `browser_*`, and
+> `network_*` tools instead of curl / WebFetch.
+
+**Manual 3 steps (no Rust toolchain needed):**
 
 ```bash
-cargo install drission-cli --bin drs
-drs serve --backend cdp --headless
-drs --json open https://example.com
-drs ax --outline
-drs mcp --backend cdp --headless
+# 1) install the prebuilt drs binary (mac/linux; Windows below)
+curl -fsSL https://raw.githubusercontent.com/MageGojo/drission-rs/main/install/drs-install.sh | sh
+# 2) auto-write Cursor (.cursor/mcp.json) + Codex (~/.codex/config.toml)
+drs setup
+# 3) restart Cursor / Codex — the `drs` MCP server is ready
 ```
 
-The CLI lives in the same workspace but keeps its own dependencies, so ordinary `drission` library users do not inherit `clap`, `rmcp`, or daemon/runtime dependencies. See [`docs/CLI.md`](docs/CLI.md).
+Windows (PowerShell): `irm https://raw.githubusercontent.com/MageGojo/drission-rs/main/install/drs-install.ps1 | iex` then `drs setup`.
+
+The MCP server attaches to a **persistent browser** (tabs & login state survive MCP restarts), so "log in once, keep scraping next time". Details in [`docs/CLI.md`](docs/CLI.md).
+
+## 📦 No Rust installed?
+
+**Just want the `drs` CLI / MCP** (no Rust): install the prebuilt binary with the one-liner above — it pulls a static `drs` from [GitHub Releases](https://github.com/MageGojo/drission-rs/releases) (GitCode mirror as fallback).
+
+**Want to write Rust against the `drission` library**: use the one-click toolchain scripts in [`install/`](install/) (`install-mac.command` / `install-windows.bat`, China-mirror accelerated), then `cargo add drission`.
+**Prerequisite**: Chrome / Edge installed (point to it via `CHROME_BIN`); OCR examples auto-download the model to cache on first run.
 
 ---
 

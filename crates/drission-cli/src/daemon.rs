@@ -1,5 +1,7 @@
 use std::path::PathBuf;
+use std::process::Stdio;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::{Context, Result};
 use rand::{Rng, distributions::Alphanumeric};
@@ -128,6 +130,96 @@ pub async fn remove_state_file() -> Result<()> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(e) => Err(e.into()),
     }
+}
+
+/// Return true when the on-disk daemon state responds to `status`.
+pub async fn daemon_is_healthy() -> bool {
+    let Ok(state) = read_state_file().await else {
+        return false;
+    };
+    ping_daemon(&state).await
+}
+
+async fn ping_daemon(state: &StateFile) -> bool {
+    let Ok(mut stream) = TcpStream::connect(state.endpoint()).await else {
+        let _ = remove_state_file().await;
+        return false;
+    };
+    let req = DaemonRequest {
+        token: state.token.clone(),
+        command: EngineCommand::Status,
+    };
+    let Ok(line) = serde_json::to_string(&req) else {
+        return false;
+    };
+    if stream.write_all((line + "\n").as_bytes()).await.is_err() {
+        return false;
+    }
+    if stream.flush().await.is_err() {
+        return false;
+    }
+    let mut reader = BufReader::new(stream);
+    let mut buf = String::new();
+    if reader.read_line(&mut buf).await.is_err() {
+        return false;
+    }
+    serde_json::from_str::<JsonResponse>(buf.trim())
+        .ok()
+        .is_some_and(|resp| resp.ok)
+}
+
+/// Start `drs serve` in the background when no healthy daemon exists.
+pub async fn ensure_daemon(
+    backend: BackendKind,
+    headless: bool,
+    user_data_dir: Option<PathBuf>,
+) -> Result<StateFile> {
+    if daemon_is_healthy().await {
+        return read_state_file().await;
+    }
+
+    spawn_daemon(backend, headless, user_data_dir)?;
+
+    for _ in 0..60 {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        if let Ok(state) = read_state_file().await {
+            if ping_daemon(&state).await {
+                return Ok(state);
+            }
+        }
+    }
+
+    anyhow::bail!("timed out waiting for `drs serve` to become ready")
+}
+
+fn spawn_daemon(
+    backend: BackendKind,
+    headless: bool,
+    user_data_dir: Option<PathBuf>,
+) -> Result<()> {
+    let exe = std::env::current_exe().context("resolve current drs executable")?;
+    let mut cmd = std::process::Command::new(exe);
+    cmd.arg("serve").arg("--backend").arg(backend.to_string());
+    if headless {
+        cmd.arg("--headless");
+    }
+    if let Some(dir) = user_data_dir {
+        cmd.arg("--user-data-dir").arg(dir);
+    }
+    cmd.stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    // Detach into its own process group so the daemon (and its browser + login
+    // state) survives even when the spawning CLI/MCP process is killed, e.g.
+    // when Cursor restarts the MCP server.
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        cmd.process_group(0);
+    }
+    cmd.spawn()
+        .context("spawn background `drs serve` process")?;
+    Ok(())
 }
 
 async fn handle_connection(

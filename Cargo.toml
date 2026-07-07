@@ -7,7 +7,7 @@ rust-version = "1.85"
 # main.rs 本就不会被当示例,这里再加一道保险,杜绝把资源/子目录误判为示例)。
 autoexamples = false
 authors = ["极数本源 (apizero.cn)"]
-description = "Rust 反检测浏览器自动化 + 内置验证码识别:ddddocr 离线 OCR 与图片滑块缺口距离(极验/顶象),默认 Google Chrome/CDP、可选 Camoufox/Firefox、自动过 Cloudflare 盾、高并发爬虫与 XHR 监听拦截,DrissionPage 风格 API。Anti-detect browser automation in Rust with built-in ddddocr captcha OCR + slider-gap solving, Chrome/CDP by default, optional Camoufox, Cloudflare bypass — a Rust DrissionPage."
+description = "Rust 反检测浏览器自动化与身份治理引擎:账号池指纹准入/漂移/lifecycle 审计,内置 ddddocr OCR 与滑块缺口识别,默认 Chrome/CDP、可选 Camoufox、Cloudflare 过盾、高并发爬虫与 XHR 监听拦截。Anti-detect browser automation and browser identity governance in Rust."
 documentation = "https://docs.rs/drission"
 homepage = "https://apizero.cn"
 repository = "https://github.com/MageGojo/drission-rs"

@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "drs": {
+      "command": "drs",
+      "args": ["mcp", "--backend", "cdp", "--headless"],
+      "env": {}
+    }
+  }
+}

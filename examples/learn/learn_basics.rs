@@ -237,9 +237,6 @@ async fn dump_list(tab: &ChromiumTab, selector: &str) -> drission::Result<usize>
 ///
 /// `<'a>` 声明一个生命周期参数;`s: &'a str -> &'a str` 表示:
 /// 返回的切片借用自 `s`,与 `s` 同寿 —— 编译器据此保证你不会拿到一个「悬垂引用」。
-fn first_word<'a>(s: &'a str) -> &'a str {
-    match s.trim_start().split_whitespace().next() {
-        Some(w) => w,
-        None => "",
-    }
+fn first_word(s: &str) -> &str {
+    s.split_whitespace().next().unwrap_or_default()
 }

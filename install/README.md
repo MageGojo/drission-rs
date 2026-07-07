@@ -1,10 +1,39 @@
-# 一键配置 Rust 环境(给想体验 drission 的非 Rust 用户)
+# 安装 drission / drs
+
+## A. 只想用 `drs` CLI / MCP(不需要 Rust)—— 推荐
+
+装预编译二进制,一条命令:
+
+```bash
+# mac / linux
+curl -fsSL https://raw.githubusercontent.com/MageGojo/drission-rs/main/install/drs-install.sh | sh
+# windows(PowerShell)
+irm https://raw.githubusercontent.com/MageGojo/drission-rs/main/install/drs-install.ps1 | iex
+```
+
+`drs-install.sh` / `drs-install.ps1` 会:
+
+1. 识别系统与架构(mac arm64/x64、linux x64/arm64 musl 静态、windows x64);
+2. 从 [GitHub Releases](https://github.com/MageGojo/drission-rs/releases)(GitCode 备用镜像)下载对应 `drs`;
+3. 装到 `~/.local/bin`(Windows 装到 `%LOCALAPPDATA%\drs\bin`,并加进用户 PATH);
+4. 打印版本号,提示下一步 `drs setup`。
+
+装完接入 AI 编辑器:
+
+```bash
+drs setup            # 自动写 Cursor(.cursor/mcp.json)+ Codex(~/.codex/config.toml)的 MCP 配置
+drs setup --target cursor   # 只配 Cursor;--target codex 只配 Codex;--scope global 写全局
+```
+
+环境变量:`DRS_VERSION=v0.3.2` 装指定版本、`DRS_INSTALL_DIR=~/bin` 换安装目录。
+
+---
+
+## B. 想写 Rust 用 `drission` 库 —— 一键配 Rust 环境
 
 不熟悉 Rust?是 Python / TS 爬虫开发者,只想快速跑起来?用下面的**一键脚本**:
 自动用**国内镜像([rsproxy.cn](https://rsproxy.cn))**装好 Rust + 配好 cargo 加速,**带进度、自动验证版本号**。
 全程**装在用户目录、无需管理员权限**,也**不依赖 Homebrew 等包管理器**。
-
-> 只想试跑、连 Rust 都不想装?直接用预编译二进制:[`../dist/mac`](../dist/mac) · [`../dist/win`](../dist/win)。
 
 ---
 

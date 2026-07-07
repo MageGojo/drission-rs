@@ -89,7 +89,19 @@ pub mod prelude {
     pub use crate::a11y::{AxNode, AxTree};
     pub use crate::codegen::{RecordedAction, RecordedScript};
     pub use crate::error::{Error, Result};
-    pub use crate::fingerprint::{FingerprintProbe, FingerprintSnapshot};
+    pub use crate::fingerprint::{
+        FingerprintProbe, FingerprintSnapshot, IdentityAdmissionAction, IdentityAdmissionPlan,
+        IdentityCapacityAction, IdentityCapacityPlan, IdentityCapacityStatus, IdentityCluster,
+        IdentityDriftRemediationAction, IdentityDriftRemediationPlan,
+        IdentityDriftRemediationTarget, IdentityDriftReport, IdentityDriftSeverity,
+        IdentityDriftSignal, IdentityEntropyBudget, IdentityEntropySignalBudget,
+        IdentityEntropyStatus, IdentityFixAction, IdentityFixPlan, IdentityFixPriority,
+        IdentityFixTarget, IdentityIssue, IdentityOffender, IdentityPoolDiversityBucket,
+        IdentityPoolDiversityReport, IdentityPoolDiversitySignal, IdentityPoolRemediationAction,
+        IdentityPoolRemediationPlan, IdentityPoolRemediationTarget, IdentityPoolReport,
+        IdentityPoolSignal, IdentityQuarantinePlan, IdentityReport, IdentitySeverity,
+        LinkabilityPair, LinkabilityReport, LinkabilitySignal, LinkabilityStrength,
+    };
     pub use crate::human::{HumanClickOpts, Humanize, ImageView, fetch_image};
     pub use crate::keys::{KeyInput, Keys};
     pub use crate::locator::{Query, parse as parse_locator};

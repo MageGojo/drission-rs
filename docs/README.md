@@ -11,6 +11,8 @@
 | 文档 | 内容 | 适合谁 |
 |---|---|---|
 | [设计.md](设计.md) | 自顶向下分层架构、Juggler 协议选型、异步并发模型、启动引导、监听/拦截/过盾接线、截图录像、WS 接管、吐环境、CDP 后端 | 想理解内部实现 / 参与贡献的人 |
+| [差异化路线.md](差异化路线.md) | 为什么 drission-rs 不应只做 Python DrissionPage 的 Rust 复刻,以及账号/Profile 运行时治理 sidecar 的产品路线 | 判断下一步功能优先级、做产品/架构取舍的人 |
+| [../python/README.md](../python/README.md) | Python 旧业务接入 `identity-job run` 的薄 helper:读取 `DRS_IDENTITY_*`、写 `DRS_IDENTITY_RESULT_OUT` | 想保留 Python 业务逻辑,只把账号/Profile 治理交给 Rust 的人 |
 | [API映射.md](API映射.md) | **DrissionPage(Python)→ drission(Rust)** 逐条 API 对照表,覆盖启动、页面、元素、定位、监听、拦截、滑块、动作链、iframe 等 | 从 DrissionPage 迁移、想快速查等价写法的人 |
 | [CLI.md](CLI.md) | `drs` CLI / MCP 使用说明:daemon、JSON 输出、AI Agent 调用、stdio MCP 工具、OCR 命令 | 想让 AI 或脚本直接操作浏览器的人 |
 | [并发池.md](并发池.md) | `BrowserPool` / 代理池 / 指纹池 / 断点续抓 的设计:两层指纹约束、轮换策略、健康自愈、Checkpoint、踩坑记录 | 做高并发规模化采集的人 |
@@ -29,6 +31,6 @@
 ## 🗂️ 阅读建议
 
 - **第一次用** → 先看根 [`README.md`](../README.md) 的「快速开始」,再跑 `cargo run --example quickstart`。
-- **从 DrissionPage 来** → 直接查 [API映射.md](API映射.md),按表把 Python 写法换成 Rust。
+- **从 DrissionPage 来** → 先看 [差异化路线.md](差异化路线.md) 判断是否需要迁移业务;只查 API 等价写法时再看 [API映射.md](API映射.md)。
 - **要做大规模采集** → 读 [并发池.md](并发池.md) + 跑 `cargo run --example pool_crawl`。
 - **想改源码 / 提 PR** → 通读 [设计.md](设计.md),它和 `src/` 的目录结构一一对应。

@@ -1,8 +1,9 @@
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Result, anyhow};
 use base64::Engine;
+use drission::prelude::FingerprintProbe;
 use serde_json::{Value, json};
 
 use crate::paths;
@@ -70,7 +71,7 @@ async fn launch_cdp(headless: bool, user_data_dir: Option<PathBuf>) -> Result<Ba
 
 #[cfg(not(feature = "cdp"))]
 async fn launch_cdp(_headless: bool, _user_data_dir: Option<PathBuf>) -> Result<BackendBrowser> {
-    bail!("backend cdp is not compiled; rebuild drs with feature `cdp`")
+    anyhow::bail!("backend cdp is not compiled; rebuild drs with feature `cdp`")
 }
 
 #[cfg(feature = "camoufox")]
@@ -89,7 +90,7 @@ async fn launch_camoufox(
     _headless: bool,
     _user_data_dir: Option<PathBuf>,
 ) -> Result<BackendBrowser> {
-    bail!("backend camoufox is not compiled; rebuild drs with feature `camoufox`")
+    anyhow::bail!("backend camoufox is not compiled; rebuild drs with feature `camoufox`")
 }
 
 impl BackendTab {
@@ -345,6 +346,24 @@ impl BackendTab {
             BackendTab::Cdp(tab) => Ok(tab.pass_cloudflare(timeout).await?),
             #[cfg(feature = "camoufox")]
             BackendTab::Camoufox(tab) => Ok(tab.pass_cloudflare(timeout).await?),
+        }
+    }
+
+    pub async fn fingerprint_snapshot(&self) -> Result<drission::fingerprint::FingerprintSnapshot> {
+        match self {
+            #[cfg(feature = "cdp")]
+            BackendTab::Cdp(tab) => Ok(tab.fingerprint_snapshot().await?),
+            #[cfg(feature = "camoufox")]
+            BackendTab::Camoufox(tab) => Ok(tab.fingerprint_snapshot().await?),
+        }
+    }
+
+    pub async fn identity_report(&self) -> Result<drission::fingerprint::IdentityReport> {
+        match self {
+            #[cfg(feature = "cdp")]
+            BackendTab::Cdp(tab) => Ok(tab.identity_report().await?),
+            #[cfg(feature = "camoufox")]
+            BackendTab::Camoufox(tab) => Ok(tab.identity_report().await?),
         }
     }
 }

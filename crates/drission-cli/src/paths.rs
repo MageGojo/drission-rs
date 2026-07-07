@@ -15,6 +15,13 @@ pub fn state_path() -> Result<PathBuf> {
     Ok(cli_dir()?.join("drs-server.json"))
 }
 
+/// Stable browser profile directory reused across daemon restarts so that
+/// cookies and logged-in sessions survive. Callers may override with an
+/// explicit `--user-data-dir`.
+pub fn default_profile_dir() -> Result<PathBuf> {
+    Ok(cli_dir()?.join("profile"))
+}
+
 pub fn screenshots_dir() -> Result<PathBuf> {
     Ok(cli_dir()?.join("screenshots"))
 }

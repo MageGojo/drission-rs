@@ -193,7 +193,7 @@ async fn main() -> drission::Result<()> {
         out.display()
     );
     let mut uniq: Vec<&(String, usize)> = seen.values().collect();
-    uniq.sort_by(|a, b| b.1.cmp(&a.1));
+    uniq.sort_by_key(|b| std::cmp::Reverse(b.1));
     for (name, cnt) in uniq {
         println!(
             "    {name}{}",
