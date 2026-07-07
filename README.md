@@ -1,4 +1,4 @@
-# drission · Rust 反检测浏览器自动化 + 内置验证码识别(OCR / 滑块缺口距离)
+# drission · drs 本地浏览器 MCP + Rust 浏览器自动化
 
 [![crates.io](https://img.shields.io/crates/v/drission.svg)](https://crates.io/crates/drission)
 [![docs.rs](https://docs.rs/drission/badge.svg)](https://docs.rs/drission)
@@ -9,90 +9,58 @@
 
 [English](README.en.md) · **简体中文** · 仓库:[GitHub](https://github.com/MageGojo/drission-rs) · [GitCode](https://gitcode.com/Roufsi/drission-rs)
 
-> **drission 是一个用 Rust 编写的高性能浏览器自动化库**:**默认开箱驱动 Google Chrome**(Chromium / CDP,
-> 也支持 Edge / Brave / Chromium / Electron),**一行开启** [Camoufox](https://github.com/daijro/camoufox)(Firefox 反检测内核)
-> 及其全部高级能力——**内置字符验证码 OCR**(ddddocr 模型 · 纯 Rust 推理)、**图片滑块缺口距离识别**(极验 / 顶象)、
-> 自动过 Cloudflare 盾、XHR 监听 / 拦截、高并发浏览器池。API 语法对齐 [DrissionPage](https://github.com/g1879/DrissionPage),面向高并发爬虫与自动化。
->
-> *drission is a high-performance browser-automation library in Rust: drives **Google Chrome (CDP) by default**, with Camoufox/Firefox
-> anti-detect available via one feature flag — **built-in captcha OCR**, **image slider-gap recognition**, async high-concurrency
-> crawling, XHR listen/intercept and Cloudflare bypass — with a DrissionPage-style API.*
+**一句话定位**:`drs` 是给 AI Agent 用的本地浏览器 MCP / CLI,把 Chrome CDP 自动化、截图、AX tree 和 OCR-ready 工具交给模型;`drission` 是同一套能力背后的 Rust 库。
 
-本库由 **极数本源([apizero.cn](https://apizero.cn))** 出品与维护,是其自动化与数据采集技术栈的一部分。
-如果你在找「**Rust Chrome 自动化 / 验证码识别 / 滑块缺口距离 / 反检测浏览器 / 高并发爬虫**」的一站式方案,这里是答案。
+**3 个核心卖点**
 
-> **与众不同之处**:Rust 生态里的浏览器自动化库(如 `zendriver-rs`、`rust_drission`、`stygian-browser` 等)验证码普遍依赖第三方打码服务
-> (capsolver / 2captcha)。**drission 默认开箱即用驱动 Google Chrome,并内置离线验证码识别(ddddocr OCR + 图片滑块缺口距离)、
-> 一行切换 Camoufox / Firefox 反检测内核**——无需联网打码,是「**Rust 版 DrissionPage**」里少有的自带打码方案。
+- **AI Agent 入口**:`drs mcp` 暴露稳定工具,`drs serve` + `drs --json` 适合脚本、Agent 和本地自动化编排。
+- **默认 Chrome/CDP**:开箱驱动 Google Chrome / Edge / Brave / Chromium / Electron,支持截图、AX tree、网络监听、请求拦截、录制生成代码。
+- **内置视觉识别**:离线字符验证码 OCR、图片滑块缺口距离识别,不依赖第三方打码平台;Rust API 对齐 DrissionPage 的顺手体验。
 
-> 🤖 **给 AI 编程助手**:若你是 AI,要**基于本库写代码**,请先阅读并严格遵循 [**`docs/SKILL.md`**](docs/SKILL.md)
-> ——本库接口 / feature / 构建规则的**权威速查**,覆盖从最基础用法到**点选验证码点击**全流程,照它写即可一次编译通过、运行正确。
-> 若你的环境不支持 "skill" 机制,可忽略此强制条款,但仍强烈建议据此使用本库。
-
----
-
-## 📖 这是什么(一句话看懂)
-
-**drission = Rust 版的 DrissionPage + 内置打码(OCR / 滑块)+ 反检测过盾。** 用一套 `tokio` 异步 API 同时拿下:
-
-- **浏览器自动化**:启动 / 接管反检测浏览器,像写 DrissionPage 一样定位元素、点击输入、抓包改包。
-- **验证码识别**:字符验证码离线 OCR、滑块缺口距离计算 + 拟人轨迹,**不依赖第三方打码平台、无需联网**。
-- **反检测与过盾**:指纹定制、`navigator.webdriver=false`、自动通过 Cloudflare Turnstile。
-- **工程化采集**:高并发浏览器池、代理 / 指纹轮换、断点续抓、Session(HTTP)双模、CSV / JSON 导出。
-
-> 典型场景:**Rust 爬虫 / 数据采集 / 自动化测试 / 风控与验证码对抗研究 / Web-JS 逆向补环境与纯算签名**。
-
----
-
-## 📦 没装 Rust 也能用(免编译上手)
-
-🦀 **Python / TS 开发者友好**:不想手动装 Rust?用**一键环境配置脚本**(国内镜像加速、**双击即装**、带进度、自动验证):
-见 [`install/`](install/) —— macOS 双击 `install-mac.command`、Windows 双击 `install-windows.bat`,装完即可 `cargo add drission`。
-**运行前提**:本机已装 Chrome / Edge(可用环境变量 `CHROME_BIN` 指定路径);用到 OCR 的示例首次运行会自动下载模型到缓存。
-
-## 🤖 `drs` CLI / MCP(AI Agent 入口)
-
-本仓库内置 `drs` 命令行与 stdio MCP server,适合让 AI 以稳定 JSON 协议驱动浏览器:
+**3 行 Quickstart**
 
 ```bash
-cargo install drission-cli --bin drs
+cargo install drission-cli --bin drs --features cdp,ocr
 drs serve --backend cdp --headless
+drs --json open https://example.com && drs screenshot --out page.png --full
+```
+
+![drs local browser MCP demo](docs/images/drs-browser-mcp-demo.gif)
+
+---
+
+## 🧰 `drs`: local browser MCP server
+
+`drs` 是本仓库优先推荐的产品入口:一个本地浏览器 daemon、一个 stdio MCP server、一个稳定 JSON CLI。AI Agent 可以用它打开页面、读取无障碍树、截图、监听网络、执行点击输入,也可以在启用 `ocr` feature 后处理验证码图片。
+
+```bash
+drs mcp --backend cdp --headless
 drs --json open https://example.com
 drs ax --outline
-drs mcp --backend cdp --headless
+drs screenshot --out page.png --full
 ```
 
 CLI 子包与核心库同仓库、独立依赖,不会污染普通 `drission` 库用户。完整说明见 [`docs/CLI.md`](docs/CLI.md)。
 
 ---
 
-## 🆕 最新版本 v0.3.2 新增
+## 📖 这是什么
 
-> **v0.3.2** —— 对标 Playwright / Puppeteer / DrissionPage 的「标配补齐」+ 录制/无障碍 + AI Agent 入口:
->
-> - **`drs` CLI / MCP(AI Agent 入口)**:新增同仓库 workspace 子包 `drission-cli`,二进制 `drs`。支持 `drs serve` 本地 daemon、`drs --json` 稳定 JSON 协议、页面观察/动作/监听/截图/过盾命令,以及 `drs mcp` stdio MCP server;CLI 依赖独立,不污染核心 `drission` 库用户。详见 [`docs/CLI.md`](docs/CLI.md)。
-> - **录制 → 生成代码(codegen / recorder)**:`tab.recorder()` 录一遍页面操作 → 直接产**可运行 Rust**(DrissionPage 风格选择器),覆盖点击/输入/勾选/下拉/按键/悬停/拖拽/iframe/多标签。对标 Playwright `codegen`。
-> - **无障碍快照(a11y)**:`tab.ax_tree()` / `ax_snapshot()` 把页面压成 `role "name"` 语义树,用于抗改版断言或**喂 LLM**(比整页 HTML 小一个数量级)。
-> - **实时指纹快照读取(fingerprint)**:`tab` 一次性 dump UA/平台/时区/屏幕/WebGL/canvas 等,用于验证「指纹确实换了」。
-> - **CDP 标配补齐**:PDF 导出 / MHTML / `set_content` / **HAR 录制+回放** / `expose_function` / 媒体·网络·CPU 模拟 / 移动端设备预设 / 运行时权限 / storage 便捷读写 / `wait().new_tab` 等。详见 [`docs/标配补齐.md`](docs/标配补齐.md)、[`docs/录制与无障碍.md`](docs/录制与无障碍.md)。
->
-> 完整记录见 [CHANGELOG.md](CHANGELOG.md)。上一版 **v0.3.1** 聚焦 **Windows 实机点选 / 过盾精准度**与**无头反检测真实度**:
->
-> - **Windows 高 DPI 点击对齐**:强制 `device-scale=1`,修复 125% / 150% 缩放下合成点击按物理像素偏移导致的 Cloudflare Turnstile / 易盾点选「点不中」。
-> - **无头 GPU 自适应**:有真实 GPU 走硬件 ANGLE、无 GPU(VM / RDP)退 D3D11 WARP,WebGL 真实可用(避开 SwiftShader 软渲染破绽)。
-> - **反检测身份一致**:伪装 Chrome UA 时必定补回一致的高熵 Client Hints / `userAgentMetadata`(消除空 `fullVersionList`、Edge 品牌矛盾)。
-> - **Cloudflare 内嵌 Turnstile 过盾**:三级定位(含闭合 shadow DOM)+ 以 token 产出判过,支持表单内嵌 Turnstile。
-> - **CDP 隔离上下文 cookie 修复**;发布产物体积优化(`opt-level=z` + LTO + strip)。
->
-> **v0.3.0** 起的能力:本版**双协议统一接口全面对齐**、新增 Session TLS 指纹、每浏览器指纹与 AI 编程技能文档。
+**drission = Rust 版 DrissionPage + 默认 Chrome/CDP + 内置 OCR / 滑块识别 + 面向 AI Agent 的 `drs` 入口。** 用一套 `tokio` 异步 API 同时拿下:
 
-- **CDP 后端全面对齐 Camoufox(同一份代码切 feature 即换后端)**:补齐 iframe / Shadow DOM / 动作链 / 控制台 / WebSocket 监听 / 截图录像 / 上传 / 对话框 / **吐环境 `dump_env`** / **高并发池 `ChromiumPool`** / **修饰组合键**(无头也真执行 Ctrl+A/C/V 编辑命令)/ **Windows 进程树兜底(Job Object)**。
-- **Session 浏览器 TLS / JA3 / JA4 + HTTP2 指纹伪装(`--features impersonate`)**:给纯 HTTP 双模套**真实浏览器握手指纹**(`wreq` + BoringSSL,`BrowserProfile::Chrome/Firefox/Safari/Edge`),让「浏览器过盾 → HTTP 接力」不再被现代 WAF(Akamai / CF / DataDome)凭 TLS 指纹拦下;Windows(含 mingw 交叉编译)已实测产出 `.exe`。
-- **每浏览器不同指纹 `CdpFingerprint` / `CdpFingerprintPool`**(对标 Camoufox 指纹池):并发起 N 个浏览器各套一份**连贯指纹**(UA / 平台 / 语言 / 时区 / 屏幕 / 硬件 / WebGL / canvas·audio 噪声),同 OS 变体保真(Turnstile 友好)、跨 OS persona 完整伪装。
-- **🤖 AI 编程技能 [`docs/SKILL.md`](docs/SKILL.md)(AI 必读)**:从基础到**点选验证码点击**全流程的接口 / feature / 构建规则权威速查;README 顶部声明「AI 基于本库开发须遵循此 skill」。
-- **示例全部可复制运行**:默认后端翻为 cdp 后,修正 ~45 个 Camoufox / slider / ocr 示例头注释的运行命令(Camoufox 系须 `--no-default-features --features camoufox`)。
+- **浏览器自动化**:启动 / 接管浏览器,像写 DrissionPage 一样定位元素、点击输入、抓包改包。
+- **视觉识别**:字符验证码离线 OCR、滑块缺口距离计算 + 拟人轨迹,不依赖第三方打码平台。
+- **工程化采集**:高并发浏览器池、代理 / 指纹轮换、断点续抓、Session(HTTP)双模、CSV / JSON 导出。
+- **反检测与双模运行**:Chrome/CDP 默认后端,可选 Camoufox,也支持浏览器与 HTTP Session 双模接力。
 
-> 早期版本能力(`0.1.x` / `0.2.x`):默认 CDP / Google Chrome 驱动与自动下载、Windows 稳定支持 + Chrome 路径探测、验证码 OCR、图片滑块、**点选验证码真过盾**、Session / `WebPage` 双模、纯算签名运行器、Cloudflare 过盾、代理池健康、登录态持久化、Shadow DOM、下载管理 —— 详见 [CHANGELOG.md](CHANGELOG.md)。
+本库由 **极数本源([apizero.cn](https://apizero.cn))** 出品与维护,是其自动化与数据采集技术栈的一部分。
+
+---
+
+## 📦 没装 Rust 也能用
+
+Python / TS 开发者可以用一键环境配置脚本:见 [`install/`](install/) —— macOS 双击 `install-mac.command`、Windows 双击 `install-windows.bat`,装完即可 `cargo add drission`。
+运行前提:本机已装 Chrome / Edge(可用环境变量 `CHROME_BIN` 指定路径);用到 OCR 的示例首次运行会自动下载模型到缓存。
 
 ---
 
@@ -146,6 +114,20 @@ println!("需移动 {:.0}px,置信 {:.2}", gap.displace, gap.confidence);
   离线标定缺口命中 6/6;算法已沉淀为库能力(`GapMethod::ContentNcc`)。
 - 通用配置 `SliderConfig` + `tab.slider_gap()` / `tab.solve_slider()`,换厂商只换配置。
 
+### 3. `drs` CLI / MCP(AI Agent 入口)
+
+`drs` 把常用浏览器动作做成稳定命令和 MCP 工具,适合让 Agent 直接使用,也适合 shell / Node / Python 脚本编排:
+
+```bash
+drs serve --backend cdp --headless
+drs --json open https://example.com
+drs ax --outline
+drs screenshot --out page.png --full
+drs mcp --backend cdp --headless
+```
+
+MCP 工具覆盖 `browser_open`、`browser_click`、`browser_type`、`browser_eval`、`browser_ax`、`browser_screenshot` 等常见动作;开启 `ocr` feature 后还可接入图片验证码识别。更完整的命令和协议见 [`docs/CLI.md`](docs/CLI.md)。
+
 ---
 
 ## 🧰 还支持
@@ -159,6 +141,20 @@ println!("需移动 {:.0}px,置信 {:.2}", gap.displace, gap.confidence);
 - **吐环境(补环境)**:采集 canvas / webgl / audio 真实指纹 + 签名 sink 定位,一键导出可 `node` 运行的补环境工程;配合 `signer` 可编成无 Node 单二进制纯算签名。
 - **接管浏览器**:`BrowserServer` 暴露 WebSocket 端点,`Browser::connect` 接管已运行的浏览器。
 - **多后端**:**默认 Chromium / CDP**(驱动 / 接管 Chrome / Edge / Brave / Chromium / Electron);`--features camoufox` 起 Camoufox / Firefox(Juggler)反检测后端及其全部高级能力。
+
+---
+
+## 🆕 最新版本 v0.3.2 新增
+
+**v0.3.2** 聚焦把 `drs` 做成 AI Agent 入口,并补齐 Playwright / Puppeteer / DrissionPage 常见能力:
+
+- **`drs` CLI / MCP**:本地 daemon、稳定 JSON 协议、stdio MCP server,支持页面观察、动作、网络监听、截图等命令。
+- **录制 → 生成代码**:`tab.recorder()` 录一遍页面操作,直接产出可运行 Rust 代码。
+- **无障碍快照**:`tab.ax_tree()` / `ax_snapshot()` 输出紧凑语义树,适合断言和喂给 LLM。
+- **CDP 标配补齐**:PDF、MHTML、`set_content`、HAR 录制/回放、`expose_function`、设备/网络/CPU 模拟、权限和 storage 便捷读写。
+- **Windows / 无头稳定性**:高 DPI 点击对齐、无头 GPU 自适应、Client Hints 一致性、CDP 隔离上下文 cookie 修复。
+
+完整记录见 [CHANGELOG.md](CHANGELOG.md)、[`docs/CLI.md`](docs/CLI.md)、[`docs/标配补齐.md`](docs/标配补齐.md)、[`docs/录制与无障碍.md`](docs/录制与无障碍.md)。
 
 ---
 
@@ -306,7 +302,7 @@ A:macOS(主力)· Linux · Windows(命名管道传输已打通);Rust ≥ 1.85(ed
 
 ## 📚 文档
 
-- [🤖 **编程技能 SKILL(AI 必读)**](docs/SKILL.md) — 接口 / feature / 构建规则权威速查,基础 → 点选验证码全流程,照写即对
+- [🤖 **给 AI 编程助手**](docs/SKILL.md) — 基于本库写代码前先读;接口 / feature / 构建规则权威速查,基础 → 点选验证码全流程
 - [文档总览 `docs/`](docs/) — 设计 · API 映射 · 并发池 · 长监听
 - [**DrissionPage → drission API 映射**](docs/API映射.md) — 从 DP 迁移,按表把 Python 写法换成 Rust,几乎零成本
 - [设计文档](docs/设计.md) — 分层架构 / Juggler 选型 / 并发模型 / 各能力接线
