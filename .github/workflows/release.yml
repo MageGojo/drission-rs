@@ -55,6 +55,12 @@ jobs:
         with:
           key: release-${{ matrix.target }}
 
+      # reqwest (a `drission` dep) pulls rustls + aws-lc-sys, whose x86_64
+      # assembly needs nasm on Windows/MSVC. cmake ships on the runner.
+      - name: Install nasm (Windows aws-lc-sys)
+        if: runner.os == 'Windows'
+        uses: ilammy/setup-nasm@v1
+
       - name: Install cross (musl targets)
         if: matrix.cross
         uses: taiki-e/install-action@v2
