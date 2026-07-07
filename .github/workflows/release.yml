@@ -128,3 +128,61 @@ jobs:
             dist/drs-*.tar.gz.sha256
             dist/drs-*.zip
             dist/drs-*.zip.sha256
+
+  # Mirror the tag + prebuilt drs assets to GitCode so install/drs-install.sh can
+  # fall back to gitcode.com/Roufsi/drission-rs/releases/download/<tag>/...
+  mirror-gitcode:
+    name: mirror release to GitCode
+    needs: release
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Push tag to GitCode
+        env:
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+        run: |
+          if [ -z "${GITCODE_TOKEN:-}" ]; then
+            echo "::notice::GITCODE_TOKEN not set — skip GitCode git push."
+            exit 0
+          fi
+          git remote add gitcode "https://oauth2:${GITCODE_TOKEN}@gitcode.com/Roufsi/drission-rs.git"
+          git push gitcode "${{ github.ref_name }}:refs/tags/${{ github.ref_name }}"
+          git push gitcode HEAD:main
+
+      - name: Create GitCode release + upload assets
+        env:
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [ -z "${GITCODE_TOKEN:-}" ]; then
+            echo "::notice::GITCODE_TOKEN not set — skip GitCode release upload."
+            echo "Install script still works via GitHub Releases (primary)."
+            exit 0
+          fi
+          set -euo pipefail
+          API="https://api.gitcode.com/api/v5/repos/Roufsi/drission-rs/releases"
+          BODY=$(jq -n --arg tag "$TAG" '{tag_name:$tag,name:$tag,body:"Prebuilt drs CLI/MCP binaries (mirrored from GitHub Release)",draft:false,prerelease:false}')
+          RESP=$(curl -fsS -X POST "$API?access_token=${GITCODE_TOKEN}" -H "Content-Type: application/json" -d "$BODY" || true)
+          if echo "$RESP" | jq -e '.id' >/dev/null 2>&1; then
+            RID=$(echo "$RESP" | jq -r '.id')
+          else
+            echo "Release may already exist, fetching by tag..."
+            RID=$(curl -fsS "$API/tags/$TAG?access_token=${GITCODE_TOKEN}" | jq -r '.id')
+          fi
+          for f in dist/drs-*; do
+            [ -f "$f" ] || continue
+            echo "Uploading $(basename "$f")..."
+            curl -fsS -X POST \
+              "https://api.gitcode.com/api/v5/repos/Roufsi/drission-rs/releases/${RID}/assets?access_token=${GITCODE_TOKEN}&name=$(basename "$f")" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary "@$f"
+          done

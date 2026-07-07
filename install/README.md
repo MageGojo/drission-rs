@@ -25,7 +25,7 @@ drs setup            # 自动写 Cursor(.cursor/mcp.json)+ Codex(~/.codex/config
 drs setup --target cursor   # 只配 Cursor;--target codex 只配 Codex;--scope global 写全局
 ```
 
-环境变量:`DRS_VERSION=v0.3.2` 装指定版本、`DRS_INSTALL_DIR=~/bin` 换安装目录。
+环境变量:`DRS_VERSION=v0.4.0` 装指定版本、`DRS_INSTALL_DIR=~/bin` 换安装目录。
 
 ---
 

@@ -38,10 +38,14 @@ drs setup
 ### 一句话给 AI 的话术(复制即用)
 
 > **使用本仓库 `MageGojo/drission-rs` 的 `drs` 浏览器 MCP**:先运行
-> `curl -fsSL https://raw.githubusercontent.com/MageGojo/drission-rs/main/install/drs-install.sh | sh` 安装 CLI,
-> 再运行 `drs setup` 自动配置 Cursor / Codex 的 MCP 服务;之后凡是需要抓「难获取」的网页数据
-> (登录态 / 反爬 / Cloudflare / 动态渲染),一律用 `drs` 的 `browser_extract`、`browser_*`、`network_*` 工具,
-> 不要用 curl / WebFetch。
+> `curl -fsSL https://raw.githubusercontent.com/MageGojo/drission-rs/main/install/drs-install.sh | sh` 安装 CLI(无需 Rust),
+> 再运行 `drs setup` 自动配置 Cursor 与 Codex 的 MCP 服务;之后凡是需要抓「难获取」的网页数据
+> (登录态 / 反爬 / Cloudflare / 动态渲染),一律用 MCP 工具 `browser_extract`、`browser_*`、`network_*`,
+> 不要用 curl / WebFetch / Playwright。
+
+**更短版(丢给 Agent 当 system 提示也行):**
+
+> 难抓的网页数据走 `drs` MCP:`install/drs-install.sh` → `drs setup` → 用 `browser_extract` 等工具;禁止 curl/WebFetch。
 
 ### 手动三步
 
@@ -220,19 +224,15 @@ MCP 工具覆盖 `browser_open`、`browser_click`、`browser_type`、`browser_ev
 
 ---
 
-## 🆕 最新版本 v0.3.2 新增
+## 🆕 最新版本 v0.4.0 新增
 
-**v0.3.2** 聚焦把 `drs` 做成 AI Agent 入口和旧 Python 业务旁边的账号/Profile 治理 sidecar:
+**v0.4.0** 把 `drs` 定位成 **Cursor / Codex 的浏览器采集 MCP**,并补齐免 Rust 安装链路:
 
-- **`drs` CLI / MCP**:本地 daemon、稳定 JSON 协议、stdio MCP server,支持页面观察、动作、网络监听、截图等命令。
-- **`identity-job run`**:包住既有 Python/Node/shell 脚本,统一 profile 租约、运行中续租、子进程超时、失败判责、冷却、熔断、runtime risk 和 explain 审计。
-- **`identity-ledger query/explain/compact/dashboard`**:聚合 runtime release ledger 与 runtime risk ledger,输出失败原因排行、账号/Profile 失败排行、仍生效的 suppression,解释单个账号或失败原因为什么还不能跑,把长期 NDJSON 压成可调度摘要,支持 checkpoint 增量读取,并生成可读 HTML 运行态报告。
-- **录制 → 生成代码**:`tab.recorder()` 录一遍页面操作,直接产出可运行 Rust 代码。
-- **无障碍快照**:`tab.ax_tree()` / `ax_snapshot()` 输出紧凑语义树,适合断言和喂给 LLM。
-- **CDP 标配补齐**:PDF、MHTML、`set_content`、HAR 录制/回放、`expose_function`、设备/网络/CPU 模拟、权限和 storage 便捷读写。
-- **Windows / 无头稳定性**:高 DPI 点击对齐、无头 GPU 自适应、Client Hints 一致性、CDP 隔离上下文 cookie 修复。
+- **MCP 持久浏览器**:`drs mcp` 默认 attach 常驻 daemon,标签与登录态跨 MCP 重启存活;`drs setup` 一条命令写好 Cursor + Codex 配置。
+- **免 Rust 安装**:`install/drs-install.sh` / `.ps1` 从 [GitHub Releases](https://github.com/MageGojo/drission-rs/releases) 下载预编译 `drs`(GitCode 同步源码 + 备用镜像);`drs setup` 即可接入 AI。
+- **账号 / Profile 治理 sidecar**:`identity-job run`、`identity-ledger query/explain/compact/dashboard` 等运行时租约、失败判责、冷却与审计流水(库 + CLI/MCP 双入口)。
 
-完整记录见 [CHANGELOG.md](CHANGELOG.md)、[`docs/CLI.md`](docs/CLI.md)、[`docs/标配补齐.md`](docs/标配补齐.md)、[`docs/录制与无障碍.md`](docs/录制与无障碍.md)。
+**v0.3.2** 还包含:`drs` CLI/MCP 初版、录制生成代码、无障碍快照、CDP 标配补齐、Windows 无头稳定性等。完整记录见 [CHANGELOG.md](CHANGELOG.md)、[`docs/CLI.md`](docs/CLI.md)、[`docs/mcp-持久浏览器.md`](docs/mcp-持久浏览器.md)。
 
 ---
 

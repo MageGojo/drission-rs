@@ -1,6 +1,6 @@
 [package]
 name = "drission-cli"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.85"
 authors = ["极数本源 (apizero.cn)"]
@@ -26,7 +26,7 @@ anyhow = "1.0.100"
 base64 = "0.22.1"
 clap = { version = "4.5.53", features = ["derive", "env"] }
 directories = "6.0.0"
-drission = { version = "0.3.2", path = "../..", default-features = false }
+drission = { version = "0.4.0", path = "../..", default-features = false }
 futures-util = "0.3.32"
 rand = "0.8.5"
 rmcp = { version = "2.1.0", default-features = false, features = ["server", "macros", "transport-io"] }

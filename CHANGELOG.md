@@ -5,6 +5,31 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/),
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.4.0] - 2026-07-07
+
+> **drs 变成给 Cursor / Codex 用的浏览器采集 MCP**:当 AI 需要抓「难获取」的数据(登录态 / 反爬 /
+> Cloudflare / 纯前端渲染)时,通过一个持久真实浏览器去打开、渲染、抓取,而不是用 curl / WebFetch 抓空壳。
+> 同时把账号 / Profile 运行时治理 sidecar 沉淀为库能力。
+
+### 新增 Added
+
+- **MCP 持久浏览器**:`drs mcp` 默认 attach 常驻 `drs serve` daemon 的同一个浏览器,标签与登录态跨 MCP
+  重启存活;daemon 用固定 profile 且脱离启动者进程组常驻;`--standalone` 回退进程内浏览器。见
+  [`docs/mcp-持久浏览器.md`](docs/mcp-持久浏览器.md)。
+- **`drs setup`**:一条命令自动为 Cursor(`.cursor/mcp.json`)与 Codex(`~/.codex/config.toml`)写好 MCP
+  配置,`command` 用 drs 绝对路径,幂等合并、不覆盖其它 server。
+- **免 Rust 安装**:`install/drs-install.sh`(mac/linux)/ `install/drs-install.ps1`(windows)从 GitHub
+  Release(GitCode 备用镜像)下载预编译静态 `drs`;新增 `.github/workflows/release.yml` 按 `v*` tag 产出
+  mac / linux(musl x64+arm64)/ windows 二进制并附校验和。
+- **账号 / Profile 身份治理 sidecar**:`identity_report` / `IdentityPoolReport`(准入、漂移、lifecycle、
+  熵预算、容量计划、隔离/修复动作队列)沉淀进库;`drs identity-*`、`identity-job run`、`identity-ledger
+  query/explain/compact/dashboard` 提供运行时租约、失败判责、冷却、runtime risk 与审计流水。
+
+### 变更 Changed
+
+- README(中/英)重定位为「给 Cursor / Codex 的浏览器采集 MCP + 免 Rust 安装 + AI 一键话术」。
+- `drission-cli` 升到 0.2.0,依赖 `drission` 0.4.0。
+
 ## [0.3.2] - 2026-07-06
 
 > **标配补齐**:对标 Playwright / Puppeteer / DrissionPage 的通用浏览器能力。这些能力为 **Chromium / CDP

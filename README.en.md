@@ -80,6 +80,16 @@ The MCP server attaches to a **persistent browser** (tabs & login state survive 
 
 ---
 
+## 🆕 New in v0.4.0
+
+> **v0.4.0** — **`drs` as a browser MCP for Cursor / Codex** + no-Rust install:
+>
+> - **Persistent browser MCP**: `drs mcp` attaches to a long-lived daemon by default (tabs & login survive MCP restarts); `drs setup` auto-wires Cursor + Codex.
+> - **No Rust required**: `install/drs-install.sh` / `.ps1` pull prebuilt `drs` from [GitHub Releases](https://github.com/MageGojo/drission-rs/releases) (GitCode mirrors source + fallback).
+> - **Account / profile governance sidecar**: `identity-job run`, `identity-ledger query/explain/compact/dashboard`, runtime leases, failure reasons, cooldowns, and audit ledgers (library + CLI/MCP).
+
+See [CHANGELOG.md](CHANGELOG.md), [`docs/CLI.md`](docs/CLI.md), [`docs/mcp-持久浏览器.md`](docs/mcp-持久浏览器.md).
+
 ## 🆕 New in v0.3.2
 
 > **v0.3.2** — standard browser features plus AI-facing runtime:
