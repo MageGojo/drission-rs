@@ -19,25 +19,30 @@ JSON 协议和本地 MCP 服务，适合测试工具、数据处理脚本和 AI 
 > `robots.txt` 和频率限制。不得用于绕过身份验证或安全控制、未授权访问账户、采集受保护数据，
 > 或实施攻击与骚扰。完整边界见[负责任使用](#负责任使用)和 [LICENSE](LICENSE)。
 
-![drs local browser MCP demo](docs/images/drs-browser-mcp-demo.gif)
+![drs CLI、MCP 与本地 Chrome CDP 工作流](docs/images/drs-readme-hero.png)
 
 ## 选择入口
 
 | 入口 | 适用场景 | 开始使用 |
 |---|---|---|
-| `drission` | 在 Rust 程序中控制浏览器 | `cargo add drission@0.4` |
-| `drs` CLI | 从终端或脚本调用浏览器，获得稳定 JSON 输出 | `cargo install drission-cli --bin drs` |
+| `drission` | 在 Rust 程序中控制浏览器 | 使用下方 v0.4.0 Git tag 命令 |
+| `drs` CLI | 从终端或脚本调用浏览器，获得稳定 JSON 输出 | 从 Release 下载预编译文件 |
 | `drs` MCP | 为 Cursor、Codex 等兼容 MCP 的本地客户端提供浏览器工具 | 安装 `drs` 后运行 `drs setup` |
 
 ## 快速开始
 
 ### Rust 库
 
-当前版本为 **0.4.x**，默认启用 Chromium / CDP 后端：
+当前仓库与 Release 版本为 **v0.4.0**，默认启用 Chromium / CDP 后端。crates.io 上的
+`drission` 目前仍为 0.3.2，因此下面固定使用已发布的 Git tag：
+
+```bash
+cargo add drission --git https://github.com/MageGojo/drission-rs --tag v0.4.0
+```
 
 ```toml
 [dependencies]
-drission = "0.4"
+drission = { git = "https://github.com/MageGojo/drission-rs", tag = "v0.4.0" }
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -68,15 +73,18 @@ cargo run --example cdp_demo
 
 ### `drs` CLI 与 MCP
 
-使用 Cargo 安装：
+推荐从 [GitHub Releases](https://github.com/MageGojo/drission-rs/releases/tag/v0.4.0)
+或 [GitCode Releases](https://gitcode.com/Roufsi/drission-rs/releases) 下载对应平台的 `drs`
+预编译文件及 SHA-256 校验文件，无需安装 Rust 工具链。
+
+也可以从已发布的 Git tag 编译安装；该命令已用 `drs 0.2.0` 验证：
 
 ```bash
-cargo install drission-cli --bin drs
+cargo install --git https://github.com/MageGojo/drission-rs --tag v0.4.0 drission-cli --bin drs
 ```
 
-不安装 Rust 工具链时，可从 [GitHub Releases](https://github.com/MageGojo/drission-rs/releases)
-或 [GitCode Releases](https://gitcode.com/Roufsi/drission-rs/releases) 下载对应平台的预编译文件。
-仓库也提供 [`install/`](install/) 下的安装脚本；执行前请先检查脚本内容。
+crates.io 上的 `drission-cli` 目前仍为 0.1.0，请勿用不带 `--git` 的安装命令获取 v0.4.0
+对应 CLI。仓库也提供 [`install/`](install/) 下的安装脚本；执行前请先检查脚本内容。
 
 常用命令：
 
@@ -124,10 +132,10 @@ drs setup
 
 ```toml
 # 默认 CDP 后端并启用 OCR
-drission = { version = "0.4", features = ["ocr"] }
+drission = { git = "https://github.com/MageGojo/drission-rs", tag = "v0.4.0", features = ["ocr"] }
 
 # 仅使用 Camoufox 后端
-# drission = { version = "0.4", default-features = false, features = ["camoufox"] }
+# drission = { git = "https://github.com/MageGojo/drission-rs", tag = "v0.4.0", default-features = false, features = ["camoufox"] }
 ```
 
 各 feature 的依赖关系与构建要求以 [Cargo.toml](Cargo.toml) 和

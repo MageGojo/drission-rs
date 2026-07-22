@@ -21,25 +21,31 @@ tools, data-processing scripts, and AI coding clients.
 > authentication or security controls, access accounts without authorization, collect protected
 > data, or conduct attacks or harassment. See [Responsible use](#responsible-use) and [LICENSE](LICENSE).
 
-![drs local browser MCP demo](docs/images/drs-browser-mcp-demo.gif)
+![drs CLI, MCP, and local Chrome CDP workflow](docs/images/drs-readme-hero.png)
 
 ## Choose an interface
 
 | Interface | Best for | Get started |
 |---|---|---|
-| `drission` | Browser control in a Rust application | `cargo add drission@0.4` |
-| `drs` CLI | Terminal or script use with stable JSON output | `cargo install drission-cli --bin drs` |
+| `drission` | Browser control in a Rust application | Use the pinned v0.4.0 Git command below |
+| `drs` CLI | Terminal or script use with stable JSON output | Download a prebuilt Release binary |
 | `drs` MCP | Local browser tools for Cursor, Codex, and other MCP-compatible clients | Install `drs`, then run `drs setup` |
 
 ## Quick start
 
 ### Rust library
 
-The current release line is **0.4.x**. Chromium/CDP is enabled by default:
+The current repository and Release version is **v0.4.0**. Chromium/CDP is enabled by default.
+The crates.io `drission` package is currently still at 0.3.2, so the commands below pin the
+published Git tag:
+
+```bash
+cargo add drission --git https://github.com/MageGojo/drission-rs --tag v0.4.0
+```
 
 ```toml
 [dependencies]
-drission = "0.4"
+drission = { git = "https://github.com/MageGojo/drission-rs", tag = "v0.4.0" }
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -71,16 +77,21 @@ selection, managed downloads, and headless environments.
 
 ### `drs` CLI and MCP
 
-Install with Cargo:
+The recommended installation path is a prebuilt `drs` binary with its SHA-256 checksum from
+[GitHub Releases](https://github.com/MageGojo/drission-rs/releases/tag/v0.4.0) or
+[GitCode Releases](https://gitcode.com/Roufsi/drission-rs/releases). It does not require a Rust
+toolchain.
+
+You can also build and install from the published Git tag. This command was verified with
+`drs 0.2.0`:
 
 ```bash
-cargo install drission-cli --bin drs
+cargo install --git https://github.com/MageGojo/drission-rs --tag v0.4.0 drission-cli --bin drs
 ```
 
-If you do not have a Rust toolchain, download a prebuilt binary from
-[GitHub Releases](https://github.com/MageGojo/drission-rs/releases) or
-[GitCode Releases](https://gitcode.com/Roufsi/drission-rs/releases). Installer scripts are also
-available under [`install/`](install/); inspect a script before executing it.
+The crates.io `drission-cli` package is currently still at 0.1.0; do not omit `--git` when installing
+the CLI that accompanies v0.4.0. Installer scripts are also available under [`install/`](install/);
+inspect a script before executing it.
 
 Common commands:
 
@@ -134,10 +145,10 @@ Example configurations:
 
 ```toml
 # Default CDP backend with OCR
-drission = { version = "0.4", features = ["ocr"] }
+drission = { git = "https://github.com/MageGojo/drission-rs", tag = "v0.4.0", features = ["ocr"] }
 
 # Camoufox backend only
-# drission = { version = "0.4", default-features = false, features = ["camoufox"] }
+# drission = { git = "https://github.com/MageGojo/drission-rs", tag = "v0.4.0", default-features = false, features = ["camoufox"] }
 ```
 
 Refer to [Cargo.toml](Cargo.toml) and the [API documentation](https://docs.rs/drission) for the
