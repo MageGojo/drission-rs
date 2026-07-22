@@ -75,7 +75,8 @@ cargo install drission-cli --bin drs
 ```
 
 不安装 Rust 工具链时，可从 [GitHub Releases](https://github.com/MageGojo/drission-rs/releases)
-下载对应平台的预编译文件。仓库也提供 [`install/`](install/) 下的安装脚本；执行前请先检查脚本内容。
+或 [GitCode Releases](https://gitcode.com/Roufsi/drission-rs/releases) 下载对应平台的预编译文件。
+仓库也提供 [`install/`](install/) 下的安装脚本；执行前请先检查脚本内容。
 
 常用命令：
 

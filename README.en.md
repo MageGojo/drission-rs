@@ -78,7 +78,8 @@ cargo install drission-cli --bin drs
 ```
 
 If you do not have a Rust toolchain, download a prebuilt binary from
-[GitHub Releases](https://github.com/MageGojo/drission-rs/releases). Installer scripts are also
+[GitHub Releases](https://github.com/MageGojo/drission-rs/releases) or
+[GitCode Releases](https://gitcode.com/Roufsi/drission-rs/releases). Installer scripts are also
 available under [`install/`](install/); inspect a script before executing it.
 
 Common commands:
