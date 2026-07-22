@@ -1,311 +1,45 @@
-# drission · drs 本地浏览器 MCP + 账号/Profile 治理 sidecar
+# drission
+
+Rust 浏览器自动化库，以及面向本地脚本和 AI 客户端的 `drs` CLI / MCP 服务。
 
 [![crates.io](https://img.shields.io/crates/v/drission.svg)](https://crates.io/crates/drission)
 [![docs.rs](https://docs.rs/drission/badge.svg)](https://docs.rs/drission)
-[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org)
-[![platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue.svg)](#-支持的平台与浏览器)
-[![GitHub](https://img.shields.io/badge/GitHub-MageGojo%2Fdrission--rs-181717?logo=github)](https://github.com/MageGojo/drission-rs)
-[![GitCode](https://img.shields.io/badge/GitCode-Roufsi%2Fdrission--rs-c71d23)](https://gitcode.com/Roufsi/drission-rs)
+[![Rust](https://img.shields.io/badge/Rust-1.85%2B-orange.svg)](https://www.rust-lang.org)
+[![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue.svg)](#兼容性)
+[![License](https://img.shields.io/badge/license-source--available-lightgrey.svg)](LICENSE)
 
-[English](README.en.md) · **简体中文** · 仓库:[GitHub](https://github.com/MageGojo/drission-rs) · [GitCode](https://gitcode.com/Roufsi/drission-rs)
+**简体中文** · [English](README.en.md) · [API 文档](https://docs.rs/drission) · [更新日志](CHANGELOG.md)
 
-**一句话定位**:`drs` 是给 **Cursor / Codex 等 AI** 用的**本地浏览器 MCP**——当你需要抓那些「难获取」的数据(要登录态、有反爬、过 Cloudflare、纯前端 JS 渲染)时,让 AI 通过一个**持久真实浏览器**去打开、渲染、抓取,而不是用 `curl` / `WebFetch` 抓到空壳。它同时是 CLI 和账号/Profile 运行时治理 sidecar;`drission` 是同一套能力背后的 Rust 库。
+`drission` 提供基于 `tokio` 的异步浏览器控制 API，默认通过 Chrome DevTools Protocol
+驱动 Chrome、Edge、Brave、Chromium 和 Electron。仓库内的 `drs` 则把相同能力提供为命令行、
+JSON 协议和本地 MCP 服务，适合测试工具、数据处理脚本和 AI 编程客户端调用。
 
-**3 个核心卖点**
-
-- **Cursor / Codex 的数据采集 MCP**:`drs mcp` 暴露稳定的 `browser_*` / `network_*` 工具并**连一个持久浏览器**(登录态跨会话存活),AI 直接拿来抓登录/反爬/动态页面。一条命令 `drs setup` 自动写好 Cursor 和 Codex 的 MCP 配置。
-- **默认 Chrome/CDP**:开箱驱动 Google Chrome / Edge / Brave / Chromium / Electron,支持截图、AX tree、网络监听、请求拦截、录制生成代码。
-- **运行态身份治理**:`identity-job run` 包住旧 Python/Node/shell 脚本,统一 profile 租约、续租、释放、失败原因、冷却、runtime risk 和 ledger 审计。
-
-**免装 Rust,3 步接入 AI**(预编译二进制,详见 [下一节](#-给-cursor--codex-当浏览器采集-mcp免装-rust)):
-
-```bash
-# 1) 装 drs(不需要 Rust 工具链)
-curl -fsSL https://raw.githubusercontent.com/MageGojo/drission-rs/main/install/drs-install.sh | sh
-# 2) 自动配置 Cursor + Codex 的 MCP
-drs setup
-# 3) 重启 Cursor / Codex,让 AI 用 drs 的 browser_* 工具抓数据
-```
+> [!IMPORTANT]
+> 本项目仅用于您拥有或已获明确授权的系统。请遵守适用法律、网站条款、访问控制、
+> `robots.txt` 和频率限制。不得用于绕过身份验证或安全控制、未授权访问账户、采集受保护数据，
+> 或实施攻击与骚扰。完整边界见[负责任使用](#负责任使用)和 [LICENSE](LICENSE)。
 
 ![drs local browser MCP demo](docs/images/drs-browser-mcp-demo.gif)
 
----
+## 选择入口
 
-## 🤖 给 Cursor / Codex 当浏览器采集 MCP(免装 Rust)
+| 入口 | 适用场景 | 开始使用 |
+|---|---|---|
+| `drission` | 在 Rust 程序中控制浏览器 | `cargo add drission@0.4` |
+| `drs` CLI | 从终端或脚本调用浏览器，获得稳定 JSON 输出 | `cargo install drission-cli --bin drs` |
+| `drs` MCP | 为 Cursor、Codex 等兼容 MCP 的本地客户端提供浏览器工具 | 安装 `drs` 后运行 `drs setup` |
 
-**场景**:AI 助手默认只能 `curl` / `WebFetch`,遇到要登录、反爬、Cloudflare、纯前端渲染的页面就抓到空壳或被拦。把 `drs` 接成 MCP 后,AI 改用一个**常驻的真实浏览器**打开页面、等渲染、过盾、读正文/接口,再把结构化数据带回来。
+## 快速开始
 
-### 一句话给 AI 的话术(复制即用)
+### Rust 库
 
-> **使用本仓库 `MageGojo/drission-rs` 的 `drs` 浏览器 MCP**:先运行
-> `curl -fsSL https://raw.githubusercontent.com/MageGojo/drission-rs/main/install/drs-install.sh | sh` 安装 CLI(无需 Rust),
-> 再运行 `drs setup` 自动配置 Cursor 与 Codex 的 MCP 服务;之后凡是需要抓「难获取」的网页数据
-> (登录态 / 反爬 / Cloudflare / 动态渲染),一律用 MCP 工具 `browser_extract`、`browser_*`、`network_*`,
-> 不要用 curl / WebFetch / Playwright。
-
-**更短版(丢给 Agent 当 system 提示也行):**
-
-> 难抓的网页数据走 `drs` MCP:`install/drs-install.sh` → `drs setup` → 用 `browser_extract` 等工具;禁止 curl/WebFetch。
-
-### 手动三步
-
-```bash
-# 1) 安装预编译 drs(mac/linux;Windows 见下),无需 Rust
-curl -fsSL https://raw.githubusercontent.com/MageGojo/drission-rs/main/install/drs-install.sh | sh
-
-# 2) 自动写入 Cursor(.cursor/mcp.json)+ Codex(~/.codex/config.toml)的 MCP 配置
-drs setup                 # 两家都配;可 drs setup --target cursor|codex、--scope global、--dry-run
-
-# 3) 重启 Cursor / Codex —— MCP server `drs` 即可用
-```
-
-Windows(PowerShell):
-
-```powershell
-irm https://raw.githubusercontent.com/MageGojo/drission-rs/main/install/drs-install.ps1 | iex
-drs setup
-```
-
-### 配置长这样(`drs setup` 自动生成,也可手写)
-
-Cursor —— 项目根 `.cursor/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "drs": { "command": "drs", "args": ["mcp", "--backend", "cdp", "--headless"], "env": {} }
-  }
-}
-```
-
-Codex —— `~/.codex/config.toml`:
-
-```toml
-[mcp_servers.drs]
-command = "drs"
-args = ["mcp", "--backend", "cdp", "--headless"]
-startup_timeout_sec = 120
-```
-
-> `drs setup` 会把 `command` 写成当前 `drs` 可执行文件的**绝对路径**,免得编辑器起 MCP 时 `PATH` 里找不到。
-> MCP 默认 **attach 一个常驻浏览器**(登录态、已开标签跨 MCP 重启存活),所以「这次登录、下次直接接着抓」。细节见 [`docs/mcp-持久浏览器.md`](docs/mcp-持久浏览器.md)。
-
-常用 MCP 工具:`browser_extract`(开 URL → 返回 title/text/outline,首选)、`browser_open` / `browser_ax` / `browser_text` / `browser_html` / `browser_screenshot` / `browser_eval`、`network_listen_start` / `network_listen_wait`(抓接口)、`browser_pass_cf`(过 Cloudflare)。完整列表见 [`docs/CLI.md`](docs/CLI.md)。
-
----
-
-## 🧰 `drs`: local browser MCP server
-
-`drs` 是本仓库优先推荐的产品入口:一个本地浏览器 daemon、一个 stdio MCP server、一个稳定 JSON CLI,也是账号/Profile 运行时治理 sidecar。AI Agent 可以用它打开页面、读取无障碍树、截图、监听网络、执行点击输入;调度器和旧 Python 脚本可以用 `identity-job run`、runtime release ledger、runtime risk ledger 和 `identity-ledger query` 接入 profile 生命周期治理。
-
-```bash
-drs mcp --backend cdp --headless
-drs --json open https://example.com
-drs ax --outline
-drs screenshot --out page.png --full
-```
-
-CLI 子包与核心库同仓库、独立依赖,不会污染普通 `drission` 库用户。完整说明见 [`docs/CLI.md`](docs/CLI.md)。
-
----
-
-## 📖 这是什么
-
-**drission = Rust 浏览器自动化运行时 + 账号/Profile 身份治理 sidecar + 默认 Chrome/CDP + 内置 OCR / 滑块识别 + DrissionPage 风格易用 API。** 用一套 `tokio` 异步 API 和 `drs` JSON 协议同时拿下:
-
-- **浏览器自动化**:启动 / 接管浏览器,像写 DrissionPage 一样定位元素、点击输入、抓包改包。
-- **视觉识别**:字符验证码离线 OCR、滑块缺口距离计算 + 拟人轨迹,不依赖第三方打码平台。
-- **身份治理**:账号池准入、profile 生命周期账本、runtime lease、失败原因治理、冷却、熔断、runtime risk、ledger query 和 explain 审计。
-- **工程化采集**:高并发浏览器池、代理 / 指纹轮换、断点续抓、Session(HTTP)双模、CSV / JSON 导出。
-- **反检测与双模运行**:Chrome/CDP 默认后端,可选 Camoufox,也支持浏览器与 HTTP Session 双模接力。
-
-路线判断见 [`docs/差异化路线.md`](docs/差异化路线.md):DrissionPage 风格 API 是入口,账号/Profile 运行时治理 sidecar 才是 drission-rs 不同于 Python 版本的核心方向。
-
-本库由 **极数本源([apizero.cn](https://apizero.cn))** 出品与维护,是其自动化与数据采集技术栈的一部分。
-
----
-
-## 📦 没装 Rust 也能用
-
-**只想用 `drs` CLI / MCP(不写 Rust)**:直接装预编译二进制,不需要 Rust 工具链——
-
-```bash
-# mac / linux
-curl -fsSL https://raw.githubusercontent.com/MageGojo/drission-rs/main/install/drs-install.sh | sh
-# windows(PowerShell)
-irm https://raw.githubusercontent.com/MageGojo/drission-rs/main/install/drs-install.ps1 | iex
-```
-
-脚本从 [GitHub Releases](https://github.com/MageGojo/drission-rs/releases)(GitCode 为备用镜像)下载对应平台的静态 `drs`,装到 `~/.local/bin`(Windows 装到 `%LOCALAPPDATA%\drs\bin`),然后 `drs setup` 即可配好 Cursor / Codex 的 MCP。也可以直接去 Releases 页手动下载解压。
-
-**想写 Rust 用 `drission` 库**:用一键环境配置脚本装 Rust 工具链——见 [`install/`](install/) 的 `install-mac.command` / `install-windows.bat`(国内镜像加速),装完 `cargo add drission`。
-
-运行前提:本机已装 Chrome / Edge(可用环境变量 `CHROME_BIN` 指定路径);用到 OCR 的示例首次运行会自动下载模型到缓存。
-
----
-
-## ✨ 核心亮点(重点)
-
-### 1. 内置验证码 OCR(字符型,`feature = "ocr"`)
-
-字母 / 数字 / 扭曲粘连验证码**离线识别**,**无需调用第三方打码平台、无需联网**:
-采用 [ddddocr](https://github.com/sml2h3/ddddocr) 预训练模型 + **纯 Rust 推理引擎 [tract](https://github.com/sonos/tract)**
-(不依赖原生 onnxruntime,跨平台编译干净)。流水线:灰度 → 等比缩放高 64 → 归一化 → CNN-LSTM → CTC 解码。
-
-```rust
-use drission::prelude::*;
-
-#[tokio::main]
-async fn main() -> drission::Result<()> {
-    let browser = Browser::launch(BrowserOptions::new().headless(true)).await?;
-    let tab = browser.latest_tab().await?;
-    tab.get("https://apizero.cn/login").await?;
-
-    // 一步:定位验证码 <img> → 取图 → 识别(首次自动下载模型到缓存)
-    let code = tab.ocr_image("xpath://form//button/img").await?;
-    println!("验证码 = {code}");                       // 例:"P38W"
-    Ok(())
-}
-```
-
-> **端到端实测**(`examples/apizero_login`):用本库打开 [apizero.cn](https://apizero.cn) 登录页 → 自动填表
-> → OCR 识别验证码并填入 → 点登录,站点只回「账号或密码错误」而非「验证码错误」,即**验证码识别准确**
-> (有头 / 无头各 **5/5、4/4** 通过)。
-
-### 2. 图片滑块缺口距离识别(`feature = "slider"`)
-
-把「拼图要移动多远」算准 + 拟人轨迹拖到位,**与厂商无关**的通用能力,内置极验 / 顶象预设:
-
-```rust
-use drission::prelude::*;
-
-# async fn demo(tab: &Tab) -> drission::Result<()> {
-// 极验 v4:三图模板匹配,缺口距离 + 闭环纠偏
-let r = tab.solve_geetest_slide().await?;
-
-// 顶象(Dingxiang):拼图跨域 taint 不可读 → 截图 + 绿环掩膜 + 彩色内容 NCC + 暗度/描边
-let gap = tab.dingxiang_slide_gap(4).await?;   // 缺口位移(CSS 像素)+ 置信
-println!("需移动 {:.0}px,置信 {:.2}", gap.displace, gap.confidence);
-# Ok(()) }
-```
-
-- **极验 v4**:`canvas` 三图(bg / fullbg / slice)模板匹配,对齐误差 ≤1px,headless 实测过码。
-- **顶象 popup**:繁杂实拍图 + 同形诱饵 + 重度压暗,用**彩色内容 NCC + 暗度门控 + 描边对齐**,
-  离线标定缺口命中 6/6;算法已沉淀为库能力(`GapMethod::ContentNcc`)。
-- 通用配置 `SliderConfig` + `tab.slider_gap()` / `tab.solve_slider()`,换厂商只换配置。
-
-### 3. `drs` CLI / MCP(AI Agent 入口)
-
-`drs` 把常用浏览器动作做成稳定命令和 MCP 工具,适合让 Agent 直接使用,也适合 shell / Node / Python 脚本编排:
-
-```bash
-drs serve --backend cdp --headless
-drs --json open https://example.com
-drs ax --outline
-drs screenshot --out page.png --full
-drs mcp --backend cdp --headless
-```
-
-MCP 工具覆盖 `browser_open`、`browser_click`、`browser_type`、`browser_eval`、`browser_ax`、`browser_screenshot` 等常见动作;开启 `ocr` feature 后还可接入图片验证码识别。更完整的命令和协议见 [`docs/CLI.md`](docs/CLI.md)。
-
----
-
-## 🧰 还支持
-
-- **反检测过盾**:`navigator.webdriver=false`、canvas / webgl / audio 指纹定制、`block_webrtc`;**自动通过 Cloudflare 盾**(Turnstile 复选框可信点击)。
-- **元素与交互**:DrissionPage 风格定位(`@id:` / `css:` / `xpath:` / `text:`)、点击 / 输入 / 逐字符拟人输入、动作链、拖拽、下拉 / 单选 / 多选填表、文件上传、iframe、JS 对话框。
-- **网络**:XHR / Fetch **监听抓响应体**、**请求拦截改写**(fulfill / abort / resume)、WebSocket 帧监听、控制台监听。
-- **多标签与高并发**:每标签独立 cookie 隔离、`BrowserPool` 浏览器池(代理 / 指纹轮换 + 失败重试 + **断点续抓**)。
-- **Driver + Session 双模**:浏览器与纯 HTTP 会话双模、cookie 双向互通(省内存,旧机友好);Session 可选 **`--features impersonate` 套浏览器 TLS / JA3 / JA4 + HTTP2 指纹**(`wreq` + BoringSSL),让"浏览器过盾 → HTTP 接力"不被现代 WAF 凭 TLS 指纹拦下。
-- **截图与录像**:元素 / 整页 / 区域截图,视口录像合成 mp4。
-- **吐环境(补环境)**:采集 canvas / webgl / audio 真实指纹 + 签名 sink 定位,一键导出可 `node` 运行的补环境工程;配合 `signer` 可编成无 Node 单二进制纯算签名。
-- **接管浏览器**:`BrowserServer` 暴露 WebSocket 端点,`Browser::connect` 接管已运行的浏览器。
-- **多后端**:**默认 Chromium / CDP**(驱动 / 接管 Chrome / Edge / Brave / Chromium / Electron);`--features camoufox` 起 Camoufox / Firefox(Juggler)反检测后端及其全部高级能力。
-
----
-
-## 🆕 最新版本 v0.4.0 新增
-
-**v0.4.0** 把 `drs` 定位成 **Cursor / Codex 的浏览器采集 MCP**,并补齐免 Rust 安装链路:
-
-- **MCP 持久浏览器**:`drs mcp` 默认 attach 常驻 daemon,标签与登录态跨 MCP 重启存活;`drs setup` 一条命令写好 Cursor + Codex 配置。
-- **免 Rust 安装**:`install/drs-install.sh` / `.ps1` 从 [GitHub Releases](https://github.com/MageGojo/drission-rs/releases) 下载预编译 `drs`(GitCode 同步源码 + 备用镜像);`drs setup` 即可接入 AI。
-- **账号 / Profile 治理 sidecar**:`identity-job run`、`identity-ledger query/explain/compact/dashboard` 等运行时租约、失败判责、冷却与审计流水(库 + CLI/MCP 双入口)。
-
-**v0.3.2** 还包含:`drs` CLI/MCP 初版、录制生成代码、无障碍快照、CDP 标配补齐、Windows 无头稳定性等。完整记录见 [CHANGELOG.md](CHANGELOG.md)、[`docs/CLI.md`](docs/CLI.md)、[`docs/mcp-持久浏览器.md`](docs/mcp-持久浏览器.md)。
-
----
-
-## 🆚 对比:drission vs 其它方案
-
-| 维度 | **drission**(Rust) | DrissionPage(Python) | Playwright / Selenium |
-|---|---|---|---|
-| 语言 / 运行时 | Rust · `tokio` 异步 · 可编单二进制 | Python | 多语言 |
-| 默认后端 | ✅ Google Chrome(CDP),一行切 Camoufox 反检测 | Chromium | 多浏览器 |
-| 内置反检测内核 | ✅ Camoufox(`--features camoufox`) | ⚠️ 需自行加固 | ❌ 默认易被识别 |
-| 内置验证码 OCR | ✅ 离线纯 Rust 推理 | ❌ | ❌ |
-| 滑块缺口距离识别 | ✅ 极验 / 顶象 | ❌ | ❌ |
-| 自动过 Cloudflare | ✅ `pass_cloudflare()` | ⚠️ 部分 | ❌ |
-| XHR 监听 / 抓响应体 | ✅ 内置 | ✅ | ⚠️ 需手写 |
-| 高并发池 + 断点续抓 | ✅ `BrowserPool` 内置 | ⚠️ 需自建 | ❌ |
-| 旧脚本 sidecar 治理 | ✅ `identity-job run` 接管租约/冷却/risk/ledger | ❌ 业务里自建 | ❌ 业务里自建 |
-| Runtime ledger 审计 | ✅ release/risk ledger + `identity-ledger query/explain/compact/dashboard` | ❌ | ❌ |
-| 后端 | Chromium / CDP(默认)+ 可选 Camoufox | Chromium | 多浏览器 |
-
-> 一句话:**不要求旧 Python 业务迁移到 Rust,而是让 Rust 接管账号/Profile 的运行时治理、风险门禁和审计流水。**
-
----
-
-## 📦 安装
+当前版本为 **0.4.x**，默认启用 Chromium / CDP 后端：
 
 ```toml
 [dependencies]
-drission = "0.3"                                         # 默认 = Chromium / CDP(Google Chrome)
-
-# 要 Camoufox 反检测内核 + 全部高级能力(吐环境 / 过盾 / 池 / 滑块…),关默认 cdp 后开 camoufox:
-# drission = { version = "0.3", default-features = false, features = ["camoufox", "ocr", "slider", "signer", "impersonate"] }
-#
-# 只给默认 CDP 叠加 OCR / signer:
-# drission = { version = "0.3", features = ["ocr", "signer"] }
+drission = "0.4"
+tokio = { version = "1", features = ["full"] }
 ```
-
-| feature | 能力 | 依赖 | 默认 |
-|---|---|---|---|
-| `cdp` | Chromium / CDP 后端(Chrome / Edge / Brave / Chromium / Electron) | std,无额外重依赖 | **开** |
-| `camoufox` | Camoufox / Firefox(Juggler)反检测后端 + 全部高级能力 | std,自动下载 Camoufox | 关 |
-| `ocr` | 字符验证码识别(ddddocr + tract) | `image` + `tract-onnx` | 关 |
-| `slider` | 图片滑块缺口距离识别(极验 / 顶象) | 纯 JS + std,自动带入 `camoufox` | 关 |
-| `signer` | 纯算签名运行器(内嵌 QuickJS,无需 Node) | `rquickjs` | 关 |
-| `impersonate` | **Session 浏览器 TLS / JA3 / JA4 + HTTP2 指纹**(双模过 WAF) | `wreq` + BoringSSL(需 `cmake`+`nasm`;Windows 见下),自动带入 `camoufox` | 关 |
-
-> **`impersonate` 的 Windows 构建**:原生 Windows 走 **MSVC**(VS Build Tools + `nasm`,BoringSSL 一等公民)或 mingw(+`nasm`),`cargo build --features impersonate` 即可。从 macOS / Linux **交叉编译到 `x86_64-pc-windows-gnu` 已实测跑通**:`brew install mingw-w64 nasm cmake` 后用 `scripts/win-cross-build.sh build --features impersonate`(脚本自动给 BoringSSL 的 bindgen 喂 mingw sysroot,产出真 `.exe`)。
-
----
-
-## 🚀 快速开始
-
-**默认后端 = Google Chrome(CDP)**,无需任何 feature,自动探测本机 Chrome(Windows 含注册表 / 用户级安装):
-
-```rust
-use drission::prelude::*;
-
-#[tokio::main]
-async fn main() -> drission::Result<()> {
-    // 自动定位 Google Chrome(CHROME_BIN/DRISSION_CHROME → 安装路径 → Windows 注册表 → PATH);
-    // 找不到则自动下载 Chrome for Testing 到 ~/.cache/drission/chrome/(对标 CloakBrowser)。
-    // 要指定浏览器:ChromiumBrowser::launch_with("C:\\...\\chrome.exe", true)
-    let browser = ChromiumBrowser::launch(ChromiumOptions::new().headless(true)).await?; // 无头;有头零配置用 launch_default()
-    let tab = browser.new_tab(Some("https://example.com")).await?;
-
-    println!("title = {:?}", tab.title().await?);
-    println!("h1    = {:?}", tab.ele_text("h1").await?);
-
-    browser.quit().await?;
-    Ok(())
-}
-```
-
-**Camoufox 反检测内核**(`--no-default-features --features camoufox`)—— 自动下载分发,带过盾 / 吐环境 / 池 / 滑块等全部高级能力:
 
 ```rust
 use drission::prelude::*;
@@ -313,133 +47,144 @@ use drission::prelude::*;
 #[tokio::main]
 async fn main() -> drission::Result<()> {
     let browser = Browser::launch(BrowserOptions::new().headless(true)).await?;
-    let tab = browser.latest_tab().await?;
+    let tab = browser.new_tab(Some("https://example.com")).await?;
 
-    tab.listen_start(&["api/data"]).await?;        // 先开监听
-    tab.get("https://example.com").await?;          // 再访问
-    tab.ele("@id:kw").await?.input("drission").await?;
-
-    let packet = tab.listen_wait().await?;          // 抓到目标 XHR(含响应体)
-    println!("{}", packet.response.body);
+    println!("title: {:?}", tab.title().await?);
+    println!("h1: {:?}", tab.ele_text("h1").await?);
 
     browser.quit().await?;
     Ok(())
 }
 ```
 
-示例(Camoufox 系示例需 `--no-default-features` 单后端构建):
+运行仓库内的最小示例：
 
 ```bash
-cargo run --example cdp_demo                                  # 默认 Chromium / CDP 后端(Google Chrome)
-cargo run --example cdp_fetch                                 # 自动下载 Chrome for Testing 并驱动(对标 CloakBrowser)
-cargo run --example quickstart    --no-default-features --features camoufox      # Camoufox 最小闭环
-cargo run --example pool_crawl    --no-default-features --features camoufox      # 高并发池 + 代理/指纹轮换 + 断点续抓
-cargo run --example ocr_captcha   --no-default-features --features camoufox,ocr  # 验证码 OCR
-cargo run --example geetest_slide --no-default-features --features slider        # 极验滑块(slider 自动带入 camoufox)
-cargo run --example dx_slide      --no-default-features --features slider        # 顶象滑块缺口识别(HL=0 看界面)
-cargo run --example env_signer    --features signer           # 内嵌 QuickJS 纯算签名(无 Node)
+cargo run --example cdp_demo
 ```
 
----
+默认会探测本机已安装的 Chromium 系浏览器。浏览器选择、自动下载和服务器部署方式见
+[Chrome 自动下载](docs/Chrome自动下载.md)与[服务器部署](docs/服务器部署.md)。
 
-## 🖥️ 支持的平台与浏览器
+### `drs` CLI 与 MCP
 
-- **平台**:macOS(arm64,主力)· Linux · **Windows(稳定支持)**——CDP 直接启动本机浏览器;Camoufox 后端用命名管道传输。
-- **浏览器**:**默认 Google Chrome**(及 Edge / Brave / Chromium / Electron,CDP);Chrome 路径智能探测(Windows 注册表 `App Paths` + 用户级 `%LOCALAPPDATA%` + `PATH`,对标 DrissionPage)。可选 [Camoufox](https://github.com/daijro/camoufox)(Firefox 反检测分支,依赖中用 `default-features=false, features=["camoufox"]`,首次运行**自动下载分发**)。
-- **协议**:Chromium 后端走 **CDP**(Chrome DevTools Protocol);Camoufox 走 Firefox 的 **Juggler**(本库自研 `tokio` 异步 Juggler 客户端)。
-- **Rust**:≥ 1.85(edition 2024)。
-- **🐧 部署到「没界面(无 UI)的 Linux 服务器」**:开无头即可,服务器无需桌面/显示器;库已在 Linux 自动补 `--no-sandbox`/`--disable-dev-shm-usage`(root/容器不崩)。**最省心:用根目录 [`Dockerfile`](Dockerfile) 出镜像,`docker build -t drission . && docker run --rm --shm-size=1g drission` 即用**(已打包 Chrome + 中日韩字体 + 全部系统依赖)。完整指南(含裸机 musl 静态、各发行版依赖、Xvfb 兜底、崩溃速查)见 [**`docs/服务器部署.md`**](docs/服务器部署.md)。
+使用 Cargo 安装：
 
----
+```bash
+cargo install drission-cli --bin drs
+```
 
-## ❓ 常见问题(FAQ)
+不安装 Rust 工具链时，可从 [GitHub Releases](https://github.com/MageGojo/drission-rs/releases)
+下载对应平台的预编译文件。仓库也提供 [`install/`](install/) 下的安装脚本；执行前请先检查脚本内容。
 
-**Q:drission 和 DrissionPage 是什么关系?**
-A:DrissionPage 风格 API 是上手入口,方便查等价写法(见 [API 映射](docs/API映射.md));但 drission-rs 不应该只做 Python DrissionPage 的 Rust 复刻。现实里成熟 Python 业务不会因为 API 相似就整体迁移到 Rust,所以本项目的差异化重点是 `drs identity-job run` 这类 sidecar:Python 继续写业务, Rust 负责账号/Profile 租约、失败原因、冷却、runtime risk、ledger query 和审计解释。
+常用命令：
 
-**Q:验证码识别要联网或调用打码平台吗?**
-A:不需要。字符 OCR 用 ddddocr 预训练模型 + 纯 Rust 推理**离线**完成;滑块缺口距离是本地图像算法。首次仅自动下载一次模型到缓存。
+```bash
+drs ensure-serve --backend cdp --headless
+drs --json open https://example.com
+drs ax --outline
+drs screenshot --out page.png --full
+```
 
-**Q:支持 Chrome 吗?默认用哪个浏览器?**
-A:**默认就是 Google Chrome**(Chromium / CDP 后端,开箱即用,也支持 Edge / Brave / Chromium / Electron)。本机 Chrome 路径自动探测(`CHROME_BIN` / `DRISSION_CHROME` → 安装路径 → **Windows 注册表 `App Paths`** → `PATH`,对标 DrissionPage)。**找不到系统 Chrome 时自动从官方 [Chrome for Testing](https://googlechromelabs.github.io/chrome-for-testing/) 下载并缓存**(对标 CloakBrowser 首次运行自动下载,三平台 mac / win / linux),也可用 `ChromiumBrowser::launch_with(path, headless)` 指定。要 Firefox 反检测内核则关默认 cdp 后开 `camoufox`。
+接入 MCP 客户端前可先预览配置变更：
 
-**Q:没装 Chrome 也能用吗?**
-A:能。`ChromiumBrowser::launch(headless)` 找不到系统浏览器会**自动下载 Chrome for Testing** 到 `~/.cache/drission/chrome/`;也可显式 `ChromiumBrowser::download_chrome()`(返回路径、不启动),或 `drission::cdp::download_chrome_for("win64", "Stable")` **跨平台预取**(如在 mac 上为分发下载 Windows 版)。
+```bash
+drs setup --dry-run
+drs setup
+```
 
-**Q:服务器没有界面(无 UI / 无显示器)能跑吗?怎么部署?**
-A:能。**你的程序和它驱动的浏览器都不需要界面——开无头 `ChromiumOptions::new().headless(true)` 即可**。库已在 Linux 自动补 `--no-sandbox`/`--disable-dev-shm-usage`,所以 root / Docker 容器里也不会崩。**最省心**:用根目录 [`Dockerfile`](Dockerfile)(已打包 Chrome + 中日韩字体 + 全部系统依赖)`docker build -t drission . && docker run --rm --shm-size=1g drission`,目标服务器零配置。想直接 scp 二进制就用 musl 静态(`scripts/linux-musl-build.sh`)+ 在服务器装浏览器依赖。完整指南见 [**`docs/服务器部署.md`**](docs/服务器部署.md)。
+`drs setup` 会合并 Cursor 项目配置和 Codex 用户配置，不覆盖其中的其他 MCP 服务。
+服务默认连接本机常驻浏览器进程，使标签页和浏览器配置可以跨 MCP 进程重启保留。
+完整命令、JSON 响应格式、MCP 工具列表与手动配置方法见 [CLI / MCP 文档](docs/CLI.md)
+和[持久浏览器说明](docs/mcp-持久浏览器.md)。
 
-**Q:能过 Cloudflare 吗?**
-A:可以。`tab.pass_cloudflare()` 支持交互式 Turnstile 可信点击与非交互式自动放行。
+## 核心能力
 
-**Q:怎么做高并发采集?**
-A:用 `BrowserPool` 浏览器池,内置代理 / 指纹轮换、失败重试与**断点续抓**;省内存场景可切 Session(HTTP)双模。
+- **异步浏览器控制**：导航、元素定位、点击、输入、键盘、滚动、文件上传、iframe、Shadow DOM 和多标签页。
+- **页面与网络观测**：HTML、文本、截图、PDF、控制台、WebSocket、XHR / Fetch 监听与请求拦截。
+- **可访问性与录制**：无障碍树快照，以及将已授权的交互录制为 Rust 或 JSON 操作序列。
+- **并发与恢复**：浏览器池、代理健康检查、重试策略和断点检查点。
+- **本地工具接口**：`drs` 提供 CLI、JSONL daemon 和 stdio MCP，便于不同语言或本地 AI 客户端集成。
+- **运行时治理**：profile 租约、冷却、失败分类、风险记录和 ledger 查询，用于可审计地管理自动化任务。
+- **可选视觉组件**：离线 OCR 与图像位置分析，仅应用于自有或明确授权的测试环境。
 
-**Q:跨平台吗?需要什么 Rust 版本?**
-A:macOS(主力)· Linux · Windows(命名管道传输已打通);Rust ≥ 1.85(edition 2024)。
+## Features
 
----
+| Feature | 内容 | 默认启用 |
+|---|---|---|
+| `cdp` | Chrome / Edge / Brave / Chromium / Electron 的 CDP 后端 | 是 |
+| `camoufox` | Camoufox / Firefox Juggler 兼容后端 | 否 |
+| `ocr` | 基于 `tract` 的离线文字图像识别 | 否 |
+| `slider` | 授权测试环境中的图像位置分析；自动启用 `camoufox` | 否 |
+| `signer` | 内嵌 QuickJS，用于本地 JavaScript 兼容性测试 | 否 |
+| `impersonate` | HTTP 客户端兼容性配置；需要 CMake 与 C 编译工具链 | 否 |
 
-## 📚 文档
+示例配置：
 
-- [🤖 **给 AI 编程助手**](docs/SKILL.md) — 基于本库写代码前先读;接口 / feature / 构建规则权威速查,基础 → 点选验证码全流程
-- [文档总览 `docs/`](docs/) — 设计 · API 映射 · 并发池 · 长监听
-- [**DrissionPage → drission API 映射**](docs/API映射.md) — 从 DP 迁移,按表把 Python 写法换成 Rust,几乎零成本
-- [设计文档](docs/设计.md) — 分层架构 / Juggler 选型 / 并发模型 / 各能力接线
-- [高并发池设计](docs/并发池.md) — `BrowserPool` / 代理池 / 指纹池 / 断点续抓
-- [**示例索引(48+)**](examples/README.md) — 「能力 → 示例 → 运行命令」总览
-- [API 参考(docs.rs)](https://docs.rs/drission) · [更新日志 CHANGELOG](CHANGELOG.md)
+```toml
+# 默认 CDP 后端并启用 OCR
+drission = { version = "0.4", features = ["ocr"] }
 
----
+# 仅使用 Camoufox 后端
+# drission = { version = "0.4", default-features = false, features = ["camoufox"] }
+```
 
-## 🗺️ 已完成与后续方向
+各 feature 的依赖关系与构建要求以 [Cargo.toml](Cargo.toml) 和
+[API 文档](https://docs.rs/drission)为准。
 
-已落地能力:
+## 兼容性
 
-- 点选 / 文字点选链路:检测框(`Det`)→逐框 OCR→字形模板第二信号→全局最优指派→可信点击;易盾点选含采集、侦察、稳定版示例。
-- OCR 自训模型运行时接入:支持 `dddd_trainer` 产物的 onnx + `charsets.json` 加载、热替换与文档化流程。
-- 滑块通用缺口识别与拟人轨迹:GeeTest v4 / 顶象示例、最小 jerk 轨迹、闭环微调与可信鼠标事件。
-- 反检测与「吐环境」补全:CDP/Camoufox 指纹覆盖、字体枚举、像素级 canvas、WebRTC、plugins/mimeTypes、WebGL/audio 等录制回放。
-- WS 接管浏览器: `BrowserServer` + `Browser::connect` 已支持单活动客户端接管、断线重连、token 校验。
-- 静态 XPath 1.0 常用子集、Windows Job Object 进程树兜底、Linux Docker/musl/CI 构建矩阵。
+| 项目 | 支持范围 |
+|---|---|
+| Rust | 1.85 及以上，edition 2024 |
+| 操作系统 | macOS、Linux、Windows |
+| 默认后端 | Chromium / CDP |
+| 默认浏览器 | 优先探测 Google Chrome，同时支持 Edge、Brave、Chromium 和 Electron |
+| 可选后端 | Camoufox / Firefox Juggler |
 
-下一步增强:
+无桌面环境可使用 headless 模式。容器及 Linux 系统依赖见[服务器部署](docs/服务器部署.md)。
 
-- 计算题验证码、更多点选/文字点选厂商模板与样本库。
-- 滑块 / 点选行为轨迹模型化,把行为风控从启发式推进到可复用模型。
-- WS 接管的真正多客户端多路复用与 `wss://` TLS。
-- 静态 XPath 更多 axes/functions,以及更多厂商滑块 / 盾预设。
-- 更多真实云厂商、发行版、桌面/无头环境的 Linux 实测矩阵。
+## 文档与示例
 
----
+- [文档索引](docs/README.md)：架构、部署、网络监听、并发池和 API 映射。
+- [CLI / MCP](docs/CLI.md)：`drs` 命令、JSON 协议、MCP 工具与配置。
+- [示例索引](examples/README.md)：按功能分类的可运行示例与命令。
+- [DrissionPage API 映射](docs/API映射.md)：从 Python API 查找 Rust 对应写法。
+- [API 参考](https://docs.rs/drission)：类型、方法和 feature 标记。
+- [更新日志](CHANGELOG.md)：发布版本的功能与兼容性变化。
+- [贡献指南](CONTRIBUTING.md)与[安全策略](SECURITY.md)。
 
-## ⚠️ 免责声明
+## 负责任使用
 
-本项目仅供学习与合法、非盈利用途。使用者须遵守目标站点的 `robots` 协议与当地法律法规,
-**禁止**用于任何违法、侵害他人利益、攻击骚扰或采集受保护数据的行为。
-使用 drission 产生的一切行为及后果均由使用者自行承担,与版权持有人(极数本源)无关;
-版权持有人不对本项目可能存在的缺陷导致的任何损失负责。
+浏览器自动化可能处理登录状态、个人信息、受版权保护的内容或会产生真实业务影响的操作。
+在部署前，请至少确认以下事项：
 
-**未经授权,禁止将本项目(无论是否修改)作为商品出售、转售、倒卖或作为付费产品/服务的核心牟利。**
-详见 [`LICENSE`](LICENSE)。
+1. 仅访问您拥有或已获得明确书面授权的系统、账户与数据。
+2. 遵守适用法律、合同、平台条款、`robots.txt`、访问控制和频率限制。
+3. 不绕过付费墙、身份验证、验证码或其他安全控制，不规避封禁或冒充他人身份。
+4. 不采集无权处理的个人、机密、受版权保护或其他受限制数据；遵循数据最小化原则。
+5. 对写入、发布、购买、删除等操作使用隔离测试环境、最小权限和人工确认。
+6. 妥善保护浏览器 profile、Cookie、日志、截图和导出文件，避免把敏感数据提交到版本库。
 
----
+可选的 OCR、图像分析、浏览器配置和网络观测能力不构成访问任何第三方系统的授权。
+项目名称及文档中提及的第三方商标归各自权利人所有，不代表其认可、合作或担保。
 
-## 🙏 致谢
+本节是项目使用边界说明，不构成法律意见，也不能替代针对具体业务和司法辖区的专业评估。
+如发现安全问题，请按 [SECURITY.md](SECURITY.md) 使用私密渠道报告。
 
-- [DrissionPage](https://github.com/g1879/DrissionPage):API 设计灵感来源。
-- [Camoufox](https://github.com/daijro/camoufox):默认浏览器内核。
-- [ddddocr](https://github.com/sml2h3/ddddocr):验证码 OCR 预训练模型。
-- [tract](https://github.com/sonos/tract):纯 Rust ONNX 推理引擎。
+## 许可证
 
-## 📄 许可证
+本项目采用自定义的 **source-available、非商业许可**，不是 OSI 认可的开源许可证。
+个人学习和合法非盈利使用须同时满足 [LICENSE](LICENSE) 的全部条款；商业使用、付费再分发、
+将本项目作为付费产品或服务的核心等情形，需要事先取得版权持有人的书面授权。
 
-自定义许可(源代码可用 · 仅限个人学习与合法非盈利 · 禁止未授权商业用途与转售),见 [`LICENSE`](LICENSE)。
+使用者应自行评估其具体用途是否合规。许可证与免责声明不能排除适用法律下不可排除的责任。
 
----
+## 致谢
 
-<sub>关键词 / keywords: Rust 浏览器自动化 · 验证码识别 · ddddocr · OCR · 滑块缺口距离 · 极验 GeeTest · 顶象 Dingxiang ·
-反检测 · 过 Cloudflare 盾 · 高并发爬虫 · 代理轮换 · 指纹定制 · 补环境 · 纯算签名 · Camoufox · Firefox Juggler · Chromium CDP ·
-DrissionPage 风格 API · browser automation · captcha solver · captcha OCR · slider captcha · GeeTest · anti-detect ·
-undetectable · stealth · Cloudflare bypass · web scraping · crawler · proxy rotation · alternative to rust_drission / zendriver-rs ·
-由 [极数本源 apizero.cn](https://apizero.cn) 出品。</sub>
+- [DrissionPage](https://github.com/g1879/DrissionPage)：API 设计参考。
+- [Camoufox](https://github.com/daijro/camoufox)：可选浏览器后端。
+- [ddddocr](https://github.com/sml2h3/ddddocr)：OCR 模型来源。
+- [tract](https://github.com/sonos/tract)：Rust ONNX 推理引擎。
+
+由[极数本源](https://apizero.cn)维护。
