@@ -177,6 +177,9 @@ impl ChromiumTab {
             self.core.download_dir(),
             self.core.browser_context_id.clone(),
         );
+        if !self.core.should_dispose_context_on_close() {
+            core.keep_context_on_close();
+        }
         Some(ChildTarget {
             target_id,
             session_id,

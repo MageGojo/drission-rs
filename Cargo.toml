@@ -1,6 +1,6 @@
 [package]
 name = "drission"
-version = "0.5.1"
+version = "0.6.0"
 edition = "2024"
 rust-version = "1.85"
 # 示例按能力分文件夹(examples/<分类>/),每个 [[example]] 显式声明 path;关掉自动发现(子目录无
@@ -164,6 +164,12 @@ required-features = ["cdp"]
 [[example]]
 name = "cdp_extras"
 path = "examples/cdp/cdp_extras.rs"
+required-features = ["cdp"]
+
+# 一等公民 Context / ProfileManager / 网络门面(离线自验证)。
+[[example]]
+name = "cdp_context"
+path = "examples/cdp/cdp_context.rs"
 required-features = ["cdp"]
 
 # 录制生成代码(codegen)+ 无障碍快照(accessibility):录一遍表单 → 出可运行 Rust;ax_tree/ax_snapshot 语义树。

@@ -34,7 +34,7 @@ cargo build  --example env_signer --features signer
 
 | 文件夹 | 内容 |
 |---|---|
-| `cdp/` | CDP/Chromium 后端核心:demo / 高级能力 / 自动下载 Chrome / 下载管理 / 键盘 / 并发池 / 吐环境 |
+| `cdp/` | CDP/Chromium 后端核心:demo / 高级能力 / Context·Profile·网络门面 / 自动下载 Chrome / 下载管理 / 键盘 / 并发池 / 吐环境 |
 | `camoufox/` | Camoufox 后端页面·元素·交互:页面基础/进阶、表单、上传、相对定位/Shadow、动作链、截图、下载、预热 |
 | `antidetect/` | 反检测 / 指纹:webdriver/stealth、CDP 指纹池、第三方指纹验证、无头 GPU/CH 诊断 |
 | `cloudflare/` | 过 Cloudflare 盾:Camoufox(`cf_check`)与 CDP(`exa_cf`)两条路径 |
@@ -232,6 +232,7 @@ QCC_USERNAME='用户名' QCC_PASSWORD='密码' cargo run --example qcc_login
 | [cdp_pool](cdp/cdp_pool.rs) | CDP 高并发池 `ChromiumPool`(多 worker + 每任务独立 context + 断点续抓) | 🔌 |
 | [cdp_dump_env](cdp/cdp_dump_env.rs) | CDP 吐环境 `tab.dump_env()`(探针 + env.js + 导出工程 + 双跑验证) | 🌐 |
 | [cdp_extras](cdp/cdp_extras.rs) | **标配补齐**(对标 PW/Puppeteer/DP):set_content / 媒体深色 / 网络离线 / 设备 / storage / `wait().network_idle` / HAR / expose / PDF / MHTML 端到端 | 🔌 |
+| [cdp_context](cdp/cdp_context.rs) | **Context / Profile / 网络门面**:两账号 Context cookie 隔离 + `network().mock` + 磁盘 Profile 租约 | 🔌 |
 | [cdp_recorder](cdp/cdp_recorder.rs) | **录制生成代码 + 无障碍快照**(对标 PW codegen / a11y):`tab.recorder()` 录操作 → 生成可运行 Rust;`ax_tree()` / `ax_snapshot()` 语义树 | 🔌 |
 
 ## Windows 专项(windows/,在 Windows 上运行)

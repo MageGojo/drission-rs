@@ -4,7 +4,7 @@ use clap::{Args, Parser, Subcommand};
 
 use crate::protocol::{
     BackendKind, EngineCommand, IdentityDriftMatchMode, IdentityGate, IdentityGatePreset,
-    IdentityLifecycleBaselinePolicy,
+    IdentityLifecycleBaselinePolicy, McpToolset,
 };
 use crate::setup::{SetupScope, SetupTarget};
 
@@ -1105,8 +1105,12 @@ pub struct SetupArgs {
     #[arg(long)]
     pub no_headless: bool,
     /// MCP server key/name to write.
+    /// Cursor shows user-scoped entries as `user-<name>` (e.g. config `drs` → agent id `user-drs`).
     #[arg(long, default_value = "drs")]
     pub name: String,
+    /// Tool surface written into Cursor/Codex MCP `env.DRS_MCP_TOOLS` (default `core`).
+    #[arg(long, value_enum, default_value_t = McpToolset::Core)]
+    pub tools: McpToolset,
     /// Print the planned changes without writing any files.
     #[arg(long)]
     pub dry_run: bool,
@@ -1128,6 +1132,10 @@ pub struct McpArgs {
     /// shared persistent `drs serve` daemon.
     #[arg(long)]
     pub standalone: bool,
+    /// MCP tool surface. Default `core` keeps agent tool lists small;
+    /// use `browser` / `identity` / `all` when you need the rest.
+    #[arg(long, value_enum, default_value_t = McpToolset::Core, env = "DRS_MCP_TOOLS")]
+    pub tools: McpToolset,
 }
 
 #[derive(Debug, Args, Clone, Default)]
@@ -1224,6 +1232,8 @@ pub enum ListenCommand {
 #[cfg(feature = "ocr")]
 #[derive(Debug, Subcommand)]
 pub enum OcrCommand {
+    /// Recognize characters in a captcha image file (PNG/JPEG) → text.
+    Recognize { image: PathBuf },
     /// Solve click-word coordinates from an image and target text.
     Clickword { image: PathBuf, targets: String },
 }
@@ -1419,6 +1429,7 @@ mod tests {
                     "MCP should attach to the daemon by default"
                 );
                 assert_eq!(args.user_data_dir, None);
+                assert_eq!(args.tools, McpToolset::Core);
             }
             other => panic!("unexpected command: {other:?}"),
         }

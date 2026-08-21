@@ -8,6 +8,18 @@ use anyhow::Result;
 use crate::protocol::JsonResponse;
 
 #[cfg(feature = "ocr")]
+pub async fn recognize(image: &Path) -> Result<JsonResponse> {
+    let bytes = tokio::fs::read(image).await?;
+    let ocr = drission::ocr::Ocr::new().await?;
+    let text = ocr.recognize(&bytes)?;
+    Ok(JsonResponse::ok(serde_json::json!({
+        "image": image,
+        "text": text,
+        "len": text.chars().count(),
+    })))
+}
+
+#[cfg(feature = "ocr")]
 pub async fn clickword(image: &Path, targets: &str) -> Result<JsonResponse> {
     let bytes = tokio::fs::read(image).await?;
     let targets: Vec<String> = targets

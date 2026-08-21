@@ -50,6 +50,9 @@ pub(crate) struct CdpCore {
     pub(crate) target_id: String,
     /// 该标签所属的独立 BrowserContext(仅 `new_tab_with` 带代理时为 `Some`);`close` 时一并销毁。
     pub(crate) browser_context_id: Option<String>,
+    /// `true` 时 `Tab::close` 会 `disposeBrowserContext`(池一次性隔离)。
+    /// 命名 [`ChromiumBrowserContext`](crate::cdp::ChromiumBrowserContext) 开的标签为 `false`。
+    dispose_context_on_close: AtomicBool,
     timeout_ms: AtomicU64,
     /// 最近一次 `get` 是否加载成功(供 `url_available` 同步读取,对齐 camoufox)。
     last_load_ok: AtomicBool,
@@ -83,6 +86,7 @@ impl CdpCore {
             session_id,
             target_id,
             browser_context_id,
+            dispose_context_on_close: AtomicBool::new(true),
             timeout_ms: AtomicU64::new(30_000),
             last_load_ok: AtomicBool::new(false),
             download_dir: std::sync::Mutex::new(download_dir),
@@ -126,6 +130,16 @@ impl CdpCore {
     /// 最近一次 `get` 是否加载成功(同步读)。
     pub(crate) fn load_ok(&self) -> bool {
         self.last_load_ok.load(Ordering::Relaxed)
+    }
+
+    /// 命名 Context 开的标签:关 tab 不拆 context。
+    pub(crate) fn keep_context_on_close(&self) {
+        self.dispose_context_on_close
+            .store(false, Ordering::Release);
+    }
+
+    pub(crate) fn should_dispose_context_on_close(&self) -> bool {
+        self.dispose_context_on_close.load(Ordering::Acquire)
     }
 
     /// 在本标签 page 会话上发一个 CDP 命令并等响应。

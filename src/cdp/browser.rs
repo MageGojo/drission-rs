@@ -8,6 +8,8 @@ use std::time::Duration;
 use serde_json::{Value, json};
 use tokio::time::sleep;
 
+use crate::cdp::attach::CdpAttach;
+use crate::cdp::context::{ChromiumBrowserContext, ContextSpec};
 use crate::cdp::core::CdpCore;
 use crate::cdp::options::{ChromiumContextOverride, ChromiumOptions};
 use crate::cdp::tab::ChromiumTab;
@@ -44,6 +46,8 @@ pub struct ChromiumBrowser {
     /// [`container`](crate::cdp::container))。在内置反检测脚本之后、用户 init_scripts 之前注入,
     /// 把软渲染破绽(SwiftShader/llvmpipe)改写成常见 Linux 桌面 GPU。
     container_js: Option<String>,
+    /// 命名 BrowserContext 注册表(供 [`context`](Self::context) 复用)。
+    named_contexts: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, String>>>,
     /// Windows:把 Chrome 绑入 KILL_ON_JOB_CLOSE 的 Job,quit/Drop 时级联杀掉渲染/GPU 等子进程
     /// (`kill_on_drop` 只杀主进程,会留孤儿)。仅自启动时为 `Some`;接管不接管生命周期。
     #[cfg(windows)]
@@ -364,6 +368,7 @@ impl ChromiumBrowser {
             download_dir: opts.download_path.clone(),
             init_scripts: opts.init_scripts.clone(),
             container_js,
+            named_contexts: CdpAttach::empty_registry(),
             #[cfg(windows)]
             job: std::sync::Mutex::new(job_guard),
         })
@@ -397,6 +402,7 @@ impl ChromiumBrowser {
             init_scripts: opts.init_scripts.clone(),
             // 接管不重启浏览器(无法改启动 GPU 参数),补环境不适用。
             container_js: None,
+            named_contexts: CdpAttach::empty_registry(),
             // 接管不接管对方生命周期,故不绑 Job。
             #[cfg(windows)]
             job: std::sync::Mutex::new(None),
@@ -500,92 +506,48 @@ impl ChromiumBrowser {
         self.attach_in_context(target_id, None).await
     }
 
-    /// 附着到 target,并记录其所属 BrowserContext(`new_tab_with` 带代理时为 `Some`,`close` 时销毁)。
+    pub(crate) fn attach_handle(&self) -> CdpAttach {
+        CdpAttach {
+            conn: self.conn.clone(),
+            download_dir: self.download_dir.clone(),
+            stealth: self.stealth,
+            headless: self.headless,
+            full_ua_metadata: self.full_ua_metadata,
+            ua_override: self.ua_override.clone(),
+            ua_full_version: self.ua_full_version.clone(),
+            platform_version: self.platform_version.clone(),
+            init_scripts: self.init_scripts.clone(),
+            container_js: self.container_js.clone(),
+            named_contexts: self.named_contexts.clone(),
+        }
+    }
+
+    /// 附着到 target,并记录其所属 BrowserContext(`new_tab_with` 的隔离 context 在 `close` 时销毁)。
     async fn attach_in_context(
         &self,
         target_id: String,
         browser_context_id: Option<String>,
     ) -> Result<ChromiumTab> {
-        let a = self
-            .conn
-            .send(
-                "Target.attachToTarget",
-                json!({ "targetId": target_id, "flatten": true }),
-                None,
-            )
-            .await?;
-        let session_id = a["sessionId"]
-            .as_str()
-            .ok_or_else(|| Error::msg("CDP: 附着无 sessionId"))?
-            .to_string();
-        let core = CdpCore::new(
-            self.conn.clone(),
-            session_id,
-            target_id,
-            self.download_dir.clone(),
-            browser_context_id,
-        );
-        // 开启 Page 域(导航 `loadEventFired` 需要;**不是** CF 探测点)。
-        let _ = core.send("Page.enable", json!({})).await;
-        // 配了下载目录则启动期即设下载行为(让 `download_path` 开箱即用,不必显式 set_download_path)。
-        if let Some(dir) = &self.download_dir {
-            let _ = std::fs::create_dir_all(dir);
-            let _ = core
-                .send(
-                    "Browser.setDownloadBehavior",
-                    json!({ "behavior": "allow", "downloadPath": dir.display().to_string(), "eventsEnabled": true }),
-                )
-                .await;
-        }
-        // 反检测关键点:**绝不调用 `Runtime.enable`**。
-        // CF/DataDome 用"console 序列化带 getter 对象"探测在线的 CDP `Runtime` 域;只要不开它,
-        // 这条泄漏就不存在。`Runtime.evaluate`/`callFunctionOn`(省略 contextId)无需 enable 即可工作。
-        if self.stealth {
-            // 导航前注入兜底脚本(下次新文档生效),消除残留的 webdriver 痕迹。
-            let _ = core
-                .send(
-                    "Page.addScriptToEvaluateOnNewDocument",
-                    json!({ "source": stealth::STEALTH_JS }),
-                )
-                .await;
-            // 无头额外补屏幕尺寸(无头默认 800x600 是显式破绽;WebGL 已靠 GPU 参数解决)。
-            if self.headless {
-                let _ = core
-                    .send(
-                        "Page.addScriptToEvaluateOnNewDocument",
-                        json!({ "source": stealth::headless_screen_js() }),
-                    )
-                    .await;
-            }
-            // 容器 / 无 GPU Linux「补环境」:把软渲染 WebGL renderer 改写成常见 Linux 桌面 GPU,
-            // 抹掉 SwiftShader/llvmpipe 破绽(在用户/指纹脚本之前注入,默认占先;用户显式 webgl 覆盖见
-            // launch_inner 的 user_has_webgl 判定)。
-            if let Some(js) = &self.container_js {
-                let _ = core
-                    .send(
-                        "Page.addScriptToEvaluateOnNewDocument",
-                        json!({ "source": js }),
-                    )
-                    .await;
-            }
-        }
-        // 用户/指纹注入脚本(深指纹伪装等):在内置反检测脚本之后按序注入,与反检测兼容。
-        for src in &self.init_scripts {
-            let _ = core
-                .send(
-                    "Page.addScriptToEvaluateOnNewDocument",
-                    json!({ "source": src }),
-                )
-                .await;
-        }
-        // 无头补环境(opt-in):补回被 `--user-agent` 清空的高熵 Client Hints。
-        // 用 CDP `Emulation.setUserAgentOverride` 下发完整 `userAgentMetadata`(会话级持久,跨导航有效)。
-        if self.full_ua_metadata {
-            if let (Some(ua), Some(full)) = (&self.ua_override, &self.ua_full_version) {
-                apply_ua_metadata(&core, ua, full, self.platform_version.as_deref()).await;
-            }
-        }
-        Ok(ChromiumTab::new(core))
+        self.attach_handle()
+            .attach_in_context(target_id, browser_context_id, true)
+            .await
+    }
+
+    /// 取出或创建命名 Context(同名复用同一 CDP context)。一个名字 ≈ 一个账号身份。
+    pub async fn context(&self, name: &str) -> Result<ChromiumBrowserContext> {
+        self.context_with(ContextSpec::new().name(name)).await
+    }
+
+    /// 按规格创建(或按 `spec.name` 复用)独立 Context。
+    pub async fn context_with(&self, spec: ContextSpec) -> Result<ChromiumBrowserContext> {
+        ChromiumBrowserContext::create(self.attach_handle(), spec).await
+    }
+
+    /// 匿名独立 Context(每次新建,不进命名表)。
+    pub async fn new_context(&self, spec: ContextSpec) -> Result<ChromiumBrowserContext> {
+        let mut spec = spec;
+        spec.name = None;
+        ChromiumBrowserContext::create(self.attach_handle(), spec).await
     }
 
     /// 优雅关闭:`Browser.close` + 杀子进程(自启动时)+ 清临时 profile。
@@ -825,7 +787,7 @@ async fn detect_platform_version() -> Option<String> {
 /// `Emulation.setUserAgentOverride` 下发(会话级、跨导航持久)→ 补回被 `--user-agent` 清空的
 /// 高熵 Client Hints(`fullVersionList`/`architecture`/`bitness`/`platformVersion`/`uaFullVersion`)。
 /// 失败静默放弃,绝不破坏既有行为。
-async fn apply_ua_metadata(
+pub(crate) async fn apply_ua_metadata(
     core: &CdpCore,
     ua: &str,
     full_version: &str,

@@ -12,6 +12,22 @@ pub enum BackendKind {
     Camoufox,
 }
 
+/// Which MCP tool surface to expose (`DRS_MCP_TOOLS` / `--tools`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ValueEnum, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+#[value(rename_all = "kebab-case")]
+pub enum McpToolset {
+    /// Core browse loop only (~11 tools). Default for agents.
+    #[default]
+    Core,
+    /// Core + extended browser/network (no `identity_assets_*`).
+    Browser,
+    /// `identity_assets_*` + `browser_identity*` only.
+    Identity,
+    /// Full tool surface.
+    All,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum IdentityDriftMatchMode {

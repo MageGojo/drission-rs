@@ -5,6 +5,33 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/),
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+## [0.6.0] - 2026-08-21
+
+> **运行时分层 + Context / Profile / 网络门面**:账号身份不再堆进巨大 `Browser`;`drs` MCP 默认只暴露浏览核心。
+
+### 新增 Added
+
+- **运行时分层**:`src/runtime` 按 Browser / HTTP / AI / Task 再导出,避免继续把能力堆进巨大 `Browser` 类。设计见 `docs/运行时分层.md`。
+- **一等公民 `BrowserContext`**:`browser.context("account_001")` / `new_context(spec)`;Context 管 Cookie / Proxy / UA / locale / timezone / headers / permissions / viewport。同名复用,关 Context 才 dispose。
+- **`ProfileManager`**:磁盘 `profiles/<id>/{manifest.json,chrome/,.lock}`;`acquire` 排他租约后 `launch`。仅用于自有或已授权账号。
+- **网络门面** `tab.network().filter("/api/").method("POST").listen/block/mock/rewrite/record`;统一 `NetRequest` / `NetResponse`。旧 `listen` / `intercept` / HAR 保留。
+- **`ChromiumPool::acquire`**:领取并发槽 + worker,Deref 到 Browser,再 `context` / `new_tab`。
+- 离线示例 `cdp_context`。
+- MCP `browser_click` / `browser_type` / `browser_press` / `browser_wait` 支持可选
+  `return_snapshot=true`：成功后附带轻量 `page` 快照（refs + 短正文，跳过 markdown）。
+- MCP 工具面分组：`DRS_MCP_TOOLS` / `drs mcp --tools` / `drs setup --tools`，取值
+  `core`（默认，~11 个浏览核心工具）/ `browser` / `identity` / `all`。
+- MCP `ServerInfo.instructions` 内嵌稳定核心 schema 与 Cursor server id 说明。
+- 针对失效 snapshot ref 返回错误码 `stale_ref`，hint 明确要求重新 `browser_snapshot`。
+
+### 变更 Changed
+
+- `drission` 升到 0.6.0,`drission-cli` 升到 0.3.2。
+- Skill / setup 统一说明：配置 key 为 `drs`，Cursor Agent 调用 id 通常为 `user-drs`。
+- `drs setup` 写入 `env.DRS_MCP_TOOLS`（默认 `core`）。
+
 ## [0.5.1] - 2026-07-31
 
 > **AI 读页 + MCP 防卡退**:让 Agent 一条命令读懂当前页(大纲 / refs / Markdown),并避免重页把 MCP 卡死。
@@ -348,6 +375,7 @@
 - **内置验证码 OCR**(ddddocr 模型 + tract 纯 Rust 推理)与**图片滑块缺口距离识别**(极验)。
 - 跨平台:macOS / Linux / Windows(命名管道传输)。
 
+[0.6.0]: https://github.com/MageGojo/drission-rs/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/MageGojo/drission-rs/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/MageGojo/drission-rs/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/MageGojo/drission-rs/compare/v0.3.2...v0.4.0

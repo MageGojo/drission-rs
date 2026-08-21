@@ -14,6 +14,23 @@
 
 use serde_json::Value;
 
+/// 统一请求形状(监听 / 拦截共用的对外视图)。
+#[derive(Debug, Clone, Default)]
+pub struct NetRequest {
+    pub url: String,
+    pub method: String,
+    pub headers: Vec<(String, String)>,
+    pub body: Option<String>,
+}
+
+/// 统一响应形状。
+#[derive(Debug, Clone, Default)]
+pub struct NetResponse {
+    pub status: u16,
+    pub headers: Vec<(String, String)>,
+    pub body: String,
+}
+
 /// 请求侧数据。
 #[derive(Debug, Clone, Default)]
 pub struct RequestData {
@@ -80,6 +97,25 @@ impl DataPacket {
     pub fn json(&self) -> Option<Value> {
         serde_json::from_str(&self.response.body).ok()
     }
+
+    /// 统一请求视图。
+    pub fn as_request(&self) -> NetRequest {
+        NetRequest {
+            url: self.url.clone(),
+            method: self.method.clone(),
+            headers: self.request.headers.clone(),
+            body: self.request.post_data.clone(),
+        }
+    }
+
+    /// 统一响应视图。
+    pub fn as_response(&self) -> NetResponse {
+        NetResponse {
+            status: self.response.status,
+            headers: self.response.headers.clone(),
+            body: self.response.body.clone(),
+        }
+    }
 }
 
 /// 监听过滤条件。
@@ -89,12 +125,19 @@ pub struct ListenFilter {
     pub url_keywords: Vec<String>,
     /// 仅匹配 XHR/fetch 类请求(hook 模式天然只覆盖 fetch/XHR)。
     pub xhr_only: bool,
+    /// HTTP 方法白名单(大写);为空表示匹配所有方法。
+    pub methods: Vec<String>,
 }
 
 impl ListenFilter {
     /// URL 与资源类型是否同时匹配(供请求拦截复用)。
     pub(crate) fn matches(&self, url: &str, resource_type: &str) -> bool {
         self.url_matches(url) && self.type_matches(resource_type)
+    }
+
+    /// URL + 资源类型 + 方法是否同时匹配。
+    pub fn matches_request(&self, url: &str, resource_type: &str, method: &str) -> bool {
+        self.matches(url, resource_type) && self.method_matches(method)
     }
 
     fn url_matches(&self, url: &str) -> bool {
@@ -107,6 +150,14 @@ impl ListenFilter {
         }
         let t = resource_type.to_ascii_lowercase();
         t.contains("xhr") || t.contains("fetch") || t.contains("xmlhttprequest")
+    }
+
+    fn method_matches(&self, method: &str) -> bool {
+        if self.methods.is_empty() {
+            return true;
+        }
+        let m = method.to_ascii_uppercase();
+        self.methods.iter().any(|want| want.eq_ignore_ascii_case(&m))
     }
 }
 
@@ -155,9 +206,17 @@ mod tests {
         let f = ListenFilter {
             url_keywords: vec!["/api/".into()],
             xhr_only: false,
+            methods: Vec::new(),
         };
         assert!(f.matches("https://x.com/api/v1", "fetch"));
         assert!(!f.matches("https://x.com/static.js", "fetch"));
+        let post = ListenFilter {
+            url_keywords: vec!["/api/".into()],
+            xhr_only: false,
+            methods: vec!["POST".into()],
+        };
+        assert!(post.matches_request("https://x.com/api/v1", "xhr", "POST"));
+        assert!(!post.matches_request("https://x.com/api/v1", "xhr", "GET"));
         let all = ListenFilter::default();
         assert!(all.matches("anything", "document"));
     }

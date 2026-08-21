@@ -443,7 +443,28 @@ drs mcp --headless --standalone
 
 `identity_assets_*` 等纯文件治理工具不需要浏览器,始终在 MCP 进程内直接执行,与是否 attach daemon 无关。
 
-稳定工具名如下(客户端不要依赖 `tools/list` 的返回顺序):
+### 工具面分组(`DRS_MCP_TOOLS` / `--tools`)
+
+默认 **`core`**,只暴露浏览主循环(~11 个工具),避免 Agent 被 `identity_assets_*` 噪声干扰:
+
+| 取值 | 暴露 |
+|---|---|
+| `core`(默认) | `browser_open` / `tabs` / `use_tab` / `close` / `snapshot` / `extract` / `click` / `type` / `press` / `wait` / `screenshot` |
+| `browser` | `core` + `ax`/`html`/`markdown`/`text`/`eval`/登录态/`ocr`/滑块/`network_*`/`pass_cf`/`browser_identity*` |
+| `identity` | `identity_assets_*` + `browser_identity*` |
+| `all` | 全量 |
+
+```bash
+drs mcp --headless --tools core          # 默认
+DRS_MCP_TOOLS=all drs mcp --headless     # 环境变量
+drs setup --scope global --tools core    # 写入 mcp.json env
+```
+
+Cursor 配置 key 为 **`drs`**;Agent 侧 server id 通常为 **`user-drs`**。MCP `instructions` 内嵌稳定核心 schema,会话内可复用,不必每次重拉全量 `tools/list`。
+
+### 稳定工具名(全量;`all` 时可用)
+
+客户端不要依赖 `tools/list` 的返回顺序:
 
 - `browser_open`
 - `browser_tabs`
@@ -479,7 +500,7 @@ drs mcp --headless --standalone
 - `identity_assets_health`
 - `identity_assets_sweep`
 
-`browser_snapshot` 是 AI 读当前页的首选工具:返回 `title` / `url` / `snapshot`(interesting-only 大纲,可交互节点带 `[ref=eN]`) / `refs` / **`markdown`(htmd 从 body HTML 转换)** / 截断正文。随后可用 `browser_click` / `browser_type` 传 `ref: "e1"`(或 `selector: "ref:e1"`)操作。完整无障碍树仍用 `browser_ax`;整页 HTML 用 `browser_html`(默认截断 20 万字符,防 MCP 卡退)。只要 Markdown 用 `browser_markdown` / `drs markdown`。
+`browser_snapshot` 是 AI 读当前页的首选工具:返回 `title` / `url` / `snapshot`(interesting-only 大纲,可交互节点带 `[ref=eN]`) / `refs` / **`markdown`(htmd 从 body HTML 转换)** / 截断正文。随后可用 `browser_click` / `browser_type` 传 `ref: "e1"`(或 `selector: "ref:e1"`)操作;多步交互可传 `return_snapshot: true`,成功后在结果里附带轻量 `page` 快照(跳过 markdown)。完整无障碍树仍用 `browser_ax`;整页 HTML 用 `browser_html`(默认截断 20 万字符,防 MCP 卡退)。只要 Markdown 用 `browser_markdown` / `drs markdown`。
 
 `browser_press` 在当前标签按一个键(如 `Enter`、`Tab`、`Escape`、`ArrowDown`),可选 `selector` 先聚焦某元素再按;`browser_type` 只填字符、不产生按键提交,需要回车提交/切换焦点/方向键时用 `browser_press`。
 
@@ -489,6 +510,8 @@ drs mcp --headless --standalone
 防卡退:`DRS_MCP_TIMEOUT_MS` / `DRS_DAEMON_TIMEOUT_MS`(默认各 60000)限制 MCP/daemon RPC;超时返回 `timeout` 错误码而非挂死。详见 [`AI页面快照.md`](AI页面快照.md)。
 `browser_identity` / `browser_identity_pool` 接受可选 `gate_preset`、`min_score`、`max_linkability`、`max_concentration_ratio`、`max_concentrated_signals`、`fail_on_high_risk`、`fail_on_risky_pairs`,并在结构化结果里返回同样的 `gate` 对象。
 `identity_assets_*` 工具对齐同名 CLI 命令的 kebab-case 版本,但 MCP 参数使用 snake_case,例如 `identity_assets_gate` 传 `asset_manifest`、`desired_concurrency`、`max_wait_seconds`;`identity_assets_select` 可写 `asset_manifest_out` 来预留 `runtimeLease*`;`identity_assets_release` 的 `result_json` 可直接传 JSON 值。它们让 Agent 在启动业务自动化前完成容量门禁、恢复预测、profile 领取,并在业务结束后回写 release ledger、健康分和过期残留清理。
+
+ref 失效时错误码为 **`stale_ref`**(hint:`call browser_snapshot again and use a fresh ref`),不要盲目重试旧 `eN`。
 
 ## 一键接入 Cursor / Codex(`drs setup`)
 
@@ -515,13 +538,18 @@ drs --json setup --dry-run      # 只打印计划、不落盘
 
 ## OCR
 
-开启 `ocr` feature 后可使用纯图片点选求解:
+开启 `ocr` feature 后（`cargo install --path crates/drission-cli --bin drs --features cdp,ocr`）：
 
 ```bash
+# 整图字符验证码（4 位字母数字等）→ text。自训模型：DRISSION_OCR_MODEL / DRISSION_OCR_CHARSET
+drs --json ocr recognize ./captcha.jpg
+
+# 点选验证码
 drs --json ocr clickword ./captcha.png 税实企
 ```
 
-输出包含按目标顺序的 `points` 和每个命中的 `bbox` / `affinity` / `template`。
+`recognize` 走 `Ocr::recognize`（ddddocr beta + tract 纯 Rust，Linux 可部署，不用 Apple Vision）。
+`clickword` 输出按目标顺序的 `points` 和每个命中的 `bbox` / `affinity` / `template`。
 
 ## 常见错误
 
@@ -531,6 +559,7 @@ drs --json ocr clickword ./captcha.png 税实企
 | `daemon_unreachable` | state 文件存在但端口连不上 | 重启 `drs serve`;CLI 会移除 stale state |
 | `unauthorized` | token 不匹配 | 删除缓存中的 `drs-server.json` 或重启 daemon |
 | `command_failed` | 浏览器动作失败 | 查看 `message`;常见是 selector 未命中或页面超时 |
+| `stale_ref` | snapshot `ref` 已失效或页面已变 | 重新 `browser_snapshot`,用新的 `eN` 再 click/type |
 | `timeout` | MCP/daemon 命令超时 | 页面可能对自动化不友好;改用 `browser_snapshot`,或提高 `DRS_MCP_TIMEOUT_MS` / `DRS_DAEMON_TIMEOUT_MS` |
 | `Session with given id not found` | active tab 对应的浏览器 target 已关闭,常见于打开会触发下载的 URL | 用 `drs open` 打开 HTML 页面;下载型资源用网络监听或 HTTP 客户端处理 |
 

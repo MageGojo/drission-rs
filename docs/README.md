@@ -10,6 +10,8 @@
 
 | 文档 | 内容 | 适合谁 |
 |---|---|---|
+| [运行时分层.md](运行时分层.md) | **Browser / HTTP / AI / Task 四层** + 一等公民 `BrowserContext` / `ProfileManager` / 网络门面;避免巨大 Browser 类 | 做多账号、池化、网络调试,或判断下一步往哪长的人 |
+| [进度.md](进度.md) | 里程碑 90 可验收进度(Context / Profile / 网络门面) | 断点续作、对账「做到哪了」 |
 | [设计.md](设计.md) | 自顶向下分层架构、Juggler 协议选型、异步并发模型、启动引导、监听/拦截/过盾接线、截图录像、WS 接管、吐环境、CDP 后端 | 想理解内部实现 / 参与贡献的人 |
 | [差异化路线.md](差异化路线.md) | 为什么 drission-rs 不应只做 Python DrissionPage 的 Rust 复刻,以及账号/Profile 运行时治理 sidecar 的产品路线 | 判断下一步功能优先级、做产品/架构取舍的人 |
 | [../python/README.md](../python/README.md) | Python 旧业务接入 `identity-job run` 的薄 helper:读取 `DRS_IDENTITY_*`、写 `DRS_IDENTITY_RESULT_OUT` | 想保留 Python 业务逻辑,只把账号/Profile 治理交给 Rust 的人 |

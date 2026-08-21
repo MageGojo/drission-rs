@@ -156,6 +156,7 @@ mod tests {
         let s = hook_script(&ListenFilter {
             url_keywords: vec!["aweme/detail".into()],
             xhr_only: false,
+            ..Default::default()
         });
         assert!(s.contains("aweme/detail"));
         assert!(!s.contains("__KW__"));

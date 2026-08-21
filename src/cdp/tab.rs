@@ -64,16 +64,18 @@ impl ChromiumTab {
                 None,
             )
             .await;
-        if let Some(ctx) = &self.core.browser_context_id {
-            let _ = self
-                .core
-                .conn
-                .send(
-                    "Target.disposeBrowserContext",
-                    json!({ "browserContextId": ctx }),
-                    None,
-                )
-                .await;
+        if self.core.should_dispose_context_on_close() {
+            if let Some(ctx) = &self.core.browser_context_id {
+                let _ = self
+                    .core
+                    .conn
+                    .send(
+                        "Target.disposeBrowserContext",
+                        json!({ "browserContextId": ctx }),
+                        None,
+                    )
+                    .await;
+            }
         }
         Ok(())
     }
@@ -883,6 +885,11 @@ impl ChromiumTab {
     /// 网络监听句柄(对标 DP `tab.listen`):`start`/`wait`/`wait_count`/`stop`。
     pub fn listen(&self) -> CdpListen {
         CdpListen::new(self.core.clone())
+    }
+
+    /// 网络门面:链式 `filter` / `method` / `listen` / `block` / `mock` / `rewrite` / `record`。
+    pub fn network(&self) -> crate::cdp::NetworkHandle {
+        crate::cdp::NetworkHandle::new(self.core.clone())
     }
 
     /// **调试器句柄**(逆向「主动定位」重武器):XHR/事件断点 + 调用栈 + 断点上下文求值/局部变量 +

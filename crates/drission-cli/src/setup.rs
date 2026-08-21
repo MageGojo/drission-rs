@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use serde_json::{Map, Value, json};
 
-use crate::protocol::{BackendKind, JsonResponse};
+use crate::protocol::{BackendKind, JsonResponse, McpToolset};
 
 /// Which editor/client to configure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
@@ -41,7 +41,17 @@ pub struct SetupOptions {
     pub backend: BackendKind,
     pub headless: bool,
     pub name: String,
+    pub tools: McpToolset,
     pub dry_run: bool,
+}
+
+fn tools_env_value(tools: McpToolset) -> &'static str {
+    match tools {
+        McpToolset::Core => "core",
+        McpToolset::Browser => "browser",
+        McpToolset::Identity => "identity",
+        McpToolset::All => "all",
+    }
 }
 
 /// Resolve the absolute path to the running `drs` binary so the generated MCP
@@ -123,7 +133,9 @@ async fn configure_cursor(opts: &SetupOptions, exe: &str, args: &[String]) -> Re
         json!({
             "command": exe,
             "args": args,
-            "env": {},
+            "env": {
+                "DRS_MCP_TOOLS": tools_env_value(opts.tools),
+            },
         }),
     );
 
@@ -181,6 +193,9 @@ async fn configure_codex(opts: &SetupOptions, exe: &str, args: &[String]) -> Res
     entry["command"] = toml_edit::value(exe);
     entry["args"] = toml_edit::value(arr);
     entry["startup_timeout_sec"] = toml_edit::value(120);
+    let mut env = toml_edit::Table::new();
+    env["DRS_MCP_TOOLS"] = toml_edit::value(tools_env_value(opts.tools));
+    entry["env"] = toml_edit::Item::Table(env);
     doc["mcp_servers"][&opts.name] = toml_edit::Item::Table(entry);
 
     if !opts.dry_run {
@@ -214,12 +229,18 @@ pub async fn run_setup(opts: SetupOptions) -> Result<JsonResponse> {
 
     Ok(JsonResponse::ok(json!({
         "serverName": opts.name,
+        "cursorServerId": format!("user-{}", opts.name),
         "command": exe,
         "args": args,
+        "tools": tools_env_value(opts.tools),
         "dryRun": opts.dry_run,
         "configured": results,
         "nextSteps": [
             "restart Cursor / Codex so the new MCP server is picked up",
+            format!(
+                "in Cursor agents the server id is usually `user-{}` (config key `{}`)",
+                opts.name, opts.name
+            ),
             "then ask the agent to use the `drs` browser tools for hard-to-get web data",
         ],
     })))
@@ -247,6 +268,7 @@ mod tests {
             backend: BackendKind::Cdp,
             headless: true,
             name: "drs".to_string(),
+            tools: McpToolset::Core,
             dry_run: false,
         };
         configure_cursor(&opts, "/abs/drs", &server_args(BackendKind::Cdp, true))
@@ -258,6 +280,7 @@ mod tests {
         assert_eq!(value["mcpServers"]["other"]["command"], "x");
         assert_eq!(value["mcpServers"]["drs"]["command"], "/abs/drs");
         assert_eq!(value["mcpServers"]["drs"]["args"][0], "mcp");
+        assert_eq!(value["mcpServers"]["drs"]["env"]["DRS_MCP_TOOLS"], "core");
         let _ = tokio::fs::remove_dir_all(&dir).await;
     }
 

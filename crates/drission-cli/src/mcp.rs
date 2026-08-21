@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -5,13 +6,15 @@ use anyhow::Result;
 use rmcp::{
     ServerHandler, ServiceExt,
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
-    model::{CallToolResult, ContentBlock},
+    model::{
+        CallToolResult, ContentBlock, Implementation, ServerCapabilities, ServerInfo,
+    },
     tool, tool_handler, tool_router,
     transport::stdio,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 use tokio::sync::Mutex;
 
 use crate::daemon;
@@ -19,7 +22,99 @@ use crate::engine::BrowserState;
 use crate::identity_cmd;
 use crate::protocol::{
     AxFormat, BackendKind, EngineCommand, IdentityGate, IdentityGatePreset, JsonResponse,
+    McpToolset,
 };
+
+/// Core browse loop exposed by default (`DRS_MCP_TOOLS=core`).
+const CORE_TOOLS: &[&str] = &[
+    "browser_open",
+    "browser_tabs",
+    "browser_use_tab",
+    "browser_close",
+    "browser_snapshot",
+    "browser_extract",
+    "browser_click",
+    "browser_type",
+    "browser_press",
+    "browser_wait",
+    "browser_screenshot",
+];
+
+/// Extended browser/network tools (included in `browser` + `all`).
+const BROWSER_EXTRA_TOOLS: &[&str] = &[
+    "browser_ax",
+    "browser_markdown",
+    "browser_html",
+    "browser_title",
+    "browser_url",
+    "browser_text",
+    "browser_eval",
+    "browser_save_state",
+    "browser_load_state",
+    "browser_ocr",
+    "browser_solve_slider",
+    "network_listen_start",
+    "network_listen_wait",
+    "network_listen_stop",
+    "browser_pass_cf",
+    "browser_identity",
+    "browser_identity_pool",
+];
+
+/// Identity asset governance tools (included in `identity` + `all`).
+const IDENTITY_TOOLS: &[&str] = &[
+    "browser_identity",
+    "browser_identity_pool",
+    "identity_assets_validate",
+    "identity_assets_status",
+    "identity_assets_forecast",
+    "identity_assets_gate",
+    "identity_assets_select",
+    "identity_assets_release",
+    "identity_assets_reconcile_runtime",
+    "identity_assets_health",
+    "identity_assets_sweep",
+];
+
+const ALL_MCP_TOOLS: &[&str] = &[
+    "browser_open",
+    "browser_tabs",
+    "browser_use_tab",
+    "browser_close",
+    "browser_ax",
+    "browser_snapshot",
+    "browser_markdown",
+    "browser_html",
+    "browser_title",
+    "browser_url",
+    "browser_extract",
+    "browser_text",
+    "browser_eval",
+    "browser_click",
+    "browser_type",
+    "browser_press",
+    "browser_wait",
+    "browser_save_state",
+    "browser_load_state",
+    "browser_ocr",
+    "browser_solve_slider",
+    "browser_screenshot",
+    "network_listen_start",
+    "network_listen_wait",
+    "network_listen_stop",
+    "browser_identity",
+    "browser_identity_pool",
+    "browser_pass_cf",
+    "identity_assets_validate",
+    "identity_assets_status",
+    "identity_assets_forecast",
+    "identity_assets_gate",
+    "identity_assets_select",
+    "identity_assets_release",
+    "identity_assets_reconcile_runtime",
+    "identity_assets_health",
+    "identity_assets_sweep",
+];
 
 /// How to (re)launch the shared daemon when it is missing.
 #[derive(Clone)]
@@ -43,19 +138,33 @@ enum DrsBackend {
 #[derive(Clone)]
 pub struct DrsMcp {
     backend: DrsBackend,
+    toolset: McpToolset,
     tool_router: ToolRouter<Self>,
 }
 
 #[tool_handler(router = self.tool_router)]
-impl ServerHandler for DrsMcp {}
+impl ServerHandler for DrsMcp {
+    fn get_info(&self) -> ServerInfo {
+        ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
+            .with_server_info(
+                Implementation::new("drs", env!("CARGO_PKG_VERSION"))
+                    .with_title("drs browser")
+                    .with_description(
+                        "Persistent browser MCP. Cursor agent id is usually `user-drs` (config key `drs`).",
+                    ),
+            )
+            .with_instructions(mcp_instructions(self.toolset))
+    }
+}
 
 #[tool_router(router = tool_router)]
 impl DrsMcp {
     /// Attach to the shared persistent daemon browser (default MCP mode).
-    fn attached(config: DaemonConfig) -> Self {
+    fn attached(config: DaemonConfig, toolset: McpToolset) -> Self {
         Self {
             backend: DrsBackend::Daemon(config),
-            tool_router: Self::tool_router(),
+            toolset,
+            tool_router: Self::router_for(toolset),
         }
     }
 
@@ -64,13 +173,26 @@ impl DrsMcp {
         backend: BackendKind,
         headless: bool,
         user_data_dir: Option<PathBuf>,
+        toolset: McpToolset,
     ) -> Result<Self> {
         Ok(Self {
             backend: DrsBackend::Local(Arc::new(Mutex::new(
                 BrowserState::launch(backend, headless, user_data_dir).await?,
             ))),
-            tool_router: Self::tool_router(),
+            toolset,
+            tool_router: Self::router_for(toolset),
         })
+    }
+
+    fn router_for(toolset: McpToolset) -> ToolRouter<Self> {
+        let mut router = Self::tool_router();
+        let allowed = allowed_tools(toolset);
+        for name in ALL_MCP_TOOLS {
+            if !allowed.contains(*name) {
+                router.remove_route(name);
+            }
+        }
+        router
     }
 
     #[tool(name = "browser_open", description = "Open a URL in a new browser tab")]
@@ -209,17 +331,11 @@ impl DrsMcp {
 
     #[tool(
         name = "browser_click",
-        description = "Click an element in the active tab. Use selector, or ref from browser_snapshot (e.g. e1 / ref:e1)."
+        description = "Click an element in the active tab. Prefer ref from browser_snapshot (e1 / ref:e1). Pass return_snapshot=true to attach a lightweight page snapshot after success."
     )]
     async fn browser_click(&self, Parameters(req): Parameters<ClickParams>) -> CallToolResult {
         let selector = match (req.ref_id, req.selector) {
-            (Some(r), _) => {
-                if r.starts_with("ref:") {
-                    r
-                } else {
-                    format!("ref:{r}")
-                }
-            }
+            (Some(r), _) => normalize_ref_selector(r),
             (None, Some(s)) => s,
             (None, None) => {
                 return result_to_tool(JsonResponse::err(
@@ -229,22 +345,23 @@ impl DrsMcp {
                 ));
             }
         };
-        self.exec(EngineCommand::Click { selector }).await
+        self.exec_action(
+            EngineCommand::Click {
+                selector: selector.clone(),
+            },
+            Some(&selector),
+            req.return_snapshot.unwrap_or(false),
+        )
+        .await
     }
 
     #[tool(
         name = "browser_type",
-        description = "Type text into an element in the active tab. Use selector, or ref from browser_snapshot (e.g. e1 / ref:e1)."
+        description = "Type text into an element in the active tab. Prefer ref from browser_snapshot (e1 / ref:e1). Pass return_snapshot=true to attach a lightweight page snapshot after success."
     )]
     async fn browser_type(&self, Parameters(req): Parameters<TypeParams>) -> CallToolResult {
-        let selector = match (req.ref_id.clone(), req.selector.clone()) {
-            (Some(r), _) => {
-                if r.starts_with("ref:") {
-                    r
-                } else {
-                    format!("ref:{r}")
-                }
-            }
+        let selector = match (req.ref_id, req.selector) {
+            (Some(r), _) => normalize_ref_selector(r),
             (None, Some(s)) => s,
             (None, None) => {
                 return result_to_tool(JsonResponse::err(
@@ -254,34 +371,48 @@ impl DrsMcp {
                 ));
             }
         };
-        self.exec(EngineCommand::Type {
-            selector,
-            text: req.text,
-        })
+        self.exec_action(
+            EngineCommand::Type {
+                selector: selector.clone(),
+                text: req.text,
+            },
+            Some(&selector),
+            req.return_snapshot.unwrap_or(false),
+        )
         .await
     }
 
     #[tool(
         name = "browser_press",
-        description = "Press a key in the active tab, optionally scoped to an element (e.g. Enter, Tab, Escape, ArrowDown)"
+        description = "Press a key in the active tab, optionally scoped to an element (e.g. Enter, Tab, Escape, ArrowDown). Pass return_snapshot=true to attach a lightweight page snapshot after success."
     )]
     async fn browser_press(&self, Parameters(req): Parameters<PressParams>) -> CallToolResult {
-        self.exec(EngineCommand::Press {
-            key: req.key,
-            selector: req.selector,
-        })
+        let selector = req.selector.map(normalize_ref_selector);
+        self.exec_action(
+            EngineCommand::Press {
+                key: req.key,
+                selector: selector.clone(),
+            },
+            selector.as_deref(),
+            req.return_snapshot.unwrap_or(false),
+        )
         .await
     }
 
     #[tool(
         name = "browser_wait",
-        description = "Wait for an element to be displayed"
+        description = "Wait for an element to be displayed. Pass return_snapshot=true to attach a lightweight page snapshot after success."
     )]
     async fn browser_wait(&self, Parameters(req): Parameters<WaitParams>) -> CallToolResult {
-        self.exec(EngineCommand::Wait {
-            selector: req.selector,
-            timeout_ms: req.timeout_ms,
-        })
+        let selector = normalize_ref_selector(req.selector);
+        self.exec_action(
+            EngineCommand::Wait {
+                selector: selector.clone(),
+                timeout_ms: req.timeout_ms,
+            },
+            Some(&selector),
+            req.return_snapshot.unwrap_or(false),
+        )
         .await
     }
 
@@ -688,23 +819,69 @@ impl DrsMcp {
 
 impl DrsMcp {
     async fn exec(&self, command: EngineCommand) -> CallToolResult {
+        self.exec_action(command, None, false).await
+    }
+
+    /// Run a browser action; optionally attach a lightweight snapshot afterwards.
+    async fn exec_action(
+        &self,
+        command: EngineCommand,
+        selector_hint: Option<&str>,
+        return_snapshot: bool,
+    ) -> CallToolResult {
         let timeout_ms = mcp_command_timeout_ms();
-        match tokio::time::timeout(
+        let response = match tokio::time::timeout(
             std::time::Duration::from_millis(timeout_ms),
             self.exec_response(command),
         )
         .await
         {
-            Ok(response) => result_to_tool(response),
-            Err(_) => result_to_tool(JsonResponse::err(
+            Ok(response) => annotate_command_error(response, selector_hint),
+            Err(_) => JsonResponse::err(
                 "timeout",
                 format!("MCP browser command timed out after {timeout_ms}ms"),
                 Some(
                     "page may be automation-hostile; try browser_snapshot, or raise DRS_MCP_TIMEOUT_MS"
                         .to_string(),
                 ),
-            )),
+            ),
+        };
+
+        if !response.ok || !return_snapshot {
+            return result_to_tool(response);
         }
+
+        let mut data = response.data.unwrap_or_else(|| json!({}));
+        let snap = match tokio::time::timeout(
+            std::time::Duration::from_millis(timeout_ms.min(15_000)),
+            self.exec_response(EngineCommand::Snapshot {
+                budget_ms: Some(1_500),
+                max_items: Some(80),
+                max_text_chars: Some(2_000),
+                max_markdown_chars: Some(0),
+            }),
+        )
+        .await
+        {
+            Ok(snap) => snap,
+            Err(_) => JsonResponse::err(
+                "timeout",
+                "lightweight snapshot after action timed out",
+                Some("retry browser_snapshot separately".to_string()),
+            ),
+        };
+        if snap.ok {
+            if let Some(page) = snap.data {
+                data["page"] = page;
+            }
+        } else if let Some(error) = snap.error {
+            data["pageError"] = json!({
+                "code": error.code,
+                "message": error.message,
+                "hint": error.hint,
+            });
+        }
+        result_to_tool(JsonResponse::ok(data))
     }
 
     async fn exec_response(&self, command: EngineCommand) -> JsonResponse {
@@ -754,9 +931,10 @@ pub async fn run_mcp(
     headless: bool,
     user_data_dir: Option<PathBuf>,
     standalone: bool,
+    tools: McpToolset,
 ) -> Result<()> {
     let mcp = if standalone {
-        DrsMcp::standalone(backend, headless, user_data_dir).await?
+        DrsMcp::standalone(backend, headless, user_data_dir, tools).await?
     } else {
         // Bring up (or reuse) the shared persistent daemon before serving, so
         // that MCP browser commands attach to the long-lived daemon browser
@@ -773,7 +951,7 @@ pub async fn run_mcp(
             config.user_data_dir.clone(),
         )
         .await?;
-        DrsMcp::attached(config)
+        DrsMcp::attached(config, tools)
     };
     let service = mcp.serve(stdio()).await?;
     service.waiting().await?;
@@ -885,6 +1063,8 @@ struct ClickParams {
     /// Interactive ref from browser_snapshot (`e1` or `ref:e1`).
     #[serde(rename = "ref")]
     ref_id: Option<String>,
+    /// After a successful click, attach a lightweight `page` snapshot (refs + short text; no markdown).
+    return_snapshot: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema)]
@@ -895,6 +1075,8 @@ struct TypeParams {
     #[serde(rename = "ref")]
     ref_id: Option<String>,
     text: String,
+    /// After successful typing, attach a lightweight `page` snapshot (refs + short text; no markdown).
+    return_snapshot: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema)]
@@ -903,6 +1085,8 @@ struct PressParams {
     key: String,
     /// Optional element selector to focus before pressing; omit to press on the active element.
     selector: Option<String>,
+    /// After a successful key press, attach a lightweight `page` snapshot (refs + short text; no markdown).
+    return_snapshot: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema)]
@@ -923,6 +1107,8 @@ struct SolveSliderParams {
 struct WaitParams {
     selector: String,
     timeout_ms: Option<u64>,
+    /// After the element appears, attach a lightweight `page` snapshot (refs + short text; no markdown).
+    return_snapshot: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema)]
@@ -1101,90 +1287,168 @@ impl IdentityGateParams {
     }
 }
 
+fn normalize_ref_selector(selector: String) -> String {
+    if selector.starts_with("ref:") || !is_bare_ref_id(&selector) {
+        selector
+    } else {
+        format!("ref:{selector}")
+    }
+}
+
+fn is_bare_ref_id(value: &str) -> bool {
+    let mut chars = value.chars();
+    matches!(chars.next(), Some('e'))
+        && chars.next().is_some_and(|c| c.is_ascii_digit())
+        && chars.all(|c| c.is_ascii_digit())
+}
+
+fn allowed_tools(toolset: McpToolset) -> HashSet<&'static str> {
+    let mut set = HashSet::new();
+    match toolset {
+        McpToolset::Core => set.extend(CORE_TOOLS.iter().copied()),
+        McpToolset::Browser => {
+            set.extend(CORE_TOOLS.iter().copied());
+            set.extend(BROWSER_EXTRA_TOOLS.iter().copied());
+        }
+        McpToolset::Identity => set.extend(IDENTITY_TOOLS.iter().copied()),
+        McpToolset::All => set.extend(ALL_MCP_TOOLS.iter().copied()),
+    }
+    set
+}
+
+fn looks_like_stale_ref(message: &str, selector_hint: Option<&str>) -> bool {
+    let hint = selector_hint.unwrap_or("");
+    let has_ref_marker = message.contains("data-drs-ref")
+        || message.contains("ref:")
+        || hint.starts_with("ref:")
+        || is_bare_ref_id(hint);
+    if !has_ref_marker {
+        return false;
+    }
+    let lower = message.to_ascii_lowercase();
+    message.contains("未找到元素")
+        || message.contains("已失效")
+        || lower.contains("element not found")
+        || lower.contains("stale element")
+        || lower.contains("no node")
+        || lower.contains("could not find")
+}
+
+fn annotate_command_error(response: JsonResponse, selector_hint: Option<&str>) -> JsonResponse {
+    if response.ok {
+        return response;
+    }
+    let Some(error) = response.error else {
+        return response;
+    };
+    if looks_like_stale_ref(&error.message, selector_hint) {
+        return JsonResponse::err(
+            "stale_ref",
+            error.message,
+            Some(
+                "stale_ref → call browser_snapshot again and use a fresh ref (page changed or prior ref expired)"
+                    .to_string(),
+            ),
+        );
+    }
+    JsonResponse::err(error.code, error.message, error.hint)
+}
+
+fn mcp_instructions(toolset: McpToolset) -> String {
+    let profile = match toolset {
+        McpToolset::Core => "core",
+        McpToolset::Browser => "browser",
+        McpToolset::Identity => "identity",
+        McpToolset::All => "all",
+    };
+    format!(
+        r#"drs persistent browser MCP (toolset={profile}).
+Cursor agent server id is usually `user-drs` (mcp.json key `drs`).
+
+Preferred loop: browser_snapshot → browser_click/type/press/wait with ref → optional return_snapshot=true.
+Do NOT use browser_html/browser_ax on heavy pages; prefer browser_snapshot / browser_extract.
+
+Stable core schemas (session-cacheable; after one GetMcpTools for this server, reuse these args):
+- browser_open {{url}}
+- browser_snapshot {{budget_ms?, max_items?, max_text_chars?, max_markdown_chars?}}
+- browser_extract {{url?, wait_selector?, pass_cf?, include_markdown?}}
+- browser_click {{ref?|selector?, return_snapshot?}}
+- browser_type {{ref?|selector?, text, return_snapshot?}}
+- browser_press {{key, selector?, return_snapshot?}}
+- browser_wait {{selector, timeout_ms?, return_snapshot?}}
+- browser_screenshot {{out?, full?, inline?}}
+- browser_tabs / browser_use_tab {{tab_id}} / browser_close {{tab_id?}}
+
+Errors: code `stale_ref` means the snapshot ref is gone — call browser_snapshot and retry with a new ref.
+Need identity_assets_* or network_*? Restart with DRS_MCP_TOOLS=browser|identity|all (default core)."#
+    )
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn tool_names_are_stable() {
-        const MCP_TOOL_NAMES: &[&str] = &[
-            "browser_open",
-            "browser_tabs",
-            "browser_use_tab",
-            "browser_close",
-            "browser_ax",
-            "browser_snapshot",
-            "browser_markdown",
-            "browser_html",
-            "browser_title",
-            "browser_url",
-            "browser_extract",
-            "browser_text",
-            "browser_eval",
-            "browser_click",
-            "browser_type",
-            "browser_press",
-            "browser_wait",
-            "browser_save_state",
-            "browser_load_state",
-            "browser_ocr",
-            "browser_solve_slider",
-            "browser_screenshot",
-            "network_listen_start",
-            "network_listen_wait",
-            "network_listen_stop",
-            "browser_identity",
-            "browser_identity_pool",
-            "browser_pass_cf",
-            "identity_assets_validate",
-            "identity_assets_status",
-            "identity_assets_forecast",
-            "identity_assets_gate",
-            "identity_assets_select",
-            "identity_assets_release",
-            "identity_assets_reconcile_runtime",
-            "identity_assets_health",
-            "identity_assets_sweep",
-        ];
-        assert_eq!(
-            MCP_TOOL_NAMES,
-            &[
-                "browser_open",
-                "browser_tabs",
-                "browser_use_tab",
-                "browser_close",
-                "browser_ax",
-                "browser_snapshot",
-                "browser_markdown",
-                "browser_html",
-                "browser_title",
-                "browser_url",
-                "browser_extract",
-                "browser_text",
-                "browser_eval",
-                "browser_click",
-                "browser_type",
-                "browser_press",
-                "browser_wait",
-                "browser_save_state",
-                "browser_load_state",
-                "browser_ocr",
-                "browser_solve_slider",
-                "browser_screenshot",
-                "network_listen_start",
-                "network_listen_wait",
-                "network_listen_stop",
-                "browser_identity",
-                "browser_identity_pool",
-                "browser_pass_cf",
-                "identity_assets_validate",
-                "identity_assets_status",
-                "identity_assets_forecast",
-                "identity_assets_gate",
-                "identity_assets_select",
-                "identity_assets_release",
-                "identity_assets_reconcile_runtime",
-                "identity_assets_health",
-                "identity_assets_sweep",
-            ]
+        assert_eq!(ALL_MCP_TOOLS.len(), 37);
+        assert!(ALL_MCP_TOOLS.contains(&"browser_snapshot"));
+        assert!(ALL_MCP_TOOLS.contains(&"identity_assets_sweep"));
+    }
+
+    #[test]
+    fn core_toolset_is_small_and_excludes_identity_assets() {
+        let core = allowed_tools(McpToolset::Core);
+        assert_eq!(core.len(), CORE_TOOLS.len());
+        assert!(core.contains("browser_snapshot"));
+        assert!(core.contains("browser_click"));
+        assert!(!core.contains("identity_assets_gate"));
+        assert!(!core.contains("network_listen_start"));
+        assert!(!core.contains("browser_html"));
+    }
+
+    #[test]
+    fn browser_toolset_keeps_network_but_not_identity_assets() {
+        let browser = allowed_tools(McpToolset::Browser);
+        assert!(browser.contains("network_listen_wait"));
+        assert!(browser.contains("browser_pass_cf"));
+        assert!(!browser.contains("identity_assets_select"));
+    }
+
+    #[test]
+    fn stale_ref_detection_uses_resolved_selector_markers() {
+        assert!(looks_like_stale_ref(
+            "未找到元素: css:[data-drs-ref=\"e3\"]",
+            Some("ref:e3")
+        ));
+        assert!(looks_like_stale_ref(
+            "Element not found: css:[data-drs-ref=\"e1\"]",
+            None
+        ));
+        assert!(!looks_like_stale_ref(
+            "未找到元素: css:#submit",
+            Some("css:#submit")
+        ));
+    }
+
+    #[test]
+    fn annotate_promotes_stale_ref_code() {
+        let response = annotate_command_error(
+            JsonResponse::err(
+                "command_failed",
+                "未找到元素: css:[data-drs-ref=\"e9\"]",
+                None,
+            ),
+            Some("ref:e9"),
         );
+        let err = response.error.expect("error");
+        assert_eq!(err.code, "stale_ref");
+        assert!(err.hint.unwrap().contains("browser_snapshot"));
+    }
+
+    #[test]
+    fn normalize_ref_accepts_bare_ids() {
+        assert_eq!(normalize_ref_selector("e12".into()), "ref:e12");
+        assert_eq!(normalize_ref_selector("ref:e12".into()), "ref:e12");
+        assert_eq!(normalize_ref_selector("css:#x".into()), "css:#x");
     }
 }

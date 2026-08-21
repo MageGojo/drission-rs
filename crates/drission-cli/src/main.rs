@@ -47,7 +47,14 @@ async fn main() -> Result<()> {
             init_tracing();
             engine::validate_backend_or_bail(args.backend)?;
             let user_data_dir = resolve_profile_dir(args.user_data_dir)?;
-            mcp::run_mcp(args.backend, args.headless, user_data_dir, args.standalone).await?;
+            mcp::run_mcp(
+                args.backend,
+                args.headless,
+                user_data_dir,
+                args.standalone,
+                args.tools,
+            )
+            .await?;
             Ok(())
         }
         Command::Setup(args) => {
@@ -58,6 +65,7 @@ async fn main() -> Result<()> {
                 backend: args.backend,
                 headless: !args.no_headless,
                 name: args.name,
+                tools: args.tools,
                 dry_run: args.dry_run,
             })
             .await?;
@@ -877,6 +885,7 @@ async fn main() -> Result<()> {
         #[cfg(feature = "ocr")]
         Command::Ocr { command } => {
             let response = match command {
+                cli::OcrCommand::Recognize { image } => ocr_cmd::recognize(&image).await?,
                 cli::OcrCommand::Clickword { image, targets } => {
                     ocr_cmd::clickword(&image, &targets).await?
                 }

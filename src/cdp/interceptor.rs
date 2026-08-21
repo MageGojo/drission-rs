@@ -29,6 +29,7 @@ pub(crate) struct InterceptShared {
 }
 
 /// 请求拦截句柄(`tab.intercept()` 返回)。
+#[derive(Clone)]
 pub struct CdpIntercept {
     core: Arc<CdpCore>,
 }
@@ -49,10 +50,16 @@ impl CdpIntercept {
     }
 
     async fn start_with(&self, keywords: &[&str], xhr_only: bool) -> Result<()> {
-        let filter = ListenFilter {
+        self.start_filter(ListenFilter {
             url_keywords: keywords.iter().map(|s| s.to_string()).collect(),
             xhr_only,
-        };
+            ..Default::default()
+        })
+        .await
+    }
+
+    /// 按完整 [`ListenFilter`] 开始拦截(含 HTTP 方法过滤)。
+    pub async fn start_filter(&self, filter: ListenFilter) -> Result<()> {
         self.stop().await?;
         self.core
             .send(
@@ -197,6 +204,16 @@ impl CdpInterceptedRequest {
     pub fn request_id(&self) -> &str {
         &self.request_id
     }
+
+    /// 统一请求视图。
+    pub fn as_request(&self) -> crate::net::NetRequest {
+        crate::net::NetRequest {
+            url: self.url.clone(),
+            method: self.method.clone(),
+            headers: self.headers.clone(),
+            body: self.post_data.clone(),
+        }
+    }
 }
 
 /// 拦截后台任务:订阅事件,把匹配过滤的 `Fetch.requestPaused` 投递给用户,其余自动放行。
@@ -241,20 +258,21 @@ async fn intercept_pump(
         };
         let req = &ev.params["request"];
         let url = req["url"].as_str().unwrap_or_default().to_string();
+        let method = req["method"].as_str().unwrap_or_default().to_string();
         let resource_type = ev.params["resourceType"]
             .as_str()
             .unwrap_or_default()
             .to_string();
 
         // 不匹配:自动放行,别让请求悬着。
-        if !filter.matches(&url, &resource_type) {
+        if !filter.matches_request(&url, &resource_type, &method) {
             auto_continue(request_id).await;
             continue;
         }
 
         let intercepted = CdpInterceptedRequest {
             url,
-            method: req["method"].as_str().unwrap_or_default().to_string(),
+            method,
             resource_type,
             headers: header_map_to_pairs(&req["headers"]),
             post_data: req["postData"].as_str().map(str::to_string),

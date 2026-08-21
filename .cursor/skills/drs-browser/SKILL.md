@@ -7,11 +7,45 @@ description: Mandatory browser and live web content gateway via the local `drs` 
 
 ## 铁律
 
-1. **所有浏览器操作和内容提取必须走 `drs`**：`drs --json ...` CLI，或 Cursor MCP 工具 `browser_*` / `network_*`（server 名 `drs`）。
+1. **所有浏览器操作和内容提取必须走 `drs`**：`drs --json ...` CLI，或 Cursor MCP 工具 `browser_*` / `network_*`。
 2. **禁止绕过**：不得用 Playwright / Puppeteer / Selenium / chromedriver / WebFetch / curl 直接抓需要 JS 渲染、登录态、反爬或 Cloudflare 的页面。
 3. **机器读取一律 `--json`**：解析 `{ "ok": true, "data": ... }` 或 `{ "ok": false, "error": ... }`。
 4. **先确保 daemon**：任意 daemon 命令前执行 `drs ensure-serve --headless`，或给命令加 `--ensure-serve --ensure-headless`。
 5. **内容先落盘**：抓到的页面 bundle / 网络包 / 截图先写入项目 `data/browser/`（JSON/PNG），再分析。
+
+## MCP server 名（统一）
+
+| 位置 | 名字 |
+|---|---|
+| `~/.cursor/mcp.json` / 项目 `.cursor/mcp.json` 的 key | **`drs`** |
+| Cursor Agent 里调用 MCP 时的 server id | **`user-drs`**（Cursor 给用户级配置加的 `user-` 前缀） |
+| Codex `~/.codex/config.toml` | **`drs`** |
+
+调用时用 **`user-drs`**（Cursor）。Skill / 文档里写的 `drs` 指配置 key，不是 CallMcpTool 的 server 参数。
+
+## Schema 复用（少打 GetMcpTools）
+
+核心工具 schema **会话内稳定**。推荐：
+
+1. 会话里对 `user-drs` **最多完整发现一次**：`GetMcpTools({ server: "user-drs" })`，或按需 `GetMcpTools({ server: "user-drs", toolName: "browser_click" })`。
+2. 之后对已知核心工具直接 `CallMcpTool`，不必每次重拉全量 catalog（全量含 identity 时很重；默认 toolset=`core` 已缩到 ~11 个）。
+3. 默认只暴露浏览核心；需要网络监听 / CF / identity 资产时，让用户把 `DRS_MCP_TOOLS` 设为 `browser` / `identity` / `all` 后重启 MCP。
+
+稳定核心参数（可按此直接 call）：
+
+- `browser_open` `{url}`
+- `browser_snapshot` `{budget_ms?, max_items?, max_text_chars?, max_markdown_chars?}`
+- `browser_extract` `{url?, wait_selector?, pass_cf?, include_markdown?}`
+- `browser_click` `{ref?|selector?, return_snapshot?}`
+- `browser_type` `{ref?|selector?, text, return_snapshot?}`
+- `browser_press` `{key, selector?, return_snapshot?}`
+- `browser_wait` `{selector, timeout_ms?, return_snapshot?}`
+- `browser_screenshot` `{out?, full?, inline?}`
+- `browser_tabs` / `browser_use_tab` `{tab_id}` / `browser_close` `{tab_id?}`
+
+多步交互优先 `return_snapshot: true`，避免再单独打一轮 snapshot。
+
+错误码 `stale_ref`：旧 ref 失效 → **立刻再 `browser_snapshot`，用新 ref 重试**。
 
 ## 首选：读懂当前页
 
@@ -30,7 +64,9 @@ drs --json click "ref:e1"
 drs --json type "ref:e2" "hello"
 ```
 
-MCP 等价：`browser_snapshot` → `browser_click({ "ref": "e1" })` / `browser_type({ "ref": "e2", "text": "hello" })`。
+MCP 等价（server=`user-drs`）：
+
+`browser_snapshot` → `browser_click({ ref: "e1", return_snapshot: true })` / `browser_type({ ref: "e2", text: "hello", return_snapshot: true })`。
 
 一次性打开并抽取仍可用 `extract`：
 
@@ -58,44 +94,41 @@ drs --json extract https://example.com \
 
 ## MCP（Cursor 内）
 
-项目已配置 `.cursor/mcp.json`，server 名 **`drs`**。优先工具：
+配置 key **`drs`**，Agent 调用 id **`user-drs`**。默认 toolset=`core`：
 
-- **`browser_snapshot`** — 读懂当前页（首选：大纲 + refs + 短正文）
+- **`browser_snapshot`** — 读懂当前页（首选）
 - **`browser_extract`** — 打开 URL 并返回 title/url/text/outline
-- `browser_open` / `browser_ax` / `browser_text` / `browser_html`（默认截断）/ `browser_screenshot`
-- `browser_click` / `browser_type`（可用 snapshot 的 `ref`）
-- `network_listen_start` / `network_listen_wait`
-- `browser_pass_cf`
+- `browser_open` / `browser_tabs` / `browser_use_tab` / `browser_close`
+- `browser_click` / `browser_type` / `browser_press` / `browser_wait`（可 `return_snapshot`）
+- `browser_screenshot`
 
-MCP 默认 **attach 到常驻 daemon 的同一个持久浏览器**：浏览器活在 `drs serve` 进程里，MCP server 重启也不丢标签/登录态，CLI 与 MCP 操作同一组标签。daemon 用固定 profile（`<cache>/drission/cli/profile`），登录态跨重启存活——这正是「下次查数据直接接着用、不用重登」的关键。想要一次性独立浏览器时用 `drs mcp --standalone`。
+`DRS_MCP_TOOLS=browser` 才有 `network_*` / `browser_pass_cf` / `browser_html` 等；`=identity` 才有 `identity_assets_*`；`=all` 全开。
+
+MCP 默认 **attach 到常驻 daemon**：标签/登录态跨 MCP 重启存活。一次性独立浏览器用 `drs mcp --standalone`。
 
 ## 决策树
 
 ```
 需要浏览器或动态页面内容？
-├─ 是 → 只用 drs（CLI 或 MCP）
-│   ├─ 看当前页有什么 → browser_snapshot / drs snapshot（首选）
-│   ├─ 一次性打开+读 → browser_extract / drs extract
-│   ├─ 多步交互 → snapshot → click/type(ref) / wait
-│   └─ 抓 API → listen start + wait
+├─ 是 → 只用 drs（CLI 或 MCP user-drs）
+│   ├─ 看当前页有什么 → browser_snapshot（首选）
+│   ├─ 一次性打开+读 → browser_extract
+│   ├─ 多步交互 → click/type/press/wait + return_snapshot=true
+│   └─ 抓 API → DRS_MCP_TOOLS=browser 后 listen start + wait
 └─ 否（静态 JSON/API，无反爬）→ 可用普通 HTTP 客户端
 ```
 
 ## 安装 / 开发
 
-免 Rust 装预编译二进制(推荐给「只用不写」的场景):
-
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MageGojo/drission-rs/main/install/drs-install.sh | sh   # mac/linux
-drs setup    # 自动写 Cursor(.cursor/mcp.json)+ Codex(~/.codex/config.toml)的 MCP 配置
+curl -fsSL https://raw.githubusercontent.com/MageGojo/drission-rs/main/install/drs-install.sh | sh
+drs setup --scope global   # 写 ~/.cursor/mcp.json（key=drs，env DRS_MCP_TOOLS=core）
 ```
 
-从源码装(要 Rust):
+从源码：
 
 ```bash
 cargo install --path crates/drission-cli --bin drs
-# 或
-cargo install drission-cli --bin drs --features cdp,ocr
 ```
 
-完整命令、`drs setup` 与 identity 治理见 [docs/CLI.md](../../docs/CLI.md)。
+完整命令见 [docs/CLI.md](../../docs/CLI.md)。

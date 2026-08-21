@@ -18,9 +18,12 @@ use std::time::Duration;
 
 use futures_util::StreamExt;
 use futures_util::stream;
-use tokio::sync::{Mutex, Semaphore};
+use tokio::sync::{Mutex, OwnedSemaphorePermit, Semaphore};
 
-use crate::cdp::{ChromiumBrowser, ChromiumContextOverride, ChromiumOptions, ChromiumTab};
+use crate::cdp::{
+    ChromiumBrowser, ChromiumBrowserContext, ChromiumContextOverride, ChromiumOptions, ChromiumTab,
+    ContextSpec,
+};
 use crate::pool::ProxyPool;
 use crate::pool::rotate::{RotateStrategy, Rotator, hash_key};
 use crate::pool::{Checkpoint, RetryPolicy, is_worker_dead};
@@ -416,6 +419,34 @@ impl ChromiumPool {
         out
     }
 
+    /// 领取一个并发槽 + 一个 worker 浏览器。Drop 释放槽。
+    ///
+    /// ```ignore
+    /// let browser = pool.acquire().await?;
+    /// let context = browser.context("account_001").await?;
+    /// let tab = context.new_tab(None).await?;
+    /// ```
+    pub async fn acquire(&self) -> Result<PoolLease> {
+        self.acquire_keyed(None).await
+    }
+
+    /// 同 [`acquire`](Self::acquire),`key` 做 worker / 代理 / UA 粘性定位。
+    pub async fn acquire_keyed(&self, key: Option<&str>) -> Result<PoolLease> {
+        let permit = self
+            .sem
+            .clone()
+            .acquire_owned()
+            .await
+            .map_err(|_| Error::Other("并发池信号量已关闭".into()))?;
+        let worker = self.pick_worker(key);
+        let browser = worker.handle().await?;
+        Ok(PoolLease {
+            browser,
+            _permit: permit,
+            override_: self.build_override(key),
+        })
+    }
+
     /// 关闭池:并行优雅退出所有 worker(`ChromiumBrowser::quit`),`Drop` 仍兜底。
     pub async fn shutdown(self) -> Result<()> {
         let mut futs = Vec::new();
@@ -427,5 +458,39 @@ impl ChromiumPool {
         }
         futures_util::future::join_all(futs).await;
         Ok(())
+    }
+}
+
+/// [`ChromiumPool::acquire`] 拿到的租约:持并发许可,Deref 到 [`ChromiumBrowser`]。
+pub struct PoolLease {
+    browser: Arc<ChromiumBrowser>,
+    _permit: OwnedSemaphorePermit,
+    override_: ChromiumContextOverride,
+}
+
+impl PoolLease {
+    pub fn browser(&self) -> &ChromiumBrowser {
+        &self.browser
+    }
+
+    /// 在本 worker 上取/建命名 Context。
+    pub async fn context(&self, name: &str) -> Result<ChromiumBrowserContext> {
+        self.browser.context(name).await
+    }
+
+    pub async fn context_with(&self, spec: ContextSpec) -> Result<ChromiumBrowserContext> {
+        self.browser.context_with(spec).await
+    }
+
+    /// 按池轮换覆盖开一个隔离标签(对齐 `run` 的 per-task context)。
+    pub async fn new_tab(&self) -> Result<ChromiumTab> {
+        self.browser.new_tab_with(&self.override_).await
+    }
+}
+
+impl std::ops::Deref for PoolLease {
+    type Target = ChromiumBrowser;
+    fn deref(&self) -> &ChromiumBrowser {
+        &self.browser
     }
 }

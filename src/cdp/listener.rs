@@ -69,11 +69,16 @@ impl CdpListen {
     }
 
     async fn start_with(&self, keywords: &[&str], xhr_only: bool) -> Result<()> {
-        let filter = ListenFilter {
+        self.start_filter(ListenFilter {
             url_keywords: keywords.iter().map(|s| s.to_string()).collect(),
             xhr_only,
-        };
-        // 先停掉旧的(如有),再重开。
+            ..Default::default()
+        })
+        .await
+    }
+
+    /// 按完整 [`ListenFilter`] 开始监听(含 HTTP 方法过滤)。
+    pub async fn start_filter(&self, filter: ListenFilter) -> Result<()> {
         self.stop().await?;
         self.core
             .send("Network.enable", serde_json::json!({}))
@@ -207,7 +212,7 @@ async fn listen_pump(conn: Connection, session_id: String, filter: ListenFilter,
             "Network.loadingFinished" => {
                 if let Some(id) = ev.params["requestId"].as_str() {
                     if let Some(p) = pending.remove(id) {
-                        if filter.matches(&p.url, &p.resource_type) {
+                        if filter.matches_request(&p.url, &p.resource_type, &p.method) {
                             let packet = assemble(&conn, &session_id, id, p).await;
                             let mut g = buf.lock().await;
                             if g.len() >= BUFFER_CAP {

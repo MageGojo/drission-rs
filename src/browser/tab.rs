@@ -1613,6 +1613,7 @@ impl Tab {
         self.listen_start_filter(ListenFilter {
             url_keywords: keywords.iter().map(|s| s.to_string()).collect(),
             xhr_only: false,
+            ..Default::default()
         })
         .await
     }
@@ -2059,6 +2060,7 @@ impl Tab {
         self.intercept_start_filter(ListenFilter {
             url_keywords: keywords.iter().map(|s| s.to_string()).collect(),
             xhr_only: false,
+            ..Default::default()
         })
         .await
     }
@@ -2068,6 +2070,7 @@ impl Tab {
         self.intercept_start_filter(ListenFilter {
             url_keywords: keywords.iter().map(|s| s.to_string()).collect(),
             xhr_only: true,
+            ..Default::default()
         })
         .await
     }

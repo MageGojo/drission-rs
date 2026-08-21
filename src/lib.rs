@@ -67,6 +67,8 @@ pub mod page;
 #[cfg(any(feature = "camoufox", feature = "cdp"))]
 pub mod pool;
 pub mod protocol;
+/// 四层运行时再导出(Browser / HTTP / AI / Task)。见 `docs/运行时分层.md`。
+pub mod runtime;
 pub mod scrape;
 /// HTTP Session(不开浏览器)+ 与浏览器 cookie 互通(Camoufox 后端)。仅 `--features camoufox`。
 #[cfg(feature = "camoufox")]
@@ -114,7 +116,10 @@ pub mod prelude {
     pub use crate::human::{HumanClickOpts, Humanize, ImageView, fetch_image};
     pub use crate::keys::{KeyInput, Keys};
     pub use crate::locator::{Query, parse as parse_locator};
-    pub use crate::net::{DataPacket, ListenFilter, RequestData, ResponseData, ResumeOptions};
+    pub use crate::net::{
+        DataPacket, ListenFilter, NetRequest, NetResponse, RequestData, ResponseData,
+        ResumeOptions,
+    };
     pub use crate::scrape::{
         TableOptions, print_table, print_table_with_options, records_to_csv, records_to_json,
         rows_to_csv, rows_to_table, rows_to_table_with_options, write_csv, write_json,
@@ -144,12 +149,15 @@ pub mod prelude {
     pub use crate::cdp::{
         CdpIntercept as Intercept, CdpInterceptedRequest as InterceptedRequest,
         CdpListen as Listen, ChromiumActions as Actions, ChromiumBrowser as Browser,
-        ChromiumConsole as Console, ChromiumDownloads as Downloads, ChromiumElement as Element,
+        ChromiumBrowserContext as BrowserContext, ChromiumConsole as Console,
+        ChromiumDownloads as Downloads, ChromiumElement as Element,
         ChromiumElementRect as ElementRect, ChromiumElementWait as ElementWait,
         ChromiumFrame as Frame, ChromiumOptions as BrowserOptions, ChromiumPage as Page,
         ChromiumRecorder as Recorder, ChromiumScreencast as Screencast, ChromiumScroll as Scroll,
         ChromiumSetTab as SetTab, ChromiumShadowRoot as ShadowRoot, ChromiumTab as Tab,
         ChromiumWait as Wait, ChromiumWindow as Window, ChromiumWsListener as WsListener,
+        ContextSpec, NetworkHandle, NetworkRoute, PoolLease, ProfileLease, ProfileManager,
+        ProfileManifest,
     };
     #[cfg(all(feature = "cdp", not(feature = "camoufox")))]
     pub use crate::cdp::{
@@ -188,11 +196,11 @@ pub mod prelude {
     #[cfg(feature = "cdp")]
     pub use crate::cdp::{
         CdpIntercept, CdpInterceptedRequest, CdpListen, ChromiumActions, ChromiumBrowser,
-        ChromiumConsole, ChromiumContextOverride, ChromiumDownloads, ChromiumElement,
-        ChromiumElementRect, ChromiumElementWait, ChromiumFrame, ChromiumOptions, ChromiumPage,
-        ChromiumPool, ChromiumPoolOptions, ChromiumRecorder, ChromiumScreencast, ChromiumScroll,
-        ChromiumSetTab, ChromiumShadowRoot, ChromiumTab, ChromiumWait, ChromiumWindow,
-        ChromiumWsListener,
+        ChromiumBrowserContext, ChromiumConsole, ChromiumContextOverride, ChromiumDownloads,
+        ChromiumElement, ChromiumElementRect, ChromiumElementWait, ChromiumFrame, ChromiumOptions,
+        ChromiumPage, ChromiumPool, ChromiumPoolOptions, ChromiumRecorder, ChromiumScreencast,
+        ChromiumScroll, ChromiumSetTab, ChromiumShadowRoot, ChromiumTab, ChromiumWait,
+        ChromiumWindow, ChromiumWsListener,
     };
 
     // ── Camoufox 后端显式名(始终随 camoufox 可用,供两后端并存时取用)─

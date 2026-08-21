@@ -689,6 +689,9 @@ impl ChromiumWait {
             self.core.download_dir(),
             self.core.browser_context_id.clone(),
         );
+        if !self.core.should_dispose_context_on_close() {
+            core.keep_context_on_close();
+        }
         let _ = core.send("Page.enable", json!({})).await;
         Ok(ChromiumTab::new(core))
     }
