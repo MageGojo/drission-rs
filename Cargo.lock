@@ -948,7 +948,7 @@ checksum = "117240f60069e65410b3ae1bb213295bd828f707b5bec6596a1afc8793ce0cbc"
 
 [[package]]
 name = "drission"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "aes 0.8.4",
  "async-trait",
@@ -988,7 +988,7 @@ dependencies = [
 
 [[package]]
 name = "drission-cli"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "anyhow",
  "base64",

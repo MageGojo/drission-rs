@@ -20,6 +20,7 @@ use tokio::sync::Mutex;
 use crate::daemon;
 use crate::engine::BrowserState;
 use crate::identity_cmd;
+use crate::paths;
 use crate::protocol::{
     AxFormat, BackendKind, EngineCommand, IdentityGate, IdentityGatePreset, JsonResponse,
     McpToolset,
@@ -56,6 +57,16 @@ const BROWSER_EXTRA_TOOLS: &[&str] = &[
     "network_listen_start",
     "network_listen_wait",
     "network_listen_stop",
+    "network_block",
+    "network_mock",
+    "network_rewrite",
+    "network_record",
+    "network_stop",
+    "browser_context_list",
+    "browser_context_use",
+    "browser_context_close",
+    "profile_list",
+    "profile_show",
     "browser_pass_cf",
     "browser_identity",
     "browser_identity_pool",
@@ -65,6 +76,8 @@ const BROWSER_EXTRA_TOOLS: &[&str] = &[
 const IDENTITY_TOOLS: &[&str] = &[
     "browser_identity",
     "browser_identity_pool",
+    "profile_list",
+    "profile_show",
     "identity_assets_validate",
     "identity_assets_status",
     "identity_assets_forecast",
@@ -102,6 +115,16 @@ const ALL_MCP_TOOLS: &[&str] = &[
     "network_listen_start",
     "network_listen_wait",
     "network_listen_stop",
+    "network_block",
+    "network_mock",
+    "network_rewrite",
+    "network_record",
+    "network_stop",
+    "browser_context_list",
+    "browser_context_use",
+    "browser_context_close",
+    "profile_list",
+    "profile_show",
     "browser_identity",
     "browser_identity_pool",
     "browser_pass_cf",
@@ -197,7 +220,11 @@ impl DrsMcp {
 
     #[tool(name = "browser_open", description = "Open a URL in a new browser tab")]
     async fn browser_open(&self, Parameters(req): Parameters<OpenParams>) -> CallToolResult {
-        self.exec(EngineCommand::Open { url: req.url }).await
+        self.exec(EngineCommand::Open {
+            url: req.url,
+            context: req.context,
+        })
+        .await
     }
 
     #[tool(name = "browser_tabs", description = "List browser tabs")]
@@ -497,6 +524,7 @@ impl DrsMcp {
         self.exec(EngineCommand::ListenStart {
             keywords: req.keywords.unwrap_or_default(),
             xhr_only: req.xhr_only.unwrap_or(false),
+            methods: req.methods.unwrap_or_default(),
         })
         .await
     }
@@ -519,6 +547,117 @@ impl DrsMcp {
     #[tool(name = "network_listen_stop", description = "Stop network listening")]
     async fn network_listen_stop(&self) -> CallToolResult {
         self.exec(EngineCommand::ListenStop).await
+    }
+
+    #[tool(
+        name = "network_block",
+        description = "Abort matching requests on the active tab"
+    )]
+    async fn network_block(&self, Parameters(req): Parameters<NetworkFilterParams>) -> CallToolResult {
+        self.exec(EngineCommand::NetworkBlock {
+            keywords: req.keywords.unwrap_or_default(),
+            methods: req.methods.unwrap_or_default(),
+        })
+        .await
+    }
+
+    #[tool(
+        name = "network_mock",
+        description = "Fulfill matching requests with a fake response"
+    )]
+    async fn network_mock(&self, Parameters(req): Parameters<NetworkMockParams>) -> CallToolResult {
+        self.exec(EngineCommand::NetworkMock {
+            keywords: req.keywords.unwrap_or_default(),
+            methods: req.methods.unwrap_or_default(),
+            status: req.status.unwrap_or(200),
+            body: req.body.unwrap_or_default(),
+            headers: req.headers.unwrap_or_default(),
+        })
+        .await
+    }
+
+    #[tool(
+        name = "network_rewrite",
+        description = "Rewrite matching requests then let them continue"
+    )]
+    async fn network_rewrite(
+        &self,
+        Parameters(req): Parameters<NetworkRewriteParams>,
+    ) -> CallToolResult {
+        self.exec(EngineCommand::NetworkRewrite {
+            keywords: req.keywords.unwrap_or_default(),
+            methods: req.methods.unwrap_or_default(),
+            set_headers: req.set_headers.unwrap_or_default(),
+            url: req.url,
+            method: req.method,
+            post_data: req.post_data,
+        })
+        .await
+    }
+
+    #[tool(
+        name = "network_record",
+        description = "Start HAR recording on the active tab"
+    )]
+    async fn network_record(&self, Parameters(req): Parameters<NetworkRecordParams>) -> CallToolResult {
+        self.exec(EngineCommand::NetworkRecord { out: req.out }).await
+    }
+
+    #[tool(
+        name = "network_stop",
+        description = "Stop block/mock/rewrite/record and the old listener on the active tab"
+    )]
+    async fn network_stop(&self) -> CallToolResult {
+        self.exec(EngineCommand::NetworkStop).await
+    }
+
+    #[tool(
+        name = "browser_context_list",
+        description = "List named CDP contexts in the current browser"
+    )]
+    async fn browser_context_list(&self) -> CallToolResult {
+        self.exec(EngineCommand::ContextList).await
+    }
+
+    #[tool(
+        name = "browser_context_use",
+        description = "Create or reuse a named CDP context; later browser_open can inherit it"
+    )]
+    async fn browser_context_use(
+        &self,
+        Parameters(req): Parameters<ContextUseParams>,
+    ) -> CallToolResult {
+        self.exec(EngineCommand::ContextUse {
+            name: req.name,
+            proxy: req.proxy,
+            user_agent: req.user_agent,
+            locale: req.locale,
+            timezone: req.timezone,
+            viewport: req.viewport,
+        })
+        .await
+    }
+
+    #[tool(
+        name = "browser_context_close",
+        description = "Dispose a named CDP context and its tabs"
+    )]
+    async fn browser_context_close(
+        &self,
+        Parameters(req): Parameters<ContextNameParams>,
+    ) -> CallToolResult {
+        self.exec(EngineCommand::ContextClose { name: req.name })
+            .await
+    }
+
+    #[tool(name = "profile_list", description = "List disk profile ids")]
+    async fn profile_list(&self, Parameters(req): Parameters<ProfileRootParams>) -> CallToolResult {
+        result_to_tool(profile_list_response(req.root))
+    }
+
+    #[tool(name = "profile_show", description = "Show one disk profile manifest")]
+    async fn profile_show(&self, Parameters(req): Parameters<ProfileShowParams>) -> CallToolResult {
+        result_to_tool(profile_show_response(req.id, req.root))
     }
 
     #[tool(
@@ -974,9 +1113,58 @@ fn result_to_tool_result(result: Result<JsonResponse>) -> CallToolResult {
     }
 }
 
+fn profile_root_or_default(root: Option<PathBuf>) -> Result<PathBuf> {
+    Ok(root.unwrap_or(paths::default_profiles_root()?))
+}
+
+fn profile_list_response(root: Option<PathBuf>) -> JsonResponse {
+    match profile_list_inner(root) {
+        Ok(data) => JsonResponse::ok(data),
+        Err(e) => JsonResponse::err("command_failed", e.to_string(), None),
+    }
+}
+
+fn profile_show_response(id: String, root: Option<PathBuf>) -> JsonResponse {
+    match profile_show_inner(id, root) {
+        Ok(data) => JsonResponse::ok(data),
+        Err(e) => JsonResponse::err("command_failed", e.to_string(), None),
+    }
+}
+
+#[cfg(feature = "cdp")]
+fn profile_list_inner(root: Option<PathBuf>) -> Result<Value> {
+    let root = profile_root_or_default(root)?;
+    let mgr = drission::cdp::ProfileManager::open(&root)?;
+    Ok(json!({ "root": root, "profiles": mgr.list()? }))
+}
+
+#[cfg(not(feature = "cdp"))]
+fn profile_list_inner(_root: Option<PathBuf>) -> Result<Value> {
+    Err(anyhow::Error::msg("profile 只支持 CDP 后端"))
+}
+
+#[cfg(feature = "cdp")]
+fn profile_show_inner(id: String, root: Option<PathBuf>) -> Result<Value> {
+    let root = profile_root_or_default(root)?;
+    let mgr = drission::cdp::ProfileManager::open(&root)?;
+    let profile = mgr.get(&id)?;
+    Ok(json!({
+        "id": profile.id,
+        "dir": profile.dir,
+        "chromeDir": profile.chrome_dir,
+        "manifest": profile.manifest,
+    }))
+}
+
+#[cfg(not(feature = "cdp"))]
+fn profile_show_inner(_id: String, _root: Option<PathBuf>) -> Result<Value> {
+    Err(anyhow::Error::msg("profile 只支持 CDP 后端"))
+}
+
 #[derive(Debug, Deserialize, Serialize, JsonSchema)]
 struct OpenParams {
     url: String,
+    context: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema)]
@@ -1122,6 +1310,63 @@ struct ScreenshotParams {
 struct ListenStartParams {
     keywords: Option<Vec<String>>,
     xhr_only: Option<bool>,
+    methods: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+struct NetworkFilterParams {
+    keywords: Option<Vec<String>>,
+    methods: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+struct NetworkMockParams {
+    keywords: Option<Vec<String>>,
+    methods: Option<Vec<String>>,
+    status: Option<u16>,
+    body: Option<String>,
+    headers: Option<Vec<(String, String)>>,
+}
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+struct NetworkRewriteParams {
+    keywords: Option<Vec<String>>,
+    methods: Option<Vec<String>>,
+    set_headers: Option<Vec<(String, String)>>,
+    url: Option<String>,
+    method: Option<String>,
+    post_data: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+struct NetworkRecordParams {
+    out: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+struct ContextUseParams {
+    name: String,
+    proxy: Option<String>,
+    user_agent: Option<String>,
+    locale: Option<String>,
+    timezone: Option<String>,
+    viewport: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+struct ContextNameParams {
+    name: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+struct ProfileRootParams {
+    root: Option<PathBuf>,
+}
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+struct ProfileShowParams {
+    id: String,
+    root: Option<PathBuf>,
 }
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema)]
@@ -1390,7 +1635,7 @@ mod tests {
 
     #[test]
     fn tool_names_are_stable() {
-        assert_eq!(ALL_MCP_TOOLS.len(), 37);
+        assert_eq!(ALL_MCP_TOOLS.len(), 47);
         assert!(ALL_MCP_TOOLS.contains(&"browser_snapshot"));
         assert!(ALL_MCP_TOOLS.contains(&"identity_assets_sweep"));
     }

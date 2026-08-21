@@ -7,6 +7,23 @@
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-08-21
+
+`drs` 补上 Context / 网络门面 / 磁盘 profile；README 改成对着 0.6.x 写。
+
+### 新增 Added
+
+- `ChromiumBrowser::named_contexts()`
+- `drs context list|use|close`，`open --context`
+- `drs network block|mock|rewrite|record|stop`；`listen start` 加 `--method`
+- `drs profile list|show`，`serve --profile <id>`
+- MCP（`tools=browser|all`）：`browser_context_*`、`network_block/mock/rewrite/record/stop`、`profile_list/show`
+
+### 变更 Changed
+
+- `drission` 0.6.1，`drission-cli` 0.3.3
+- README 不再写 crates.io 停在旧版 / 请用 v0.4.0 tag
+
 ## [0.6.0] - 2026-08-21
 
 > **运行时分层 + Context / Profile / 网络门面**:账号身份不再堆进巨大 `Browser`;`drs` MCP 默认只暴露浏览核心。
@@ -375,6 +392,7 @@
 - **内置验证码 OCR**(ddddocr 模型 + tract 纯 Rust 推理)与**图片滑块缺口距离识别**(极验)。
 - 跨平台:macOS / Linux / Windows(命名管道传输)。
 
+[0.6.1]: https://github.com/MageGojo/drission-rs/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/MageGojo/drission-rs/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/MageGojo/drission-rs/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/MageGojo/drission-rs/compare/v0.4.0...v0.5.0

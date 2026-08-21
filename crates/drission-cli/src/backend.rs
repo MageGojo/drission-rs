@@ -56,6 +56,154 @@ impl BackendBrowser {
         }
         Ok(())
     }
+
+    pub fn list_contexts(&self) -> Result<Value> {
+        match self {
+            #[cfg(feature = "cdp")]
+            BackendBrowser::Cdp(browser) => {
+                let contexts: Vec<Value> = browser
+                    .named_contexts()
+                    .into_iter()
+                    .map(|(name, id)| json!({ "name": name, "id": id }))
+                    .collect();
+                Ok(json!({ "contexts": contexts }))
+            }
+            #[cfg(feature = "camoufox")]
+            BackendBrowser::Camoufox(_) => {
+                anyhow::bail!("context 只支持 CDP 后端")
+            }
+        }
+    }
+
+    pub async fn ensure_context(&self, spec: ContextUseSpec<'_>) -> Result<Value> {
+        match self {
+            #[cfg(feature = "cdp")]
+            BackendBrowser::Cdp(browser) => {
+                let ctx = browser.context_with(spec.into_spec()).await?;
+                Ok(json!({
+                    "name": ctx.name(),
+                    "id": ctx.id(),
+                }))
+            }
+            #[cfg(feature = "camoufox")]
+            BackendBrowser::Camoufox(_) => {
+                let _ = spec;
+                anyhow::bail!("context 只支持 CDP 后端")
+            }
+        }
+    }
+
+    pub async fn new_tab_in_context(
+        &self,
+        spec: ContextUseSpec<'_>,
+        url: Option<&str>,
+    ) -> Result<BackendTab> {
+        match self {
+            #[cfg(feature = "cdp")]
+            BackendBrowser::Cdp(browser) => {
+                let ctx = browser.context_with(spec.into_spec()).await?;
+                Ok(BackendTab::Cdp(ctx.new_tab(url).await?))
+            }
+            #[cfg(feature = "camoufox")]
+            BackendBrowser::Camoufox(_) => {
+                let _ = (spec, url);
+                anyhow::bail!("context 只支持 CDP 后端")
+            }
+        }
+    }
+
+    pub async fn close_context(&self, name: &str) -> Result<()> {
+        match self {
+            #[cfg(feature = "cdp")]
+            BackendBrowser::Cdp(browser) => {
+                let ctx = browser.context(name).await?;
+                ctx.close().await?;
+                Ok(())
+            }
+            #[cfg(feature = "camoufox")]
+            BackendBrowser::Camoufox(_) => {
+                let _ = name;
+                anyhow::bail!("context 只支持 CDP 后端")
+            }
+        }
+    }
+}
+
+pub struct ContextUseSpec<'a> {
+    pub name: &'a str,
+    pub proxy: Option<&'a str>,
+    pub user_agent: Option<&'a str>,
+    pub locale: Option<&'a str>,
+    pub timezone: Option<&'a str>,
+    pub viewport: Option<(u32, u32)>,
+}
+
+impl ContextUseSpec<'_> {
+    #[cfg(feature = "cdp")]
+    fn into_spec(self) -> drission::cdp::ContextSpec {
+        let mut spec = drission::cdp::ContextSpec::new().name(self.name);
+        if let Some(p) = self.proxy {
+            spec = spec.proxy(p);
+        }
+        if let Some(ua) = self.user_agent {
+            spec = spec.user_agent(ua);
+        }
+        if let Some(l) = self.locale {
+            spec = spec.locale(l);
+        }
+        if let Some(tz) = self.timezone {
+            spec = spec.timezone(tz);
+        }
+        if let Some((w, h)) = self.viewport {
+            spec = spec.viewport(w, h);
+        }
+        spec
+    }
+}
+
+pub enum BackendRoute {
+    #[cfg(feature = "cdp")]
+    Cdp(drission::cdp::NetworkRoute),
+}
+
+impl BackendRoute {
+    pub async fn stop(self) -> Result<()> {
+        match self {
+            #[cfg(feature = "cdp")]
+            Self::Cdp(route) => route.stop().await?,
+        }
+        Ok(())
+    }
+}
+
+pub struct BackendRecorder {
+    #[cfg(feature = "cdp")]
+    inner: drission::cdp::HarRecorder,
+}
+
+enum NetworkAction {
+    Block,
+    Mock {
+        status: u16,
+        headers: Vec<(String, String)>,
+        body: String,
+    },
+    Rewrite(drission::net::ResumeOptions),
+}
+
+impl BackendRecorder {
+    pub async fn save(self, path: &std::path::Path) -> Result<PathBuf> {
+        #[cfg(feature = "cdp")]
+        {
+            let log = self.inner.stop().await?;
+            return Ok(log.save(path).await?);
+        }
+        #[cfg(not(feature = "cdp"))]
+        {
+            let _ = path;
+            anyhow::bail!("network record 只支持 CDP 后端")
+        }
+    }
 }
 
 #[cfg(feature = "cdp")]
@@ -356,30 +504,130 @@ impl BackendTab {
         Ok(json!({ "passed": r.passed, "attempts": r.attempts, "align_error": r.align_error }))
     }
 
-    pub async fn listen_start(&self, keywords: &[String], xhr_only: bool) -> Result<Value> {
-        let refs: Vec<&str> = keywords.iter().map(String::as_str).collect();
+    pub async fn listen_start(
+        &self,
+        keywords: &[String],
+        xhr_only: bool,
+        methods: &[String],
+    ) -> Result<Value> {
         match self {
             #[cfg(feature = "cdp")]
             BackendTab::Cdp(tab) => {
-                if xhr_only {
-                    tab.listen().start_xhr(&refs).await?;
-                } else {
-                    tab.listen().start(&refs).await?;
+                let mut handle = tab.network();
+                for keyword in keywords {
+                    handle = handle.filter(keyword);
                 }
-                Ok(json!({ "listening": true, "xhrOnly": xhr_only }))
+                for method in methods {
+                    handle = handle.method(method);
+                }
+                if xhr_only {
+                    handle = handle.xhr_only();
+                }
+                handle.listen().await?;
+                Ok(json!({
+                    "listening": true,
+                    "xhrOnly": xhr_only,
+                    "methods": methods,
+                }))
             }
             #[cfg(feature = "camoufox")]
             BackendTab::Camoufox(tab) => {
+                let refs: Vec<&str> = keywords.iter().map(String::as_str).collect();
                 tab.listen().start(&refs).await?;
                 Ok(json!({
                     "listening": true,
                     "xhrOnly": false,
-                    "warning": if xhr_only {
-                        Some("camoufox listener ignores xhr_only; URL filters still apply")
+                    "warning": if xhr_only || !methods.is_empty() {
+                        Some("camoufox listener ignores xhr_only/method; URL filters still apply")
                     } else {
                         None
                     }
                 }))
+            }
+        }
+    }
+
+    pub async fn network_block(
+        &self,
+        keywords: &[String],
+        methods: &[String],
+    ) -> Result<BackendRoute> {
+        self.network_route(keywords, methods, NetworkAction::Block)
+            .await
+    }
+
+    pub async fn network_mock(
+        &self,
+        keywords: &[String],
+        methods: &[String],
+        status: u16,
+        headers: Vec<(String, String)>,
+        body: String,
+    ) -> Result<BackendRoute> {
+        self.network_route(
+            keywords,
+            methods,
+            NetworkAction::Mock {
+                status,
+                headers,
+                body,
+            },
+        )
+        .await
+    }
+
+    pub async fn network_rewrite(
+        &self,
+        keywords: &[String],
+        methods: &[String],
+        opts: drission::net::ResumeOptions,
+    ) -> Result<BackendRoute> {
+        self.network_route(keywords, methods, NetworkAction::Rewrite(opts))
+            .await
+    }
+
+    pub async fn network_record(&self) -> Result<BackendRecorder> {
+        match self {
+            #[cfg(feature = "cdp")]
+            BackendTab::Cdp(tab) => Ok(BackendRecorder {
+                inner: tab.network().record().await?,
+            }),
+            #[cfg(feature = "camoufox")]
+            BackendTab::Camoufox(_) => anyhow::bail!("network record 只支持 CDP 后端"),
+        }
+    }
+
+    async fn network_route(
+        &self,
+        keywords: &[String],
+        methods: &[String],
+        action: NetworkAction,
+    ) -> Result<BackendRoute> {
+        match self {
+            #[cfg(feature = "cdp")]
+            BackendTab::Cdp(tab) => {
+                let mut handle = tab.network();
+                for keyword in keywords {
+                    handle = handle.filter(keyword);
+                }
+                for method in methods {
+                    handle = handle.method(method);
+                }
+                let route = match action {
+                    NetworkAction::Block => handle.block().await?,
+                    NetworkAction::Mock {
+                        status,
+                        headers,
+                        body,
+                    } => handle.mock(status, headers, body).await?,
+                    NetworkAction::Rewrite(opts) => handle.rewrite(opts).await?,
+                };
+                Ok(BackendRoute::Cdp(route))
+            }
+            #[cfg(feature = "camoufox")]
+            BackendTab::Camoufox(_) => {
+                let _ = (keywords, methods, action);
+                anyhow::bail!("network block/mock/rewrite 只支持 CDP 后端")
             }
         }
     }

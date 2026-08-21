@@ -22,6 +22,11 @@ pub fn default_profile_dir() -> Result<PathBuf> {
     Ok(cli_dir()?.join("profile"))
 }
 
+/// Disk profile root for `drs profile` / `drs serve --profile`.
+pub fn default_profiles_root() -> Result<PathBuf> {
+    Ok(cli_dir()?.join("profiles"))
+}
+
 pub fn screenshots_dir() -> Result<PathBuf> {
     Ok(cli_dir()?.join("screenshots"))
 }

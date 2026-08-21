@@ -26,13 +26,15 @@ async fn main() -> Result<()> {
     match cli.command {
         Command::Serve(args) => {
             engine::validate_backend_or_bail(args.backend)?;
-            let user_data_dir = resolve_profile_dir(args.user_data_dir)?;
+            let user_data_dir =
+                resolve_runtime_dir(args.user_data_dir, args.profile, args.profile_root)?;
             daemon::run_server(args.backend, args.headless, user_data_dir).await?;
             Ok(())
         }
         Command::EnsureServe(args) => {
             engine::validate_backend_or_bail(args.backend)?;
-            let user_data_dir = resolve_profile_dir(args.user_data_dir)?;
+            let user_data_dir =
+                resolve_runtime_dir(args.user_data_dir, args.profile, args.profile_root)?;
             let state = daemon::ensure_daemon(args.backend, args.headless, user_data_dir).await?;
             let response = JsonResponse::ok(serde_json::json!({
                 "ready": true,
@@ -55,6 +57,11 @@ async fn main() -> Result<()> {
                 args.tools,
             )
             .await?;
+            Ok(())
+        }
+        Command::Profile { command } => {
+            let response = run_profile_command(command)?;
+            print_response(response, json_mode)?;
             Ok(())
         }
         Command::Setup(args) => {
@@ -949,6 +956,63 @@ fn resolve_profile_dir(explicit: Option<std::path::PathBuf>) -> Result<Option<st
     match explicit {
         Some(dir) => Ok(Some(dir)),
         None => Ok(Some(paths::default_profile_dir()?)),
+    }
+}
+
+fn resolve_runtime_dir(
+    user_data_dir: Option<std::path::PathBuf>,
+    profile: Option<String>,
+    profile_root: Option<std::path::PathBuf>,
+) -> Result<Option<std::path::PathBuf>> {
+    if let Some(id) = profile {
+        let root = profile_root.unwrap_or(paths::default_profiles_root()?);
+        #[cfg(not(feature = "cdp"))]
+        {
+            let _ = (id, root);
+            anyhow::bail!("--profile 只支持 CDP 后端");
+        }
+        #[cfg(feature = "cdp")]
+        {
+            let managed = drission::cdp::ProfileManager::open(root)?.ensure(&id)?;
+            return Ok(Some(managed.chrome_dir));
+        }
+    }
+    resolve_profile_dir(user_data_dir)
+}
+
+fn profile_root_or_default(root: Option<std::path::PathBuf>) -> Result<std::path::PathBuf> {
+    Ok(root.unwrap_or(paths::default_profiles_root()?))
+}
+
+fn run_profile_command(command: cli::ProfileCommand) -> Result<JsonResponse> {
+    #[cfg(not(feature = "cdp"))]
+    {
+        let _ = command;
+        anyhow::bail!("profile 只支持 CDP 后端");
+    }
+    #[cfg(feature = "cdp")]
+    {
+        match command {
+            cli::ProfileCommand::List { root } => {
+                let root = profile_root_or_default(root)?;
+                let mgr = drission::cdp::ProfileManager::open(&root)?;
+                Ok(JsonResponse::ok(json!({
+                    "root": root,
+                    "profiles": mgr.list()?,
+                })))
+            }
+            cli::ProfileCommand::Show { id, root } => {
+                let root = profile_root_or_default(root)?;
+                let mgr = drission::cdp::ProfileManager::open(&root)?;
+                let profile = mgr.get(&id)?;
+                Ok(JsonResponse::ok(json!({
+                    "id": profile.id,
+                    "dir": profile.dir,
+                    "chromeDir": profile.chrome_dir,
+                    "manifest": profile.manifest,
+                })))
+            }
+        }
     }
 }
 

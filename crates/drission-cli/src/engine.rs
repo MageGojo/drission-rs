@@ -4,7 +4,10 @@ use std::time::Duration;
 use anyhow::{Result, anyhow};
 use serde_json::{Value, json};
 
-use crate::backend::{BackendBrowser, BackendTab, ensure_backend_available};
+use crate::backend::{
+    BackendBrowser, BackendRecorder, BackendRoute, BackendTab, ContextUseSpec,
+    ensure_backend_available,
+};
 use crate::protocol::{BackendKind, EngineCommand, IdentityGate, TabSummary};
 
 fn truncate_chars(text: &mut String, max_chars: usize) -> bool {
@@ -20,12 +23,16 @@ pub struct BrowserState {
     browser: BackendBrowser,
     tabs: Vec<TabSlot>,
     active: Option<u64>,
+    active_context: Option<String>,
     next_tab_id: u64,
 }
 
 struct TabSlot {
     id: u64,
     tab: BackendTab,
+    context: Option<String>,
+    routes: Vec<BackendRoute>,
+    recorder: Option<(PathBuf, BackendRecorder)>,
 }
 
 pub struct EngineResult {
@@ -46,10 +53,11 @@ impl BrowserState {
             browser,
             tabs: Vec::new(),
             active: None,
+            active_context: None,
             next_tab_id: 1,
         };
         let tab = state.browser.new_tab(None).await?;
-        state.insert_tab(tab);
+        state.insert_tab(tab, None);
         Ok(state)
     }
 
@@ -64,10 +72,16 @@ impl BrowserState {
                     stop: true,
                 });
             }
-            EngineCommand::Open { url } => {
-                let tab = self.browser.new_tab(Some(&url)).await?;
-                let id = self.insert_tab(tab);
-                json!({ "tabId": id, "url": url, "active": true })
+            EngineCommand::Open { url, context } => {
+                let context = context.or_else(|| self.active_context.clone());
+                let tab = self.open_tab(Some(&url), context.as_deref()).await?;
+                let id = self.insert_tab(tab, context.clone());
+                json!({
+                    "tabId": id,
+                    "url": url,
+                    "active": true,
+                    "context": context,
+                })
             }
             EngineCommand::Tabs => json!({ "tabs": self.tab_summaries().await? }),
             EngineCommand::UseTab { tab_id } => {
@@ -190,9 +204,104 @@ impl BrowserState {
                     )
                 }
             }
-            EngineCommand::ListenStart { keywords, xhr_only } => {
-                self.active_tab()?.listen_start(&keywords, xhr_only).await?
+            EngineCommand::ListenStart {
+                keywords,
+                xhr_only,
+                methods,
+            } => {
+                self.active_tab()?
+                    .listen_start(&keywords, xhr_only, &methods)
+                    .await?
             }
+            EngineCommand::ContextList => self.browser.list_contexts()?,
+            EngineCommand::ContextUse {
+                name,
+                proxy,
+                user_agent,
+                locale,
+                timezone,
+                viewport,
+            } => {
+                let spec = context_spec(
+                    &name,
+                    proxy.as_deref(),
+                    user_agent.as_deref(),
+                    locale.as_deref(),
+                    timezone.as_deref(),
+                    viewport.as_deref(),
+                )?;
+                let data = self.browser.ensure_context(spec).await?;
+                self.active_context = Some(name);
+                data
+            }
+            EngineCommand::ContextClose { name } => {
+                self.drop_tabs_in_context(&name);
+                self.browser.close_context(&name).await?;
+                if self.active_context.as_deref() == Some(name.as_str()) {
+                    self.active_context = None;
+                }
+                json!({ "closed": name, "activeContext": self.active_context })
+            }
+            EngineCommand::NetworkBlock { keywords, methods } => {
+                let route = self
+                    .active_tab()?
+                    .network_block(&keywords, &methods)
+                    .await?;
+                self.active_slot_mut()?.routes.push(route);
+                json!({ "blocked": keywords, "methods": methods })
+            }
+            EngineCommand::NetworkMock {
+                keywords,
+                methods,
+                status,
+                body,
+                headers,
+            } => {
+                let route = self
+                    .active_tab()?
+                    .network_mock(&keywords, &methods, status, headers, body)
+                    .await?;
+                self.active_slot_mut()?.routes.push(route);
+                json!({ "mocked": keywords, "status": status })
+            }
+            EngineCommand::NetworkRewrite {
+                keywords,
+                methods,
+                set_headers,
+                url,
+                method,
+                post_data,
+            } => {
+                let mut opts = drission::net::ResumeOptions::new();
+                if !set_headers.is_empty() {
+                    opts = opts.headers(set_headers);
+                }
+                if let Some(url) = url {
+                    opts = opts.url(url);
+                }
+                if let Some(method) = method {
+                    opts = opts.method(method);
+                }
+                if let Some(post_data) = post_data {
+                    opts = opts.post_data(post_data);
+                }
+                let route = self
+                    .active_tab()?
+                    .network_rewrite(&keywords, &methods, opts)
+                    .await?;
+                self.active_slot_mut()?.routes.push(route);
+                json!({ "rewritten": keywords, "methods": methods })
+            }
+            EngineCommand::NetworkRecord { out } => {
+                let path = match out {
+                    Some(p) => PathBuf::from(p),
+                    None => default_har_path()?,
+                };
+                let recorder = self.active_tab()?.network_record().await?;
+                self.active_slot_mut()?.recorder = Some((path.clone(), recorder));
+                json!({ "recording": true, "out": path })
+            }
+            EngineCommand::NetworkStop => self.stop_network().await?,
             EngineCommand::ListenWait { count, timeout_ms } => {
                 self.active_tab()?
                     .listen_wait(count, timeout_ms.map(Duration::from_millis))
@@ -345,8 +454,9 @@ impl BrowserState {
         full_screenshot: bool,
     ) -> Result<Value> {
         let tab_id = if let Some(url) = url {
-            let tab = self.browser.new_tab(Some(url)).await?;
-            let id = self.insert_tab(tab);
+            let context = self.active_context.clone();
+            let tab = self.open_tab(Some(url), context.as_deref()).await?;
+            let id = self.insert_tab(tab, context);
             self.active = Some(id);
             id
         } else {
@@ -511,10 +621,36 @@ impl BrowserState {
         }))
     }
 
-    fn insert_tab(&mut self, tab: BackendTab) -> u64 {
+    async fn open_tab(&self, url: Option<&str>, context: Option<&str>) -> Result<BackendTab> {
+        if let Some(name) = context {
+            self.browser
+                .new_tab_in_context(
+                    ContextUseSpec {
+                        name,
+                        proxy: None,
+                        user_agent: None,
+                        locale: None,
+                        timezone: None,
+                        viewport: None,
+                    },
+                    url,
+                )
+                .await
+        } else {
+            self.browser.new_tab(url).await
+        }
+    }
+
+    fn insert_tab(&mut self, tab: BackendTab, context: Option<String>) -> u64 {
         let id = self.next_tab_id;
         self.next_tab_id += 1;
-        self.tabs.push(TabSlot { id, tab });
+        self.tabs.push(TabSlot {
+            id,
+            tab,
+            context,
+            routes: Vec::new(),
+            recorder: None,
+        });
         self.active = Some(id);
         id
     }
@@ -524,11 +660,45 @@ impl BrowserState {
         Ok(&self.find_slot(id)?.tab)
     }
 
+    fn active_slot_mut(&mut self) -> Result<&mut TabSlot> {
+        let id = self.active.ok_or_else(|| anyhow!("no active tab"))?;
+        self.tabs
+            .iter_mut()
+            .find(|slot| slot.id == id)
+            .ok_or_else(|| anyhow!("tab {id} not found"))
+    }
+
     fn find_slot(&self, id: u64) -> Result<&TabSlot> {
         self.tabs
             .iter()
             .find(|slot| slot.id == id)
             .ok_or_else(|| anyhow!("tab {id} not found"))
+    }
+
+    fn drop_tabs_in_context(&mut self, name: &str) {
+        self.tabs
+            .retain(|slot| slot.context.as_deref() != Some(name));
+        if !self.tabs.iter().any(|slot| Some(slot.id) == self.active) {
+            self.active = self.tabs.last().map(|slot| slot.id);
+        }
+    }
+
+    async fn stop_network(&mut self) -> Result<Value> {
+        let slot = self.active_slot_mut()?;
+        let routes = std::mem::take(&mut slot.routes);
+        let recorder = slot.recorder.take();
+        for route in routes {
+            route.stop().await?;
+        }
+        let mut saved = None;
+        if let Some((path, recorder)) = recorder {
+            saved = Some(recorder.save(&path).await?);
+        }
+        self.active_tab()?.listen_stop().await?;
+        Ok(json!({
+            "listening": false,
+            "har": saved,
+        }))
     }
 
     async fn tab_summaries(&self) -> Result<Vec<TabSummary>> {
@@ -539,10 +709,56 @@ impl BrowserState {
                 active: self.active == Some(slot.id),
                 title: slot.tab.title().await.unwrap_or_default(),
                 url: slot.tab.url().await.unwrap_or_default(),
+                context: slot.context.clone(),
             });
         }
         Ok(out)
     }
+}
+
+fn context_spec<'a>(
+    name: &'a str,
+    proxy: Option<&'a str>,
+    user_agent: Option<&'a str>,
+    locale: Option<&'a str>,
+    timezone: Option<&'a str>,
+    viewport: Option<&'a str>,
+) -> Result<ContextUseSpec<'a>> {
+    Ok(ContextUseSpec {
+        name,
+        proxy,
+        user_agent,
+        locale,
+        timezone,
+        viewport: viewport.map(parse_viewport).transpose()?,
+    })
+}
+
+fn parse_viewport(raw: &str) -> Result<(u32, u32)> {
+    let (w, h) = raw
+        .split_once('x')
+        .or_else(|| raw.split_once('X'))
+        .ok_or_else(|| anyhow!("viewport 用 WIDTHxHEIGHT，例如 1280x720"))?;
+    Ok((
+        w.trim()
+            .parse()
+            .map_err(|_| anyhow!("viewport 宽度无效: {w}"))?,
+        h.trim()
+            .parse()
+            .map_err(|_| anyhow!("viewport 高度无效: {h}"))?,
+    ))
+}
+
+fn default_har_path() -> Result<PathBuf> {
+    let dir = crate::paths::cli_dir()?.join("har");
+    std::fs::create_dir_all(&dir)?;
+    Ok(dir.join(format!(
+        "session-{}.har",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+    )))
 }
 
 pub fn validate_backend_or_bail(backend: BackendKind) -> Result<()> {

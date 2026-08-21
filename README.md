@@ -25,24 +25,23 @@ JSON 协议和本地 MCP 服务，适合测试工具、数据处理脚本和 AI 
 
 | 入口 | 适用场景 | 开始使用 |
 |---|---|---|
-| `drission` | 在 Rust 程序中控制浏览器 | 使用下方 v0.4.0 Git tag 命令 |
-| `drs` CLI | 从终端或脚本调用浏览器，获得稳定 JSON 输出 | 从 Release 下载预编译文件 |
-| `drs` MCP | 为 Cursor、Codex 等兼容 MCP 的本地客户端提供浏览器工具 | 安装 `drs` 后运行 `drs setup` |
+| `drission` | 在 Rust 程序里控浏览器 | `cargo add drission`（crates.io 0.6.0） |
+| `drs` CLI | 终端 / 脚本，JSON 输出 | `cargo install drission-cli --bin drs` |
+| `drs` MCP | Cursor、Codex 等本地客户端 | 装好 `drs` 后跑 `drs setup` |
 
 ## 快速开始
 
 ### Rust 库
 
-当前仓库与 Release 版本为 **v0.4.0**，默认启用 Chromium / CDP 后端。crates.io 上的
-`drission` 目前仍为 0.3.2，因此下面固定使用已发布的 Git tag：
+当前是 **0.6.0**，默认 Chromium / CDP。crates.io 已同步：
 
 ```bash
-cargo add drission --git https://github.com/MageGojo/drission-rs --tag v0.4.0
+cargo add drission
 ```
 
 ```toml
 [dependencies]
-drission = { git = "https://github.com/MageGojo/drission-rs", tag = "v0.4.0" }
+drission = "0.6"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -52,7 +51,8 @@ use drission::prelude::*;
 #[tokio::main]
 async fn main() -> drission::Result<()> {
     let browser = Browser::launch(BrowserOptions::new().headless(true)).await?;
-    let tab = browser.new_tab(Some("https://example.com")).await?;
+    let ctx = browser.context("account_001").await?;
+    let tab = ctx.new_tab(Some("https://example.com")).await?;
 
     println!("title: {:?}", tab.title().await?);
     println!("h1: {:?}", tab.ele_text("h1").await?);
@@ -73,26 +73,25 @@ cargo run --example cdp_demo
 
 ### `drs` CLI 与 MCP
 
-推荐从 [GitHub Releases](https://github.com/MageGojo/drission-rs/releases/tag/v0.4.0)
-或 [GitCode Releases](https://gitcode.com/Roufsi/drission-rs/releases) 下载对应平台的 `drs`
-预编译文件及 SHA-256 校验文件，无需安装 Rust 工具链。
-
-也可以从已发布的 Git tag 编译安装；该命令已用 `drs 0.2.0` 验证：
+`drs` 现在是 **0.3.3**。crates.io 可以直接装：
 
 ```bash
-cargo install --git https://github.com/MageGojo/drission-rs --tag v0.4.0 drission-cli --bin drs
+cargo install drission-cli --bin drs
 ```
 
-crates.io 上的 `drission-cli` 目前仍为 0.1.0，请勿用不带 `--git` 的安装命令获取 v0.4.0
-对应 CLI。仓库也提供 [`install/`](install/) 下的安装脚本；执行前请先检查脚本内容。
-
-常用命令：
+不想装 Rust 的，从 [GitHub Releases](https://github.com/MageGojo/drission-rs/releases)
+或 [GitCode Releases](https://gitcode.com/Roufsi/drission-rs/releases) 下对应平台的预编译文件。
+仓库 [`install/`](install/) 里也有脚本，用之前先看一眼内容。
 
 ```bash
 drs ensure-serve --backend cdp --headless
 drs --json open https://example.com
-drs ax --outline
-drs screenshot --out page.png --full
+drs --json snapshot
+drs --json context use account_001
+drs --json open https://example.com --context account_001
+drs listen start /api/ --xhr-only --method POST
+drs --json network mock /api/user --body '{"ok":true}'
+drs --json profile list
 ```
 
 接入 MCP 客户端前可先预览配置变更：
@@ -107,15 +106,37 @@ drs setup
 完整命令、JSON 响应格式、MCP 工具列表与手动配置方法见 [CLI / MCP 文档](docs/CLI.md)
 和[持久浏览器说明](docs/mcp-持久浏览器.md)。
 
+## 0.6.0 加了什么
+
+库：
+
+- `browser.context("account_001")`：按名字隔离 Cookie / 代理 / UA / 时区。同名复用，关 Context 才拆。
+- `ProfileManager`：磁盘 `profiles/<id>/{manifest.json,chrome/}`，登录态跨进程还在。
+- `tab.network().filter("/api/").method("POST")`：listen / block / mock / rewrite / record。旧的 `listen` / `intercept` 没删。
+- `ChromiumPool::acquire()`：领一个带许可的浏览器再 `context` / `new_tab`。
+
+`drs`：
+
+| 命令 | 干什么 |
+|---|---|
+| `snapshot` | 读当前页：大纲 + `ref=eN` + Markdown |
+| `context list\|use\|close` | 命名 Context；`open --context` 开进指定身份 |
+| `network block\|mock\|rewrite\|record\|stop` | 拦请求、假响应、改写、录 HAR |
+| `listen start … --method POST` | 原来的监听，多了方法过滤 |
+| `profile list\|show` | 看磁盘 profile；`serve --profile <id>` 用那份 chrome 目录 |
+
+MCP 默认 `DRS_MCP_TOOLS=core`，只有开页 / snapshot / 点按 / 截图那一组。Context 和 `network_*` 在 `browser` 或 `all` 里。
+
+完整命令见 [CLI.md](docs/CLI.md)，分层说明见 [运行时分层.md](docs/运行时分层.md)。
+
 ## 核心能力
 
-- **异步浏览器控制**：导航、元素定位、点击、输入、键盘、滚动、文件上传、iframe、Shadow DOM 和多标签页。
-- **页面与网络观测**：HTML、文本、截图、PDF、控制台、WebSocket、XHR / Fetch 监听与请求拦截。
-- **可访问性与录制**：无障碍树快照，以及将已授权的交互录制为 Rust 或 JSON 操作序列。
-- **并发与恢复**：浏览器池、代理健康检查、重试策略和断点检查点。
-- **本地工具接口**：`drs` 提供 CLI、JSONL daemon 和 stdio MCP，便于不同语言或本地 AI 客户端集成。
-- **运行时治理**：profile 租约、冷却、失败分类、风险记录和 ledger 查询，用于可审计地管理自动化任务。
-- **可选视觉组件**：离线 OCR 与图像位置分析，仅应用于自有或明确授权的测试环境。
+- 异步控浏览器：导航、定位、点击、输入、键盘、滚动、上传、iframe、Shadow DOM、多标签。
+- Context / Profile：进程内账号隔离，磁盘 profile 保登录。
+- 网络：XHR 监听、拦截、mock、改写、HAR；控制台和 WebSocket 也能看。
+- 给脚本和 AI 用的：`drs` CLI、JSONL daemon、stdio MCP；`snapshot` 比整页 HTML 轻。
+- 池、代理健康检查、重试、断点；identity 那套租赁 / 冷却 / ledger 还在。
+- OCR、滑块缺口识别是可选 feature，只该用在自己的或已授权的测试环境。
 
 ## Features
 
@@ -131,11 +152,11 @@ drs setup
 示例配置：
 
 ```toml
-# 默认 CDP 后端并启用 OCR
-drission = { git = "https://github.com/MageGojo/drission-rs", tag = "v0.4.0", features = ["ocr"] }
+# 默认 CDP，加上 OCR
+drission = { version = "0.6", features = ["ocr"] }
 
-# 仅使用 Camoufox 后端
-# drission = { git = "https://github.com/MageGojo/drission-rs", tag = "v0.4.0", default-features = false, features = ["camoufox"] }
+# 只用 Camoufox
+# drission = { version = "0.6", default-features = false, features = ["camoufox"] }
 ```
 
 各 feature 的依赖关系与构建要求以 [Cargo.toml](Cargo.toml) 和

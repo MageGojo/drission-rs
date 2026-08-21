@@ -107,6 +107,8 @@ pub enum EngineCommand {
     Stop,
     Open {
         url: String,
+        #[serde(default)]
+        context: Option<String>,
     },
     Tabs,
     UseTab {
@@ -185,7 +187,49 @@ pub enum EngineCommand {
     ListenStart {
         keywords: Vec<String>,
         xhr_only: bool,
+        #[serde(default)]
+        methods: Vec<String>,
     },
+    ContextList,
+    ContextUse {
+        name: String,
+        proxy: Option<String>,
+        user_agent: Option<String>,
+        locale: Option<String>,
+        timezone: Option<String>,
+        viewport: Option<String>,
+    },
+    ContextClose {
+        name: String,
+    },
+    NetworkBlock {
+        keywords: Vec<String>,
+        #[serde(default)]
+        methods: Vec<String>,
+    },
+    NetworkMock {
+        keywords: Vec<String>,
+        #[serde(default)]
+        methods: Vec<String>,
+        status: u16,
+        body: String,
+        #[serde(default)]
+        headers: Vec<(String, String)>,
+    },
+    NetworkRewrite {
+        keywords: Vec<String>,
+        #[serde(default)]
+        methods: Vec<String>,
+        #[serde(default)]
+        set_headers: Vec<(String, String)>,
+        url: Option<String>,
+        method: Option<String>,
+        post_data: Option<String>,
+    },
+    NetworkRecord {
+        out: Option<String>,
+    },
+    NetworkStop,
     ListenWait {
         count: usize,
         timeout_ms: Option<u64>,
@@ -547,6 +591,8 @@ pub struct TabSummary {
     pub active: bool,
     pub title: String,
     pub url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

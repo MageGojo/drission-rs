@@ -54,7 +54,12 @@ pub enum Command {
     /// Stop the daemon and browser.
     Stop,
     /// Open a URL in a new tab and make it active.
-    Open { url: String },
+    Open {
+        url: String,
+        /// Open inside this named CDP context (same as `drs context use`).
+        #[arg(long)]
+        context: Option<String>,
+    },
     /// List daemon tabs.
     Tabs,
     /// Switch active tab by drs tab id.
@@ -171,6 +176,21 @@ pub enum Command {
     Listen {
         #[command(subcommand)]
         command: ListenCommand,
+    },
+    /// Named CDP contexts (cookie / proxy / UA isolation).
+    Context {
+        #[command(subcommand)]
+        command: ContextCommand,
+    },
+    /// Network filter / block / mock / rewrite / HAR.
+    Network {
+        #[command(subcommand)]
+        command: NetworkCommand,
+    },
+    /// Disk profiles (`profiles/<id>/chrome`).
+    Profile {
+        #[command(subcommand)]
+        command: ProfileCommand,
     },
     /// Pass Cloudflare challenge in the active tab.
     PassCf {
@@ -1085,6 +1105,12 @@ pub struct RunBrowserArgs {
     /// Persistent browser profile directory.
     #[arg(long)]
     pub user_data_dir: Option<PathBuf>,
+    /// Use a named disk profile under the CLI profiles root (`--profile-root`).
+    #[arg(long)]
+    pub profile: Option<String>,
+    /// Root directory for `--profile` (default: `<cache>/drission/cli/profiles`).
+    #[arg(long)]
+    pub profile_root: Option<PathBuf>,
 }
 
 #[derive(Debug, Args, Clone)]
@@ -1217,6 +1243,9 @@ pub enum ListenCommand {
         keywords: Vec<String>,
         #[arg(long)]
         xhr_only: bool,
+        /// HTTP methods to match (repeatable). Example: `--method POST`.
+        #[arg(long = "method")]
+        methods: Vec<String>,
     },
     /// Wait for network packets.
     Wait {
@@ -1229,6 +1258,88 @@ pub enum ListenCommand {
     Stop,
 }
 
+#[derive(Debug, Subcommand)]
+pub enum ContextCommand {
+    /// List named contexts in the current browser process.
+    List,
+    /// Create or reuse a named context and make it the default for later `open`.
+    Use {
+        name: String,
+        #[arg(long)]
+        proxy: Option<String>,
+        #[arg(long = "ua")]
+        user_agent: Option<String>,
+        #[arg(long)]
+        locale: Option<String>,
+        #[arg(long)]
+        timezone: Option<String>,
+        /// WIDTHxHEIGHT, e.g. 1280x720.
+        #[arg(long)]
+        viewport: Option<String>,
+    },
+    /// Dispose a named context and its tabs.
+    Close { name: String },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum NetworkCommand {
+    /// Abort matching requests (`blockedbyclient`).
+    Block {
+        keywords: Vec<String>,
+        #[arg(long = "method")]
+        methods: Vec<String>,
+    },
+    /// Fulfill matching requests with a fake response.
+    Mock {
+        keywords: Vec<String>,
+        #[arg(long = "method")]
+        methods: Vec<String>,
+        #[arg(long, default_value_t = 200)]
+        status: u16,
+        #[arg(long, default_value = "")]
+        body: String,
+        /// `Name:Value` or `Name=Value`. Repeatable.
+        #[arg(long = "header")]
+        headers: Vec<String>,
+    },
+    /// Rewrite matching requests then let them continue.
+    Rewrite {
+        keywords: Vec<String>,
+        #[arg(long = "method")]
+        methods: Vec<String>,
+        #[arg(long = "set-header")]
+        set_headers: Vec<String>,
+        #[arg(long)]
+        url: Option<String>,
+        #[arg(long)]
+        method: Option<String>,
+        #[arg(long)]
+        post_data: Option<String>,
+    },
+    /// Start HAR recording on the active tab.
+    Record {
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Stop block/mock/rewrite/record (and the old listener) on the active tab.
+    Stop,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ProfileCommand {
+    /// List disk profile ids.
+    List {
+        #[arg(long)]
+        root: Option<PathBuf>,
+    },
+    /// Show one profile's manifest and chrome dir.
+    Show {
+        id: String,
+        #[arg(long)]
+        root: Option<PathBuf>,
+    },
+}
+
 #[cfg(feature = "ocr")]
 #[derive(Debug, Subcommand)]
 pub enum OcrCommand {
@@ -1236,6 +1347,17 @@ pub enum OcrCommand {
     Recognize { image: PathBuf },
     /// Solve click-word coordinates from an image and target text.
     Clickword { image: PathBuf, targets: String },
+}
+
+fn parse_header_args(items: &[String]) -> Vec<(String, String)> {
+    items
+        .iter()
+        .filter_map(|raw| {
+            raw.split_once(':')
+                .or_else(|| raw.split_once('='))
+                .map(|(k, v)| (k.trim().to_string(), v.trim().to_string()))
+        })
+        .collect()
 }
 
 impl Command {
@@ -1248,7 +1370,7 @@ impl Command {
             Command::Ocr { .. } => return None,
             Command::Status => EngineCommand::Status,
             Command::Stop => EngineCommand::Stop,
-            Command::Open { url } => EngineCommand::Open { url },
+            Command::Open { url, context } => EngineCommand::Open { url, context },
             Command::Tabs => EngineCommand::Tabs,
             Command::Use { tab_id } => EngineCommand::UseTab { tab_id },
             Command::Close { tab_id } => EngineCommand::Close { tab_id },
@@ -1317,9 +1439,15 @@ impl Command {
                 timeout_ms,
             },
             Command::Listen { command } => match command {
-                ListenCommand::Start { keywords, xhr_only } => {
-                    EngineCommand::ListenStart { keywords, xhr_only }
-                }
+                ListenCommand::Start {
+                    keywords,
+                    xhr_only,
+                    methods,
+                } => EngineCommand::ListenStart {
+                    keywords,
+                    xhr_only,
+                    methods,
+                },
                 ListenCommand::Wait { count, timeout_ms } => {
                     EngineCommand::ListenWait { count, timeout_ms }
                 }
@@ -1330,7 +1458,64 @@ impl Command {
                 pool,
                 gate: gate.into(),
             },
-            Command::IdentityPool { .. }
+            Command::Context { command } => match command {
+                ContextCommand::List => EngineCommand::ContextList,
+                ContextCommand::Use {
+                    name,
+                    proxy,
+                    user_agent,
+                    locale,
+                    timezone,
+                    viewport,
+                } => EngineCommand::ContextUse {
+                    name,
+                    proxy,
+                    user_agent,
+                    locale,
+                    timezone,
+                    viewport,
+                },
+                ContextCommand::Close { name } => EngineCommand::ContextClose { name },
+            },
+            Command::Network { command } => match command {
+                NetworkCommand::Block { keywords, methods } => {
+                    EngineCommand::NetworkBlock { keywords, methods }
+                }
+                NetworkCommand::Mock {
+                    keywords,
+                    methods,
+                    status,
+                    body,
+                    headers,
+                } => EngineCommand::NetworkMock {
+                    keywords,
+                    methods,
+                    status,
+                    body,
+                    headers: parse_header_args(&headers),
+                },
+                NetworkCommand::Rewrite {
+                    keywords,
+                    methods,
+                    set_headers,
+                    url,
+                    method,
+                    post_data,
+                } => EngineCommand::NetworkRewrite {
+                    keywords,
+                    methods,
+                    set_headers: parse_header_args(&set_headers),
+                    url,
+                    method,
+                    post_data,
+                },
+                NetworkCommand::Record { out } => EngineCommand::NetworkRecord {
+                    out: out.map(|p| p.display().to_string()),
+                },
+                NetworkCommand::Stop => EngineCommand::NetworkStop,
+            },
+            Command::Profile { .. }
+            | Command::IdentityPool { .. }
             | Command::IdentityDrift { .. }
             | Command::IdentityLifecycle { .. }
             | Command::IdentityApply { .. }
@@ -1413,7 +1598,10 @@ mod tests {
         let cli = Cli::try_parse_from(["drs", "--json", "open", "https://example.com"]).unwrap();
         assert!(cli.json);
         match cli.command.into_engine().unwrap() {
-            EngineCommand::Open { url } => assert_eq!(url, "https://example.com"),
+            EngineCommand::Open { url, context } => {
+                assert_eq!(url, "https://example.com");
+                assert!(context.is_none());
+            }
             other => panic!("unexpected command: {other:?}"),
         }
     }

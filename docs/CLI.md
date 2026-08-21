@@ -86,6 +86,30 @@ drs close
 drs stop
 ```
 
+0.6 起多了 Context / 网络门面 / 磁盘 profile（CDP）：
+
+```bash
+drs --json context list
+drs --json context use account_001 --ua "Mozilla/5.0 …" --locale zh-CN
+drs --json open https://example.com --context account_001
+drs --json context close account_001
+
+drs listen start /api/ --xhr-only --method POST
+drs --json network block /tracker
+drs --json network mock /api/user --status 200 --body '{"ok":true}'
+drs --json network rewrite /api --set-header X-Debug:1
+drs --json network record --out ./session.har
+drs --json network stop
+
+drs --json profile list
+drs --json profile show user_001
+drs serve --headless --profile user_001
+```
+
+`context use` 之后不带 `--context` 的 `open` 会跟这个名字。`profile` 读写磁盘，不经过 daemon。`serve --profile` 把 Chrome user-data-dir 指到 `profiles/<id>/chrome`。
+Context / block / mock / rewrite / record 只走 CDP，Camoufox 会直接报错。
+
+
 机器读取建议始终使用 `drs --json ...`。成功响应:
 
 ```json
@@ -450,8 +474,8 @@ drs mcp --headless --standalone
 | 取值 | 暴露 |
 |---|---|
 | `core`(默认) | `browser_open` / `tabs` / `use_tab` / `close` / `snapshot` / `extract` / `click` / `type` / `press` / `wait` / `screenshot` |
-| `browser` | `core` + `ax`/`html`/`markdown`/`text`/`eval`/登录态/`ocr`/滑块/`network_*`/`pass_cf`/`browser_identity*` |
-| `identity` | `identity_assets_*` + `browser_identity*` |
+| `browser` | `core` + `ax`/`html`/`markdown`/`text`/`eval`/登录态/`ocr`/滑块/`network_*`/`browser_context_*`/`profile_*`/`pass_cf`/`browser_identity*` |
+| `identity` | `identity_assets_*` + `browser_identity*` + `profile_*` |
 | `all` | 全量 |
 
 ```bash
@@ -487,6 +511,9 @@ Cursor 配置 key 为 **`drs`**;Agent 侧 server id 通常为 **`user-drs`**。M
 - `network_listen_start`
 - `network_listen_wait`
 - `network_listen_stop`
+- `network_block` / `network_mock` / `network_rewrite` / `network_record` / `network_stop`
+- `browser_context_list` / `browser_context_use` / `browser_context_close`
+- `profile_list` / `profile_show`
 - `browser_identity`
 - `browser_identity_pool`
 - `browser_pass_cf`

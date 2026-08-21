@@ -27,25 +27,23 @@ tools, data-processing scripts, and AI coding clients.
 
 | Interface | Best for | Get started |
 |---|---|---|
-| `drission` | Browser control in a Rust application | Use the pinned v0.4.0 Git command below |
-| `drs` CLI | Terminal or script use with stable JSON output | Download a prebuilt Release binary |
-| `drs` MCP | Local browser tools for Cursor, Codex, and other MCP-compatible clients | Install `drs`, then run `drs setup` |
+| `drission` | Drive a browser from Rust | `cargo add drission` (crates.io 0.6.0) |
+| `drs` CLI | Terminal / scripts, JSON output | `cargo install drission-cli --bin drs` |
+| `drs` MCP | Cursor, Codex, other local MCP clients | Install `drs`, then `drs setup` |
 
 ## Quick start
 
 ### Rust library
 
-The current repository and Release version is **v0.4.0**. Chromium/CDP is enabled by default.
-The crates.io `drission` package is currently still at 0.3.2, so the commands below pin the
-published Git tag:
+Current version is **0.6.0**. Chromium/CDP is the default. crates.io is in sync:
 
 ```bash
-cargo add drission --git https://github.com/MageGojo/drission-rs --tag v0.4.0
+cargo add drission
 ```
 
 ```toml
 [dependencies]
-drission = { git = "https://github.com/MageGojo/drission-rs", tag = "v0.4.0" }
+drission = "0.6"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -55,7 +53,8 @@ use drission::prelude::*;
 #[tokio::main]
 async fn main() -> drission::Result<()> {
     let browser = Browser::launch(BrowserOptions::new().headless(true)).await?;
-    let tab = browser.new_tab(Some("https://example.com")).await?;
+    let ctx = browser.context("account_001").await?;
+    let tab = ctx.new_tab(Some("https://example.com")).await?;
 
     println!("title: {:?}", tab.title().await?);
     println!("h1: {:?}", tab.ele_text("h1").await?);
@@ -77,29 +76,25 @@ selection, managed downloads, and headless environments.
 
 ### `drs` CLI and MCP
 
-The recommended installation path is a prebuilt `drs` binary with its SHA-256 checksum from
-[GitHub Releases](https://github.com/MageGojo/drission-rs/releases/tag/v0.4.0) or
-[GitCode Releases](https://gitcode.com/Roufsi/drission-rs/releases). It does not require a Rust
-toolchain.
-
-You can also build and install from the published Git tag. This command was verified with
-`drs 0.2.0`:
+`drs` is **0.3.3**. Install from crates.io:
 
 ```bash
-cargo install --git https://github.com/MageGojo/drission-rs --tag v0.4.0 drission-cli --bin drs
+cargo install drission-cli --bin drs
 ```
 
-The crates.io `drission-cli` package is currently still at 0.1.0; do not omit `--git` when installing
-the CLI that accompanies v0.4.0. Installer scripts are also available under [`install/`](install/);
-inspect a script before executing it.
-
-Common commands:
+Or grab a prebuilt binary from [GitHub Releases](https://github.com/MageGojo/drission-rs/releases)
+or [GitCode Releases](https://gitcode.com/Roufsi/drission-rs/releases). Scripts live under
+[`install/`](install/); read them before running.
 
 ```bash
 drs ensure-serve --backend cdp --headless
 drs --json open https://example.com
-drs ax --outline
-drs screenshot --out page.png --full
+drs --json snapshot
+drs --json context use account_001
+drs --json open https://example.com --context account_001
+drs listen start /api/ --xhr-only --method POST
+drs --json network mock /api/user --body '{"ok":true}'
+drs --json profile list
 ```
 
 Preview MCP configuration changes before applying them:
@@ -114,21 +109,37 @@ other MCP servers. By default, MCP connects to a persistent local browser proces
 configuration can survive MCP process restarts. See the [CLI / MCP guide](docs/CLI.md) and
 [persistent browser guide](docs/mcp-持久浏览器.md) for commands, JSON responses, tools, and manual setup.
 
+## What 0.6.0 adds
+
+Library:
+
+- `browser.context("account_001")` — isolate cookies / proxy / UA / timezone by name. Same name reuses the context; closing the context disposes it.
+- `ProfileManager` — on-disk `profiles/<id>/{manifest.json,chrome/}` so logins survive process restarts.
+- `tab.network().filter("/api/").method("POST")` — listen / block / mock / rewrite / record. Old `listen` / `intercept` stay.
+- `ChromiumPool::acquire()` — take a leased browser, then `context` / `new_tab`.
+
+`drs`:
+
+| Command | What it does |
+|---|---|
+| `snapshot` | Current page: outline + `ref=eN` + Markdown |
+| `context list\|use\|close` | Named contexts; `open --context` opens into one |
+| `network block\|mock\|rewrite\|record\|stop` | Block, fake responses, rewrite, HAR |
+| `listen start … --method POST` | Existing listener, now with method filter |
+| `profile list\|show` | Disk profiles; `serve --profile <id>` uses that chrome dir |
+
+MCP defaults to `DRS_MCP_TOOLS=core` (open / snapshot / click / screenshot). Context and `network_*` live under `browser` or `all`.
+
+See [CLI.md](docs/CLI.md) and [runtime layering](docs/运行时分层.md).
+
 ## Core capabilities
 
-- **Asynchronous browser control:** navigation, locators, clicking, typing, keyboard input, scrolling,
-  file uploads, iframes, Shadow DOM, and multiple tabs.
-- **Page and network observation:** HTML, text, screenshots, PDF, console events, WebSocket events,
-  XHR / Fetch monitoring, and request interception.
-- **Accessibility and recording:** accessibility-tree snapshots and authorized interaction recording
-  to Rust or JSON action sequences.
-- **Concurrency and recovery:** browser pools, proxy health checks, retry policies, and checkpoints.
-- **Local tool interfaces:** CLI, a JSONL daemon, and stdio MCP for integration with other languages
-  and local AI clients.
-- **Runtime governance:** profile leases, cooldowns, failure classification, risk records, and ledger
-  queries for auditable automation jobs.
-- **Optional visual components:** offline OCR and image-position analysis for owned or explicitly
-  authorized test environments.
+- Async browser control: navigation, locators, click, type, keys, scroll, upload, iframe, Shadow DOM, tabs.
+- Context / Profile: in-process account isolation, disk profiles for logins.
+- Network: XHR listen, intercept, mock, rewrite, HAR; console and WebSocket too.
+- CLI + JSONL daemon + stdio MCP. Prefer `snapshot` over dumping full HTML.
+- Pools, proxy health, retries, checkpoints; identity leases / cooldown / ledger unchanged.
+- OCR and slider helpers are optional features. Use them only on systems you own or are allowed to test.
 
 ## Features
 
@@ -144,11 +155,11 @@ configuration can survive MCP process restarts. See the [CLI / MCP guide](docs/C
 Example configurations:
 
 ```toml
-# Default CDP backend with OCR
-drission = { git = "https://github.com/MageGojo/drission-rs", tag = "v0.4.0", features = ["ocr"] }
+# Default CDP plus OCR
+drission = { version = "0.6", features = ["ocr"] }
 
-# Camoufox backend only
-# drission = { git = "https://github.com/MageGojo/drission-rs", tag = "v0.4.0", default-features = false, features = ["camoufox"] }
+# Camoufox only
+# drission = { version = "0.6", default-features = false, features = ["camoufox"] }
 ```
 
 Refer to [Cargo.toml](Cargo.toml) and the [API documentation](https://docs.rs/drission) for the

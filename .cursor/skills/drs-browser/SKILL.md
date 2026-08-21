@@ -88,7 +88,10 @@ drs --json extract https://example.com \
 | 读正文 | `drs text` 或 `drs text "css:h1"` |
 | 读标题/URL | `drs --json title` / `drs --json url` |
 | 截图 | `drs screenshot --out data/browser/page.png --full` |
-| 监听 XHR | `drs --json listen start /api/ --xhr-only` → `listen wait` |
+| 监听 XHR | `drs --json listen start /api/ --xhr-only --method POST` → `listen wait` |
+| 拦 / mock | `drs --json network block /tracker`；`network mock /api/user --body '{…}'` |
+| Context | `drs --json context use account_001`；`open URL --context account_001` |
+| Profile | `drs --json profile list`；`drs serve --profile user_001` |
 | 过 CF | `drs --json pass-cf --timeout-ms 30000` |
 | 停止 | `drs stop` |
 
@@ -102,7 +105,7 @@ drs --json extract https://example.com \
 - `browser_click` / `browser_type` / `browser_press` / `browser_wait`（可 `return_snapshot`）
 - `browser_screenshot`
 
-`DRS_MCP_TOOLS=browser` 才有 `network_*` / `browser_pass_cf` / `browser_html` 等；`=identity` 才有 `identity_assets_*`；`=all` 全开。
+`DRS_MCP_TOOLS=browser` 才有 `network_*` / `browser_context_*` / `profile_*` / `browser_pass_cf` / `browser_html`；`=identity` 才有 `identity_assets_*` 和 `profile_*`；`=all` 全开。
 
 MCP 默认 **attach 到常驻 daemon**：标签/登录态跨 MCP 重启存活。一次性独立浏览器用 `drs mcp --standalone`。
 

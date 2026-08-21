@@ -533,6 +533,20 @@ impl ChromiumBrowser {
             .await
     }
 
+    /// 当前进程里已注册的命名 Context：`(name, browserContextId)`。
+    pub fn named_contexts(&self) -> Vec<(String, String)> {
+        self.named_contexts
+            .lock()
+            .ok()
+            .map(|g| {
+                let mut v: Vec<(String, String)> =
+                    g.iter().map(|(k, id)| (k.clone(), id.clone())).collect();
+                v.sort_by(|a, b| a.0.cmp(&b.0));
+                v
+            })
+            .unwrap_or_default()
+    }
+
     /// 取出或创建命名 Context(同名复用同一 CDP context)。一个名字 ≈ 一个账号身份。
     pub async fn context(&self, name: &str) -> Result<ChromiumBrowserContext> {
         self.context_with(ContextSpec::new().name(name)).await
