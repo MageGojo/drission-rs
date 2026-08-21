@@ -233,6 +233,7 @@ QCC_USERNAME='用户名' QCC_PASSWORD='密码' cargo run --example qcc_login
 | [cdp_dump_env](cdp/cdp_dump_env.rs) | CDP 吐环境 `tab.dump_env()`(探针 + env.js + 导出工程 + 双跑验证) | 🌐 |
 | [cdp_extras](cdp/cdp_extras.rs) | **标配补齐**(对标 PW/Puppeteer/DP):set_content / 媒体深色 / 网络离线 / 设备 / storage / `wait().network_idle` / HAR / expose / PDF / MHTML 端到端 | 🔌 |
 | [cdp_context](cdp/cdp_context.rs) | **Context / Profile / 网络门面**:两账号 Context cookie 隔离 + `network().mock` + 磁盘 Profile 租约 | 🔌 |
+| [cdp_agent](cdp/cdp_agent.rs) | **Agent / Locator / wait / capture**:observe 大纲、语义点登录、链式等待、capture.html | 🔌 |
 | [cdp_recorder](cdp/cdp_recorder.rs) | **录制生成代码 + 无障碍快照**(对标 PW codegen / a11y):`tab.recorder()` 录操作 → 生成可运行 Rust;`ax_tree()` / `ax_snapshot()` 语义树 | 🔌 |
 
 ## Windows 专项(windows/,在 Windows 上运行)

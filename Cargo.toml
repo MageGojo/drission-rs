@@ -1,13 +1,13 @@
 [package]
 name = "drission"
-version = "0.6.1"
+version = "0.6.2"
 edition = "2024"
 rust-version = "1.85"
 # 示例按能力分文件夹(examples/<分类>/),每个 [[example]] 显式声明 path;关掉自动发现(子目录无
 # main.rs 本就不会被当示例,这里再加一道保险,杜绝把资源/子目录误判为示例)。
 autoexamples = false
 authors = ["极数本源 (apizero.cn)"]
-description = "Rust 反检测浏览器自动化与身份治理引擎:账号池指纹准入/漂移/lifecycle 审计,内置 ddddocr OCR 与滑块缺口识别,默认 Chrome/CDP、可选 Camoufox、Cloudflare 过盾、高并发爬虫与 XHR 监听拦截。Anti-detect browser automation and browser identity governance in Rust."
+description = "Rust 里用 CDP 控 Chrome。Context / 磁盘 Profile / XHR 监听与 mock。同仓库有 drs CLI 和 MCP。"
 documentation = "https://docs.rs/drission"
 homepage = "https://apizero.cn"
 repository = "https://github.com/MageGojo/drission-rs"
@@ -171,6 +171,12 @@ required-features = ["cdp"]
 [[example]]
 name = "cdp_context"
 path = "examples/cdp/cdp_context.rs"
+required-features = ["cdp"]
+
+# Agent / Locator / wait / capture 离线自验证。
+[[example]]
+name = "cdp_agent"
+path = "examples/cdp/cdp_agent.rs"
 required-features = ["cdp"]
 
 # 录制生成代码(codegen)+ 无障碍快照(accessibility):录一遍表单 → 出可运行 Rust;ax_tree/ax_snapshot 语义树。

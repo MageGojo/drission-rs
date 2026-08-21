@@ -17,7 +17,7 @@
 
 - MCP 默认**接到常驻 daemon 的同一个持久浏览器**，浏览器活在长命的 `drs serve` 进程里，MCP 重启不影响它。
 - daemon 用**固定 profile 目录**，即使 daemon 本身重启，Chrome 复用同一 profile → cookie / 登录态存活。
-- CLI 和 MCP 共享同一浏览器: CLI 里 `drs open` 打开并登录的标签，AI 通过 MCP `browser_*` 能直接接着用，反之亦然。
+- CLI 和 MCP 共享同一浏览器: CLI 里 `drs tab open`（或旧 `drs open`）打开并登录的标签，AI 通过 MCP `browser_*` 能直接接着用，反之亦然。默认 core 含 `browser_network` / `browser_console` / `browser_download`，抓包不必改 toolset。怎么选用见 [`产品级CLI.md`](产品级CLI.md)。
 
 ## 设计
 

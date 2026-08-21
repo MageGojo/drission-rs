@@ -488,6 +488,18 @@ impl Listen {
         *self.tab.core.listen_active.lock().await
     }
 
+    /// 偷看当前缓冲(不消费)。给 `drs network inspect` 用。
+    pub async fn peek(&self) -> Vec<DataPacket> {
+        self.tab
+            .core
+            .listen_buf
+            .lock()
+            .await
+            .iter()
+            .cloned()
+            .collect()
+    }
+
     /// 等待下一个匹配数据包(默认超时;超时返回 [`Error::Timeout`])。
     pub async fn wait(&self) -> Result<DataPacket> {
         self.tab.listen_wait().await

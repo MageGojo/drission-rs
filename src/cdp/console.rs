@@ -129,6 +129,12 @@ impl ChromiumConsole {
         }
     }
 
+    /// 偷看当前缓冲(不消费)。给 `drs inspect` / `drs console list` 用。
+    pub async fn peek(&self) -> Vec<ConsoleData> {
+        let buf = self.core.console.lock().await.buf.clone();
+        buf.lock().await.iter().cloned().collect()
+    }
+
     /// 取出当前已缓冲的全部消息并清空。
     pub async fn messages(&self) -> Vec<ConsoleData> {
         let buf = self.core.console.lock().await.buf.clone();

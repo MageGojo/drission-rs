@@ -181,6 +181,66 @@ pub struct BackendRecorder {
     inner: drission::cdp::HarRecorder,
 }
 
+pub struct BackendHarPlayer {
+    #[cfg(feature = "cdp")]
+    inner: Option<drission::cdp::HarPlayer>,
+}
+
+impl BackendHarPlayer {
+    pub async fn stop(mut self) -> Result<()> {
+        #[cfg(feature = "cdp")]
+        if let Some(player) = self.inner.take() {
+            player.stop().await?;
+        }
+        Ok(())
+    }
+}
+
+pub struct BackendCodegen {
+    #[cfg(feature = "cdp")]
+    inner: drission::cdp::ChromiumRecorder,
+}
+
+impl BackendCodegen {
+    pub async fn status(&self) -> Result<Value> {
+        #[cfg(feature = "cdp")]
+        {
+            return Ok(json!({
+                "recording": self.inner.is_recording(),
+                "actions": self.inner.len().await,
+            }));
+        }
+        #[cfg(not(feature = "cdp"))]
+        anyhow::bail!("codegen record 只支持 CDP 后端")
+    }
+
+    pub async fn stop(self, out: Option<PathBuf>) -> Result<Value> {
+        #[cfg(feature = "cdp")]
+        {
+            let script = self.inner.stop().await?;
+            let rust = script.to_rust();
+            let path = match out {
+                Some(p) => p,
+                None => default_codegen_path()?,
+            };
+            if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+                tokio::fs::create_dir_all(parent).await?;
+            }
+            tokio::fs::write(&path, rust.as_bytes()).await?;
+            return Ok(json!({
+                "recording": false,
+                "actions": script.len(),
+                "out": path,
+            }));
+        }
+        #[cfg(not(feature = "cdp"))]
+        {
+            let _ = out;
+            anyhow::bail!("codegen record 只支持 CDP 后端")
+        }
+    }
+}
+
 enum NetworkAction {
     Block,
     Mock {
@@ -212,6 +272,10 @@ async fn launch_cdp(headless: bool, user_data_dir: Option<PathBuf>) -> Result<Ba
     if let Some(dir) = user_data_dir {
         opts = opts.user_data_dir(dir);
     }
+    if let Ok(dir) = paths::downloads_dir() {
+        let _ = std::fs::create_dir_all(&dir);
+        opts = opts.download_path(dir);
+    }
     Ok(BackendBrowser::Cdp(
         drission::cdp::ChromiumBrowser::launch(opts).await?,
     ))
@@ -227,6 +291,10 @@ async fn launch_camoufox(headless: bool, user_data_dir: Option<PathBuf>) -> Resu
     let mut opts = drission::launcher::BrowserOptions::new().headless(headless);
     if let Some(dir) = user_data_dir {
         opts = opts.user_data_dir(dir);
+    }
+    if let Ok(dir) = paths::downloads_dir() {
+        let _ = std::fs::create_dir_all(&dir);
+        opts = opts.download_path(dir);
     }
     Ok(BackendBrowser::Camoufox(
         drission::browser::Browser::launch(opts).await?,
@@ -691,6 +759,343 @@ impl BackendTab {
             BackendTab::Camoufox(tab) => Ok(tab.identity_report().await?),
         }
     }
+
+    pub async fn listen_inspect(&self, limit: Option<usize>) -> Result<Value> {
+        let (listening, mut packets): (bool, Vec<PacketSummary>) = match self {
+            #[cfg(feature = "cdp")]
+            BackendTab::Cdp(tab) => {
+                let listen = tab.listen();
+                (
+                    listen.is_listening().await,
+                    listen.peek().await.into_iter().map(Into::into).collect(),
+                )
+            }
+            #[cfg(feature = "camoufox")]
+            BackendTab::Camoufox(tab) => {
+                let listen = tab.listen();
+                (
+                    listen.is_listening().await,
+                    listen.peek().await.into_iter().map(Into::into).collect(),
+                )
+            }
+        };
+        let total = packets.len();
+        if let Some(limit) = limit.filter(|n| *n > 0) {
+            if packets.len() > limit {
+                packets = packets[packets.len() - limit..].to_vec();
+            }
+        }
+        Ok(json!({
+            "listening": listening,
+            "count": total,
+            "shown": packets.len(),
+            "packets": packets,
+        }))
+    }
+
+    pub async fn network_replay(
+        &self,
+        path: &str,
+        ignore_query: bool,
+        fallback: bool,
+    ) -> Result<BackendHarPlayer> {
+        match self {
+            #[cfg(feature = "cdp")]
+            BackendTab::Cdp(tab) => {
+                let opts = drission::cdp::HarReplayOptions::new()
+                    .ignore_query(ignore_query)
+                    .not_found(if fallback {
+                        drission::cdp::HarNotFound::Fallback
+                    } else {
+                        drission::cdp::HarNotFound::Abort
+                    });
+                Ok(BackendHarPlayer {
+                    inner: Some(tab.network().replay(path, &opts).await?),
+                })
+            }
+            #[cfg(feature = "camoufox")]
+            BackendTab::Camoufox(_) => {
+                let _ = (path, ignore_query, fallback);
+                anyhow::bail!("HAR replay 只支持 CDP 后端")
+            }
+        }
+    }
+
+    pub async fn save_pdf(
+        &self,
+        out: Option<PathBuf>,
+        landscape: bool,
+        print_background: bool,
+    ) -> Result<Value> {
+        match self {
+            #[cfg(feature = "cdp")]
+            BackendTab::Cdp(tab) => {
+                let path = match out {
+                    Some(p) => p,
+                    None => default_pdf_path()?,
+                };
+                let opts = drission::cdp::PdfOptions::new()
+                    .landscape(landscape)
+                    .print_background(print_background);
+                let saved = tab.save_pdf(&path, &opts).await?;
+                Ok(
+                    json!({ "path": saved, "landscape": landscape, "printBackground": print_background }),
+                )
+            }
+            #[cfg(feature = "camoufox")]
+            BackendTab::Camoufox(_) => {
+                let _ = (out, landscape, print_background);
+                anyhow::bail!("pdf 只支持 CDP 后端(需无头 Chrome)")
+            }
+        }
+    }
+
+    pub async fn codegen_start(&self) -> Result<BackendCodegen> {
+        match self {
+            #[cfg(feature = "cdp")]
+            BackendTab::Cdp(tab) => {
+                let rec = tab.recorder();
+                rec.start().await?;
+                Ok(BackendCodegen { inner: rec })
+            }
+            #[cfg(feature = "camoufox")]
+            BackendTab::Camoufox(_) => anyhow::bail!("codegen record 只支持 CDP 后端"),
+        }
+    }
+
+    pub async fn console_start(
+        &self,
+        level: Option<String>,
+        text: Option<String>,
+    ) -> Result<Value> {
+        match self {
+            #[cfg(feature = "cdp")]
+            BackendTab::Cdp(tab) => {
+                let mut filter = drission::cdp::ConsoleFilter::new();
+                if let Some(level) = level.as_deref() {
+                    filter = filter.level(level);
+                }
+                if let Some(text) = text.as_deref() {
+                    filter = filter.text(text);
+                }
+                tab.console().start_with(filter).await?;
+                Ok(json!({ "listening": true, "level": level, "text": text }))
+            }
+            #[cfg(feature = "camoufox")]
+            BackendTab::Camoufox(tab) => {
+                let mut filter = drission::browser::console::ConsoleFilter::new();
+                if let Some(level) = level.as_deref() {
+                    filter = filter.level(level);
+                }
+                if let Some(text) = text.as_deref() {
+                    filter = filter.contains(text);
+                }
+                tab.console().start_with(filter).await?;
+                Ok(json!({ "listening": true, "level": level, "text": text }))
+            }
+        }
+    }
+
+    pub async fn console_wait(&self, timeout: Option<Duration>) -> Result<Value> {
+        match self {
+            #[cfg(feature = "cdp")]
+            BackendTab::Cdp(tab) => {
+                let msg = tab.console().wait(timeout).await?;
+                Ok(
+                    json!({ "message": msg.as_ref().map(console_cdp_json), "timeout": msg.is_none() }),
+                )
+            }
+            #[cfg(feature = "camoufox")]
+            BackendTab::Camoufox(tab) => {
+                let msg = tab.console().wait(timeout).await?;
+                Ok(
+                    json!({ "message": msg.as_ref().map(console_fx_json), "timeout": msg.is_none() }),
+                )
+            }
+        }
+    }
+
+    pub async fn console_list(&self) -> Result<Value> {
+        match self {
+            #[cfg(feature = "cdp")]
+            BackendTab::Cdp(tab) => {
+                let messages: Vec<Value> = tab
+                    .console()
+                    .peek()
+                    .await
+                    .iter()
+                    .map(console_cdp_json)
+                    .collect();
+                let listening = tab.console().listening().await;
+                Ok(json!({ "listening": listening, "count": messages.len(), "messages": messages }))
+            }
+            #[cfg(feature = "camoufox")]
+            BackendTab::Camoufox(tab) => {
+                let messages: Vec<Value> = tab
+                    .console()
+                    .peek()
+                    .await
+                    .iter()
+                    .map(console_fx_json)
+                    .collect();
+                Ok(json!({ "listening": true, "count": messages.len(), "messages": messages }))
+            }
+        }
+    }
+
+    pub async fn console_stop(&self) -> Result<Value> {
+        match self {
+            #[cfg(feature = "cdp")]
+            BackendTab::Cdp(tab) => tab.console().stop().await?,
+            #[cfg(feature = "camoufox")]
+            BackendTab::Camoufox(tab) => tab.console().stop().await?,
+        }
+        Ok(json!({ "listening": false }))
+    }
+
+    pub async fn download_start(&self, dir: Option<&str>) -> Result<Value> {
+        let dir = match dir {
+            Some(d) => PathBuf::from(d),
+            None => paths::downloads_dir()?,
+        };
+        tokio::fs::create_dir_all(&dir).await?;
+        match self {
+            #[cfg(feature = "cdp")]
+            BackendTab::Cdp(tab) => {
+                tab.set_download_path(&dir).await?;
+                tab.downloads().start().await?;
+            }
+            #[cfg(feature = "camoufox")]
+            BackendTab::Camoufox(tab) => {
+                tab.downloads().start().await?;
+            }
+        }
+        Ok(json!({ "tracking": true, "dir": dir }))
+    }
+
+    pub async fn download_list(&self) -> Result<Value> {
+        match self {
+            #[cfg(feature = "cdp")]
+            BackendTab::Cdp(tab) => {
+                let missions: Vec<Value> = tab
+                    .downloads()
+                    .missions()
+                    .await
+                    .into_iter()
+                    .map(download_cdp_json)
+                    .collect();
+                Ok(json!({ "count": missions.len(), "missions": missions }))
+            }
+            #[cfg(feature = "camoufox")]
+            BackendTab::Camoufox(tab) => {
+                let missions: Vec<Value> = tab
+                    .downloads()
+                    .missions()
+                    .await
+                    .into_iter()
+                    .map(download_fx_json)
+                    .collect();
+                Ok(json!({ "count": missions.len(), "missions": missions }))
+            }
+        }
+    }
+
+    pub async fn download_wait(
+        &self,
+        timeout: Option<Duration>,
+        count: Option<usize>,
+    ) -> Result<Value> {
+        let timeout = timeout.unwrap_or(Duration::from_secs(30));
+        let count = count.unwrap_or(1).max(1);
+        match self {
+            #[cfg(feature = "cdp")]
+            BackendTab::Cdp(tab) => {
+                let missions: Vec<Value> = tab
+                    .downloads()
+                    .wait_count_done(count, timeout)
+                    .await?
+                    .into_iter()
+                    .map(download_cdp_json)
+                    .collect();
+                Ok(json!({ "count": missions.len(), "missions": missions }))
+            }
+            #[cfg(feature = "camoufox")]
+            BackendTab::Camoufox(tab) => {
+                let missions: Vec<Value> = tab
+                    .downloads()
+                    .wait_count_done(count, timeout)
+                    .await?
+                    .into_iter()
+                    .map(download_fx_json)
+                    .collect();
+                Ok(json!({ "count": missions.len(), "missions": missions }))
+            }
+        }
+    }
+
+    pub async fn download_stop(&self) -> Result<Value> {
+        match self {
+            #[cfg(feature = "cdp")]
+            BackendTab::Cdp(tab) => tab.downloads().stop().await?,
+            #[cfg(feature = "camoufox")]
+            BackendTab::Camoufox(tab) => tab.downloads().stop().await?,
+        }
+        Ok(json!({ "tracking": false }))
+    }
+}
+
+#[cfg(feature = "cdp")]
+fn console_cdp_json(d: &drission::cdp::ConsoleData) -> Value {
+    json!({
+        "level": d.level,
+        "text": d.text,
+        "url": d.url,
+        "line": d.line,
+    })
+}
+
+#[cfg(feature = "camoufox")]
+fn console_fx_json(d: &drission::browser::console::ConsoleData) -> Value {
+    json!({
+        "level": d.level,
+        "text": d.text,
+        "url": d.url,
+        "line": d.line,
+    })
+}
+
+#[cfg(feature = "cdp")]
+fn download_cdp_json(m: drission::cdp::DownloadMission) -> Value {
+    json!({
+        "guid": m.guid,
+        "url": m.url,
+        "filename": m.suggested_filename,
+        "path": m.path,
+        "state": format!("{:?}", m.state),
+        "receivedBytes": m.received_bytes,
+        "totalBytes": m.total_bytes,
+    })
+}
+
+#[cfg(feature = "camoufox")]
+fn download_fx_json(m: drission::browser::download::DownloadMission) -> Value {
+    json!({
+        "filename": m.suggested_filename,
+        "path": m.path,
+        "state": format!("{:?}", m.state),
+    })
+}
+
+fn default_pdf_path() -> Result<PathBuf> {
+    let dir = paths::pdf_dir()?;
+    std::fs::create_dir_all(&dir)?;
+    Ok(dir.join(format!("page-{}.pdf", now_ms())))
+}
+
+fn default_codegen_path() -> Result<PathBuf> {
+    let dir = paths::codegen_dir()?;
+    std::fs::create_dir_all(&dir)?;
+    Ok(dir.join(format!("script-{}.rs", now_ms())))
 }
 
 async fn default_screenshot_path() -> Result<PathBuf> {

@@ -6,9 +6,7 @@ use anyhow::Result;
 use rmcp::{
     ServerHandler, ServiceExt,
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
-    model::{
-        CallToolResult, ContentBlock, Implementation, ServerCapabilities, ServerInfo,
-    },
+    model::{CallToolResult, ContentBlock, Implementation, ServerCapabilities, ServerInfo},
     tool, tool_handler, tool_router,
     transport::stdio,
 };
@@ -39,6 +37,9 @@ const CORE_TOOLS: &[&str] = &[
     "browser_press",
     "browser_wait",
     "browser_screenshot",
+    "browser_network",
+    "browser_console",
+    "browser_download",
 ];
 
 /// Extended browser/network tools (included in `browser` + `all`).
@@ -62,6 +63,9 @@ const BROWSER_EXTRA_TOOLS: &[&str] = &[
     "network_rewrite",
     "network_record",
     "network_stop",
+    "browser_pdf",
+    "browser_inspect",
+    "browser_record",
     "browser_context_list",
     "browser_context_use",
     "browser_context_close",
@@ -120,6 +124,12 @@ const ALL_MCP_TOOLS: &[&str] = &[
     "network_rewrite",
     "network_record",
     "network_stop",
+    "browser_network",
+    "browser_console",
+    "browser_download",
+    "browser_pdf",
+    "browser_inspect",
+    "browser_record",
     "browser_context_list",
     "browser_context_use",
     "browser_context_close",
@@ -553,7 +563,10 @@ impl DrsMcp {
         name = "network_block",
         description = "Abort matching requests on the active tab"
     )]
-    async fn network_block(&self, Parameters(req): Parameters<NetworkFilterParams>) -> CallToolResult {
+    async fn network_block(
+        &self,
+        Parameters(req): Parameters<NetworkFilterParams>,
+    ) -> CallToolResult {
         self.exec(EngineCommand::NetworkBlock {
             keywords: req.keywords.unwrap_or_default(),
             methods: req.methods.unwrap_or_default(),
@@ -599,8 +612,12 @@ impl DrsMcp {
         name = "network_record",
         description = "Start HAR recording on the active tab"
     )]
-    async fn network_record(&self, Parameters(req): Parameters<NetworkRecordParams>) -> CallToolResult {
-        self.exec(EngineCommand::NetworkRecord { out: req.out }).await
+    async fn network_record(
+        &self,
+        Parameters(req): Parameters<NetworkRecordParams>,
+    ) -> CallToolResult {
+        self.exec(EngineCommand::NetworkRecord { out: req.out })
+            .await
     }
 
     #[tool(
@@ -609,6 +626,201 @@ impl DrsMcp {
     )]
     async fn network_stop(&self) -> CallToolResult {
         self.exec(EngineCommand::NetworkStop).await
+    }
+
+    #[tool(
+        name = "browser_network",
+        description = "Semantic network tool. action=inspect|listen|wait|block|mock|rewrite|record|replay|stop. Prefer this over network_*."
+    )]
+    async fn browser_network(
+        &self,
+        Parameters(req): Parameters<BrowserNetworkParams>,
+    ) -> CallToolResult {
+        let action = req.action.trim().to_ascii_lowercase();
+        match action.as_str() {
+            "inspect" => {
+                self.exec(EngineCommand::NetworkInspect { limit: req.limit })
+                    .await
+            }
+            "listen" => {
+                self.exec(EngineCommand::ListenStart {
+                    keywords: req.keywords.unwrap_or_default(),
+                    xhr_only: req.xhr_only.unwrap_or(false),
+                    methods: req.methods.unwrap_or_default(),
+                })
+                .await
+            }
+            "wait" => {
+                self.exec(EngineCommand::ListenWait {
+                    count: req.count.unwrap_or(1),
+                    timeout_ms: req.timeout_ms,
+                })
+                .await
+            }
+            "block" => {
+                self.exec(EngineCommand::NetworkBlock {
+                    keywords: req.keywords.unwrap_or_default(),
+                    methods: req.methods.unwrap_or_default(),
+                })
+                .await
+            }
+            "mock" => {
+                self.exec(EngineCommand::NetworkMock {
+                    keywords: req.keywords.unwrap_or_default(),
+                    methods: req.methods.unwrap_or_default(),
+                    status: req.status.unwrap_or(200),
+                    body: req.body.unwrap_or_default(),
+                    headers: req.headers.unwrap_or_default(),
+                })
+                .await
+            }
+            "rewrite" => {
+                self.exec(EngineCommand::NetworkRewrite {
+                    keywords: req.keywords.unwrap_or_default(),
+                    methods: req.methods.unwrap_or_default(),
+                    set_headers: req.set_headers.unwrap_or_default(),
+                    url: req.url,
+                    method: req.method,
+                    post_data: req.post_data,
+                })
+                .await
+            }
+            "record" => {
+                self.exec(EngineCommand::NetworkRecord { out: req.out })
+                    .await
+            }
+            "replay" => {
+                let Some(path) = req.har.or(req.path) else {
+                    return result_to_tool(JsonResponse::err(
+                        "command_failed",
+                        "browser_network action=replay 需要 har 或 path",
+                        None,
+                    ));
+                };
+                self.exec(EngineCommand::NetworkReplay {
+                    path,
+                    ignore_query: req.ignore_query.unwrap_or(false),
+                    fallback: req.fallback.unwrap_or(false),
+                })
+                .await
+            }
+            "stop" => self.exec(EngineCommand::NetworkStop).await,
+            other => result_to_tool(JsonResponse::err(
+                "command_failed",
+                format!(
+                    "unknown browser_network action `{other}`; use inspect|listen|wait|block|mock|rewrite|record|replay|stop"
+                ),
+                None,
+            )),
+        }
+    }
+
+    #[tool(
+        name = "browser_console",
+        description = "Semantic console tool. action=start|wait|list|stop. start enables Runtime.enable on CDP."
+    )]
+    async fn browser_console(
+        &self,
+        Parameters(req): Parameters<BrowserConsoleParams>,
+    ) -> CallToolResult {
+        match req.action.trim().to_ascii_lowercase().as_str() {
+            "start" => {
+                self.exec(EngineCommand::ConsoleStart {
+                    level: req.level,
+                    text: req.text,
+                })
+                .await
+            }
+            "wait" => {
+                self.exec(EngineCommand::ConsoleWait {
+                    timeout_ms: req.timeout_ms,
+                })
+                .await
+            }
+            "list" => self.exec(EngineCommand::ConsoleList).await,
+            "stop" => self.exec(EngineCommand::ConsoleStop).await,
+            other => result_to_tool(JsonResponse::err(
+                "command_failed",
+                format!("unknown browser_console action `{other}`; use start|wait|list|stop"),
+                None,
+            )),
+        }
+    }
+
+    #[tool(
+        name = "browser_download",
+        description = "Semantic download tracker. action=start|list|wait|stop. Call start before triggering a download."
+    )]
+    async fn browser_download(
+        &self,
+        Parameters(req): Parameters<BrowserDownloadParams>,
+    ) -> CallToolResult {
+        match req.action.trim().to_ascii_lowercase().as_str() {
+            "start" => {
+                self.exec(EngineCommand::DownloadStart { dir: req.dir })
+                    .await
+            }
+            "list" => self.exec(EngineCommand::DownloadList).await,
+            "wait" => {
+                self.exec(EngineCommand::DownloadWait {
+                    timeout_ms: req.timeout_ms,
+                    count: req.count,
+                })
+                .await
+            }
+            "stop" => self.exec(EngineCommand::DownloadStop).await,
+            other => result_to_tool(JsonResponse::err(
+                "command_failed",
+                format!("unknown browser_download action `{other}`; use start|list|wait|stop"),
+                None,
+            )),
+        }
+    }
+
+    #[tool(
+        name = "browser_pdf",
+        description = "Print the active page to PDF (headless Chrome / CDP)"
+    )]
+    async fn browser_pdf(&self, Parameters(req): Parameters<PdfParams>) -> CallToolResult {
+        self.exec(EngineCommand::Pdf {
+            out: req.out,
+            landscape: req.landscape.unwrap_or(false),
+            print_background: req.print_background.unwrap_or(true),
+        })
+        .await
+    }
+
+    #[tool(
+        name = "browser_inspect",
+        description = "Combined page debug dump: snapshot + optional network/console peek. Prefer snapshot for ordinary reading."
+    )]
+    async fn browser_inspect(&self, Parameters(req): Parameters<InspectParams>) -> CallToolResult {
+        self.exec(EngineCommand::Inspect {
+            include_network: req.include_network.unwrap_or(true),
+            include_console: req.include_console.unwrap_or(true),
+            max_packets: req.max_packets,
+        })
+        .await
+    }
+
+    #[tool(
+        name = "browser_record",
+        description = "Codegen recorder. action=start|stop|status. stop writes runnable Rust."
+    )]
+    async fn browser_record(
+        &self,
+        Parameters(req): Parameters<BrowserRecordParams>,
+    ) -> CallToolResult {
+        match req.action.trim().to_ascii_lowercase().as_str() {
+            "start" => self.exec(EngineCommand::RecordStart).await,
+            "stop" => self.exec(EngineCommand::RecordStop { out: req.out }).await,
+            "status" => self.exec(EngineCommand::RecordStatus).await,
+            other => result_to_tool(JsonResponse::err(
+                "command_failed",
+                format!("unknown browser_record action `{other}`; use start|stop|status"),
+                None,
+            )),
+        }
     }
 
     #[tool(
@@ -1344,6 +1556,69 @@ struct NetworkRecordParams {
 }
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema)]
+struct BrowserNetworkParams {
+    /// inspect | listen | wait | block | mock | rewrite | record | replay | stop
+    action: String,
+    keywords: Option<Vec<String>>,
+    methods: Option<Vec<String>>,
+    xhr_only: Option<bool>,
+    count: Option<usize>,
+    timeout_ms: Option<u64>,
+    status: Option<u16>,
+    body: Option<String>,
+    headers: Option<Vec<(String, String)>>,
+    set_headers: Option<Vec<(String, String)>>,
+    url: Option<String>,
+    method: Option<String>,
+    post_data: Option<String>,
+    out: Option<String>,
+    har: Option<String>,
+    path: Option<String>,
+    ignore_query: Option<bool>,
+    fallback: Option<bool>,
+    limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+struct BrowserConsoleParams {
+    /// start | wait | list | stop
+    action: String,
+    level: Option<String>,
+    text: Option<String>,
+    timeout_ms: Option<u64>,
+}
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+struct BrowserDownloadParams {
+    /// start | list | wait | stop
+    action: String,
+    dir: Option<String>,
+    timeout_ms: Option<u64>,
+    count: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+struct PdfParams {
+    out: Option<PathBuf>,
+    landscape: Option<bool>,
+    print_background: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+struct InspectParams {
+    include_network: Option<bool>,
+    include_console: Option<bool>,
+    max_packets: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+struct BrowserRecordParams {
+    /// start | stop | status
+    action: String,
+    out: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
 struct ContextUseParams {
     name: String,
     proxy: Option<String>,
@@ -1612,6 +1887,8 @@ Cursor agent server id is usually `user-drs` (mcp.json key `drs`).
 
 Preferred loop: browser_snapshot → browser_click/type/press/wait with ref → optional return_snapshot=true.
 Do NOT use browser_html/browser_ax on heavy pages; prefer browser_snapshot / browser_extract.
+Capture XHR with browser_network action=listen then wait/inspect — already in core, do not require DRS_MCP_TOOLS=browser.
+console start opens Runtime.enable — skip on Cloudflare/anti-bot pages. Start browser_download before clicking download.
 
 Stable core schemas (session-cacheable; after one GetMcpTools for this server, reuse these args):
 - browser_open {{url}}
@@ -1623,9 +1900,12 @@ Stable core schemas (session-cacheable; after one GetMcpTools for this server, r
 - browser_wait {{selector, timeout_ms?, return_snapshot?}}
 - browser_screenshot {{out?, full?, inline?}}
 - browser_tabs / browser_use_tab {{tab_id}} / browser_close {{tab_id?}}
+- browser_network {{action: inspect|listen|wait|block|mock|rewrite|record|replay|stop}}
+- browser_console {{action: start|wait|list|stop}}
+- browser_download {{action: start|list|wait|stop}}
 
 Errors: code `stale_ref` means the snapshot ref is gone — call browser_snapshot and retry with a new ref.
-Need identity_assets_* or network_*? Restart with DRS_MCP_TOOLS=browser|identity|all (default core)."#
+Need identity_assets_* or PDF/inspect/record? Restart with DRS_MCP_TOOLS=browser|identity|all (default core)."#
     )
 }
 
@@ -1635,8 +1915,11 @@ mod tests {
 
     #[test]
     fn tool_names_are_stable() {
-        assert_eq!(ALL_MCP_TOOLS.len(), 47);
+        assert_eq!(ALL_MCP_TOOLS.len(), 53);
         assert!(ALL_MCP_TOOLS.contains(&"browser_snapshot"));
+        assert!(ALL_MCP_TOOLS.contains(&"browser_network"));
+        assert!(ALL_MCP_TOOLS.contains(&"browser_console"));
+        assert!(ALL_MCP_TOOLS.contains(&"browser_download"));
         assert!(ALL_MCP_TOOLS.contains(&"identity_assets_sweep"));
     }
 
@@ -1646,9 +1929,13 @@ mod tests {
         assert_eq!(core.len(), CORE_TOOLS.len());
         assert!(core.contains("browser_snapshot"));
         assert!(core.contains("browser_click"));
+        assert!(core.contains("browser_network"));
+        assert!(core.contains("browser_console"));
+        assert!(core.contains("browser_download"));
         assert!(!core.contains("identity_assets_gate"));
         assert!(!core.contains("network_listen_start"));
         assert!(!core.contains("browser_html"));
+        assert!(!core.contains("browser_pdf"));
     }
 
     #[test]

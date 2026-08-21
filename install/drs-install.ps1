@@ -5,7 +5,7 @@
 #   irm https://raw.githubusercontent.com/MageGojo/drission-rs/main/install/drs-install.ps1 | iex
 #
 # Env overrides:
-#   $env:DRS_VERSION     = "v0.3.2"           # specific tag (default: latest)
+#   $env:DRS_VERSION     = "v0.6.2"           # specific tag (default: latest)
 #   $env:DRS_INSTALL_DIR = "$HOME\bin"        # install dir (default: %LOCALAPPDATA%\drs\bin)
 #   $env:DRS_REPO        = "owner/name"       # source repo (default: MageGojo/drission-rs)
 # =============================================================================

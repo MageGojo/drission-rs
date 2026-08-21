@@ -66,20 +66,18 @@ impl AiSnapshot {
             .unwrap_or_default()
             .to_string();
         let partial = v.get("partial").and_then(Value::as_bool).unwrap_or(false);
-        let truncated = v
-            .get("truncated")
-            .and_then(Value::as_bool)
-            .unwrap_or(false);
-        let item_count = v
-            .get("itemCount")
-            .and_then(Value::as_u64)
-            .unwrap_or(0) as usize;
+        let truncated = v.get("truncated").and_then(Value::as_bool).unwrap_or(false);
+        let item_count = v.get("itemCount").and_then(Value::as_u64).unwrap_or(0) as usize;
         let elapsed_ms = v.get("elapsedMs").and_then(Value::as_u64).unwrap_or(0);
 
         let mut refs = Vec::new();
         if let Some(arr) = v.get("refs").and_then(Value::as_array) {
             for item in arr {
-                let id = item.get("id").and_then(Value::as_str).unwrap_or("").to_string();
+                let id = item
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string();
                 if id.is_empty() {
                     continue;
                 }
@@ -330,10 +328,7 @@ mod tests {
 
     #[test]
     fn resolve_ref_selector() {
-        assert_eq!(
-            resolve_selector("ref:e12"),
-            "css:[data-drs-ref=\"e12\"]"
-        );
+        assert_eq!(resolve_selector("ref:e12"), "css:[data-drs-ref=\"e12\"]");
         assert_eq!(resolve_selector("css:button.ok"), "css:button.ok");
         assert_eq!(resolve_selector("ref:../evil"), "ref:../evil");
     }

@@ -79,6 +79,11 @@ pub fn parse(selector: &str) -> Query {
         ("tag:", |r| Query::Css(r.trim().to_string())),
         ("t:", |r| Query::Css(r.trim().to_string())),
         ("text:", text_contains_xpath),
+        ("role:", |r| Locator::role(r.trim()).to_query()),
+        ("label:", |r| Locator::label(r.trim()).to_query()),
+        ("placeholder:", |r| {
+            Locator::placeholder(r.trim()).to_query()
+        }),
     ];
     for &(prefix, make) in PREFIX_RULES {
         if let Some(rest) = strip_prefix_ci(sel, prefix) {
@@ -202,6 +207,191 @@ fn parse_attribute_static(rest: &str) -> StaticQuery {
     }
 }
 
+/// 统一多策略定位。最终都变成 [`Query`],给 `tab.ele` / Agent resolver 用。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Locator {
+    inner: LocatorKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum LocatorKind {
+    Query(Query),
+    Role { role: String, name: Option<String> },
+    Label(String),
+    Placeholder(String),
+}
+
+impl Locator {
+    pub fn css(sel: impl Into<String>) -> Self {
+        Self {
+            inner: LocatorKind::Query(Query::Css(sel.into())),
+        }
+    }
+    pub fn xpath(sel: impl Into<String>) -> Self {
+        Self {
+            inner: LocatorKind::Query(Query::Xpath(sel.into())),
+        }
+    }
+    pub fn id(id: impl Into<String>) -> Self {
+        Self::css(format!("#{}", id.into()))
+    }
+    pub fn text(text: impl Into<String>) -> Self {
+        Self {
+            inner: LocatorKind::Query(text_contains_xpath(&text.into())),
+        }
+    }
+    pub fn role(role: impl Into<String>) -> Self {
+        Self {
+            inner: LocatorKind::Role {
+                role: role.into(),
+                name: None,
+            },
+        }
+    }
+    pub fn name(mut self, name: impl Into<String>) -> Self {
+        if let LocatorKind::Role { name: slot, .. } = &mut self.inner {
+            *slot = Some(name.into());
+        }
+        self
+    }
+    pub fn label(text: impl Into<String>) -> Self {
+        Self {
+            inner: LocatorKind::Label(text.into()),
+        }
+    }
+    pub fn placeholder(text: impl Into<String>) -> Self {
+        Self {
+            inner: LocatorKind::Placeholder(text.into()),
+        }
+    }
+    /// DP 字符串或中文语义(「登录按钮」→ role=button + name=登录)。
+    pub fn parse(raw: impl AsRef<str>) -> Self {
+        let raw = raw.as_ref().trim();
+        if let Some(loc) = semantic_zh(raw) {
+            return loc;
+        }
+        Self {
+            inner: LocatorKind::Query(parse(raw)),
+        }
+    }
+
+    pub fn role_name(&self) -> Option<(&str, Option<&str>)> {
+        match &self.inner {
+            LocatorKind::Role { role, name } => Some((role.as_str(), name.as_deref())),
+            _ => None,
+        }
+    }
+
+    /// 给 resolver / OCR 用的可见名。CSS 选择器没有名字。
+    pub fn hint_text(&self) -> Option<String> {
+        match &self.inner {
+            LocatorKind::Role { name, .. } => name.clone(),
+            LocatorKind::Label(t) | LocatorKind::Placeholder(t) => Some(t.clone()),
+            LocatorKind::Query(Query::Xpath(s)) => extract_contained_literal(s),
+            LocatorKind::Query(Query::Css(_)) => None,
+        }
+    }
+
+    pub fn to_query(&self) -> Query {
+        match &self.inner {
+            LocatorKind::Query(q) => q.clone(),
+            LocatorKind::Role { role, name } => role_query(role, name.as_deref()),
+            LocatorKind::Label(t) => Query::Xpath(format!(
+                "//*[@aria-label={0}] | //label[contains(normalize-space(.), {0})]",
+                xpath_literal(t)
+            )),
+            LocatorKind::Placeholder(t) => {
+                Query::Xpath(format!("//*[@placeholder={}]", xpath_literal(t)))
+            }
+        }
+    }
+
+    /// 可直接交给 `tab.ele` 的 DP 选择器。
+    pub fn as_selector(&self) -> String {
+        match self.to_query() {
+            Query::Css(s) => {
+                if s.starts_with('#') || s.starts_with('.') || s.starts_with("css:") {
+                    s
+                } else {
+                    format!("css:{s}")
+                }
+            }
+            Query::Xpath(s) => {
+                if s.starts_with("xpath:") || s.starts_with("x:") {
+                    s
+                } else {
+                    format!("xpath:{s}")
+                }
+            }
+        }
+    }
+}
+
+impl From<&str> for Locator {
+    fn from(s: &str) -> Self {
+        Self::parse(s)
+    }
+}
+
+impl From<String> for Locator {
+    fn from(s: String) -> Self {
+        Self::parse(s)
+    }
+}
+
+fn role_query(role: &str, name: Option<&str>) -> Query {
+    let tag = match role {
+        "button" => "button",
+        "link" => "a",
+        "textbox" | "searchbox" => "input",
+        "heading" => "h1 | //h2 | //h3 | //h4",
+        "checkbox" => "input[@type='checkbox']",
+        _ => "",
+    };
+    let named = |expr: String| match name {
+        Some(n) => format!("{expr}[contains(normalize-space(.), {})]", xpath_literal(n)),
+        None => expr,
+    };
+    let mut parts = vec![named(format!("//*[@role={}]", xpath_literal(role)))];
+    if !tag.is_empty() && !tag.contains('|') {
+        parts.push(named(format!("//{tag}")));
+    }
+    Query::Xpath(parts.join(" | "))
+}
+
+fn extract_contained_literal(xpath: &str) -> Option<String> {
+    let key = "normalize-space(.), ";
+    let i = xpath.find(key)?;
+    let rest = xpath.get(i + key.len()..)?;
+    if let Some(body) = rest.strip_prefix('"') {
+        let end = body.find('"')?;
+        let s = &body[..end];
+        return (!s.is_empty()).then(|| s.to_string());
+    }
+    None
+}
+
+fn semantic_zh(raw: &str) -> Option<Locator> {
+    const PAIRS: &[(&str, &str)] = &[
+        ("按钮", "button"),
+        ("链接", "link"),
+        ("输入框", "textbox"),
+        ("文本框", "textbox"),
+        ("复选框", "checkbox"),
+        ("标题", "heading"),
+    ];
+    for (suffix, role) in PAIRS {
+        if let Some(name) = raw.strip_suffix(suffix) {
+            let name = name.trim();
+            if !name.is_empty() {
+                return Some(Locator::role(*role).name(name));
+            }
+            return Some(Locator::role(*role));
+        }
+    }
+    None
+}
+
 /// 大小写不敏感地剥离前缀;成功则返回去掉前缀并 `trim_start` 后的剩余部分。
 ///
 /// 用 `str::get` 取头部,避免在多字节 UTF-8(如中文)上按字节切片导致 panic。
@@ -317,5 +507,21 @@ mod tests {
             StaticQuery::TextContains("你好".into())
         );
         assert_eq!(parse_static("xpath://a"), StaticQuery::Xpath("//a".into()));
+    }
+
+    #[test]
+    fn locator_role_and_semantic() {
+        let loc = Locator::role("button").name("登录");
+        let q = loc.to_query();
+        assert!(q.as_str().contains("@role"));
+        assert!(q.as_str().contains("登录"));
+        let zh = Locator::parse("登录按钮");
+        assert_eq!(zh.role_name(), Some(("button", Some("登录"))));
+        assert_eq!(Locator::id("kw").as_selector(), "#kw");
+        assert_eq!(Locator::text("提交").hint_text().as_deref(), Some("提交"));
+        assert_eq!(
+            Locator::parse("登录按钮").hint_text().as_deref(),
+            Some("登录")
+        );
     }
 }

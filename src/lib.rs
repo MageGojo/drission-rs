@@ -26,10 +26,11 @@
 /// 无障碍快照(后端无关):`AxNode`/`AxTree` + DOM 快照脚本 + CDP 扁平树重建。
 /// `tab.ax_tree()`(cdp 原生)/ `tab.ax_snapshot()`(两后端)各自提供。
 pub mod a11y;
+/// Agent 编排层:observe / 语义定位 / 等待。仅 cdp。见 `docs/Agent运行时.md`。
+#[cfg(feature = "cdp")]
+pub mod agent;
 /// AI / MCP 友好页面快照(interesting-only + ref):`drs snapshot` / `browser_snapshot`。
 pub mod ai_snapshot;
-/// HTML → Markdown(`htmd`),供 AI 读页。
-pub mod html_md;
 /// Camoufox / Firefox(Juggler)后端 + 全部高层浏览器能力。仅 `--features camoufox`。
 #[cfg(feature = "camoufox")]
 pub mod browser;
@@ -48,6 +49,8 @@ pub mod error;
 /// 读取浏览器**实时指纹快照**(后端无关):`tab.fingerprint_snapshot()` 一次性 dump UA/平台/语言/
 /// 时区/屏幕/硬件/WebGL renderer/canvas 哈希。区别于 `cdp::fingerprint`/`pool::fingerprint`(设定指纹)。
 pub mod fingerprint;
+/// HTML → Markdown(`htmd`),供 AI 读页。
+pub mod html_md;
 pub mod human;
 pub mod keys;
 /// 启动选项 / 指纹配置 / 代理值类型;Camoufox 自动下载分发与进程启动。`options`(含后端无关的
@@ -98,6 +101,10 @@ pub use error::{Error, Result};
 pub mod prelude {
     // ── 后端无关(始终可用)──────────────────────────────────────────
     pub use crate::a11y::{AxNode, AxTree};
+    #[cfg(feature = "cdp")]
+    pub use crate::agent::{
+        AgentBrowser, AgentElement, AgentPage, FindOp, Observation, SemanticTarget,
+    };
     pub use crate::codegen::{RecordedAction, RecordedScript};
     pub use crate::error::{Error, Result};
     pub use crate::fingerprint::{
@@ -115,10 +122,9 @@ pub mod prelude {
     };
     pub use crate::human::{HumanClickOpts, Humanize, ImageView, fetch_image};
     pub use crate::keys::{KeyInput, Keys};
-    pub use crate::locator::{Query, parse as parse_locator};
+    pub use crate::locator::{Locator, Query, parse as parse_locator};
     pub use crate::net::{
-        DataPacket, ListenFilter, NetRequest, NetResponse, RequestData, ResponseData,
-        ResumeOptions,
+        DataPacket, ListenFilter, NetRequest, NetResponse, RequestData, ResponseData, ResumeOptions,
     };
     pub use crate::scrape::{
         TableOptions, print_table, print_table_with_options, records_to_csv, records_to_json,
@@ -156,8 +162,9 @@ pub mod prelude {
         ChromiumRecorder as Recorder, ChromiumScreencast as Screencast, ChromiumScroll as Scroll,
         ChromiumSetTab as SetTab, ChromiumShadowRoot as ShadowRoot, ChromiumTab as Tab,
         ChromiumWait as Wait, ChromiumWindow as Window, ChromiumWsListener as WsListener,
-        ContextSpec, NetworkHandle, NetworkRoute, PoolLease, ProfileLease, ProfileManager,
-        ProfileManifest,
+        ContextLease, ContextSpec, NetworkHandle, NetworkRoute, PageCapture, PoolLease, ProcStat,
+        ProfileLease, ProfileManager, ProfileManifest, RecycleReport, TabLease, TaskScheduler,
+        WaitDownload, WaitElement, WaitNetwork, WaitPopup, WaitText, WorkerResource,
     };
     #[cfg(all(feature = "cdp", not(feature = "camoufox")))]
     pub use crate::cdp::{

@@ -64,16 +64,20 @@ mod screencast;
 mod scripts;
 mod shadow;
 // 滑块求解:cdp `ChromiumTab` 的后端适配(只含 impl,类型在后端无关的 `crate::slider`)。
+mod capture;
+mod schedule;
 #[cfg(feature = "slider")]
 mod slider;
 mod stealth;
 mod storage;
 mod tab;
 mod types;
+mod wait_flow;
 mod websocket;
 
 pub use actions::ChromiumActions;
 pub use browser::ChromiumBrowser;
+pub use capture::PageCapture;
 pub use console::{ChromiumConsole, ConsoleData, ConsoleFilter};
 pub use context::{ChromiumBrowserContext, ContextSpec};
 pub use debugger::{CallFrame, ChromiumDebugger, PausedStack};
@@ -96,9 +100,13 @@ pub use network::{NetworkHandle, NetworkRoute};
 pub use oopif::ChildTarget;
 pub use options::{ChromiumContextOverride, ChromiumOptions};
 pub use page::ChromiumPage;
-pub use pool::{ChromiumPool, ChromiumPoolOptions, PoolLease};
+pub use pool::{
+    ChromiumPool, ChromiumPoolOptions, ContextLease, PoolLease, ProcStat, RecycleReport, TabLease,
+    WorkerResource, proc_stat,
+};
 pub use profile::{ManagedProfile, ProfileLease, ProfileManager, ProfileManifest};
 pub use recorder::{ChromiumRecorder, RECORDER_JS};
+pub use schedule::TaskScheduler;
 pub use screencast::ChromiumScreencast;
 pub use scripts::{ChromiumScripts, ScriptInfo, ScriptMatch, beautify_js};
 pub use shadow::ChromiumShadowRoot;
@@ -108,4 +116,5 @@ pub use types::{
     Cookie, CookieParam, DialogInfo, DownloadInfo, GetOptions, ImageFormat, LoadMode, PageRect,
     ShotOpts,
 };
+pub use wait_flow::{WaitDownload, WaitElement, WaitNetwork, WaitPopup, WaitText};
 pub use websocket::{ChromiumWsListener, WsDirection, WsFilter, WsMessage};

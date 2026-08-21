@@ -36,4 +36,24 @@ impl ChromiumTab {
         let tree = self.ax_tree().await?;
         Ok(tree.find_by_role(role).into_iter().cloned().collect())
     }
+
+    /// interesting-only 交互大纲 + ref,给 Agent / MCP。不要拿整页 HTML 喂模型。
+    pub async fn ai_snapshot(
+        &self,
+        budget_ms: Option<u64>,
+        max_items: Option<usize>,
+        max_text_chars: Option<usize>,
+    ) -> Result<crate::ai_snapshot::AiSnapshot> {
+        use crate::ai_snapshot::{
+            AiSnapshot, DEFAULT_BUDGET_MS, DEFAULT_MAX_ITEMS, DEFAULT_MAX_TEXT_CHARS,
+            ai_snapshot_js,
+        };
+        let js = ai_snapshot_js(
+            budget_ms.unwrap_or(DEFAULT_BUDGET_MS),
+            max_items.unwrap_or(DEFAULT_MAX_ITEMS),
+            max_text_chars.unwrap_or(DEFAULT_MAX_TEXT_CHARS),
+        );
+        let v = self.core.eval_value(&js).await?;
+        AiSnapshot::from_value(&v).ok_or_else(|| crate::Error::msg("ai snapshot 解析失败"))
+    }
 }

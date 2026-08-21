@@ -16,13 +16,7 @@ fn converter() -> &'static HtmlToMarkdown {
     CONV.get_or_init(|| {
         HtmlToMarkdown::builder()
             .skip_tags(vec![
-                "script",
-                "style",
-                "noscript",
-                "svg",
-                "canvas",
-                "iframe",
-                "template",
+                "script", "style", "noscript", "svg", "canvas", "iframe", "template",
             ])
             .build()
     })
@@ -93,20 +87,18 @@ mod tests {
 
     #[test]
     fn converts_heading_and_link() {
-        let md = html_to_markdown(
-            "<h1>Hello</h1><p>Go <a href=\"https://example.com\">there</a>.</p>",
-        )
-        .unwrap();
+        let md =
+            html_to_markdown("<h1>Hello</h1><p>Go <a href=\"https://example.com\">there</a>.</p>")
+                .unwrap();
         assert!(md.contains("# Hello"), "{md}");
         assert!(md.contains("[there](https://example.com)"), "{md}");
     }
 
     #[test]
     fn skips_script_and_style() {
-        let md = html_to_markdown(
-            "<p>ok</p><script>alert(1)</script><style>body{}</style><p>end</p>",
-        )
-        .unwrap();
+        let md =
+            html_to_markdown("<p>ok</p><script>alert(1)</script><style>body{}</style><p>end</p>")
+                .unwrap();
         assert!(!md.contains("alert"));
         assert!(!md.contains("body{}"));
         assert!(md.contains("ok"));

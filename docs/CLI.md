@@ -41,52 +41,47 @@ drs --ensure-serve --ensure-headless --json open https://example.com
 
 连接信息写入用户缓存目录下的 `drission/cli/drs-server.json`,包含 `host`、`port`、`token`、`pid` 和 `backend`。其它命令会读取该文件并带 token 调用本地 daemon。
 
-常用命令:
+产品命令分组（旧扁平命令仍可用：`open`=`tab open`）。AI 怎么选命令见 [`产品级CLI.md`](产品级CLI.md)。
 
 ```bash
-drs --json status
-drs --json open https://example.com
+drs --json browser list
+drs --json tab list
+drs --json tab open https://example.com
+drs --json snapshot
+drs --json inspect
 drs --json extract https://example.com --save-out ./page.json
 drs --json extract https://example.com --pass-cf --wait-selector "h1" --timeout-ms 5000
 drs --json title
 drs --json url
-drs --json tabs
-drs --json use 1
 drs ax --outline
-drs --json ax --json
-drs --json snapshot
 drs --json markdown
-drs html
-drs text h1
-drs eval "document.title"
 drs click "text:登录"
 drs type "#kw" "drission"
 drs press Enter --selector "#kw"
 drs wait "#result" --timeout-ms 5000
 drs screenshot --out /tmp/page.png --full
-drs listen start /api/ --xhr-only
+drs --json pdf --out ./page.pdf
+drs listen start /api/ --xhr-only --method POST
+drs --json network inspect --limit 20
 drs --json listen wait --count 3 --timeout-ms 5000
 drs listen stop
+drs --json network block /tracker
+drs --json console start --level error
+drs --json download start --dir ./data/downloads
+drs --json record start
+drs --json record stop --out ./flow.rs
+drs --json replay ./session.har --fallback
 drs pass-cf --timeout-ms 30000
 drs --json identity
-drs --json identity --pool
-drs --json identity --pool --snapshots-out ./snapshots.json
-drs --json identity --pool --snapshots-out ./snapshots.ndjson --append-snapshots
-drs --json identity --pool --gate-preset balanced
-drs --json identity --pool --min-score 80 --max-linkability 25 --fail-on-risky-pairs
-drs --json identity-pool ./snapshots.json --max-linkability 25
-drs --json identity-pool ./candidates.json --against ./baseline.ndjson --gate-preset strict
-drs --json identity-pool ./candidates.json --policy ./identity-policy.json --against ./baseline.ndjson
-drs --json identity-pool ./candidates.json --against ./baseline.ndjson --accept-out ./accepted.json --quarantine-out ./quarantine.json --baseline-out ./next-baseline.json --ledger-out ./ledger.json
-drs --json identity-pool ./candidates.json --actions-out ./pool-actions.ndjson --append-actions
-drs --json identity-drift ./baseline.json ./current.json --match-by label --max-drift-score 20 --fail-on-high-risk-drift --actions-out ./drift-actions.ndjson --append-actions
-drs --json identity-lifecycle ./baseline.json ./current.json --policy ./identity-policy.json --actions-out ./lifecycle-actions.ndjson --append-actions
-drs --json identity-apply ./lifecycle-actions.ndjson --profile-root ./profiles --journal-out ./apply.ndjson --append-journal
 drs close
 drs stop
 ```
 
-0.6 起多了 Context / 网络门面 / 磁盘 profile（CDP）：
+`inspect` 是调试包：轻量 snapshot + 网络 peek + console peek。`console start` 会开 `Runtime.enable`，过盾页不要开。`pdf` 需要无头 Chrome。
+
+仍可用的旧写法：`drs open` / `tabs` / `use` / `html` / `text` / `eval`。identity 池治理命令见下文与 [`SKILL.md`](SKILL.md)。
+
+0.6 起 Context / 网络门面 / 磁盘 profile（CDP）：
 
 ```bash
 drs --json context list
@@ -469,12 +464,12 @@ drs mcp --headless --standalone
 
 ### 工具面分组(`DRS_MCP_TOOLS` / `--tools`)
 
-默认 **`core`**,只暴露浏览主循环(~11 个工具),避免 Agent 被 `identity_assets_*` 噪声干扰:
+默认 **`core`**,只暴露浏览主循环 + 网络/控制台/下载,避免 Agent 被 `identity_assets_*` 噪声干扰:
 
 | 取值 | 暴露 |
 |---|---|
-| `core`(默认) | `browser_open` / `tabs` / `use_tab` / `close` / `snapshot` / `extract` / `click` / `type` / `press` / `wait` / `screenshot` |
-| `browser` | `core` + `ax`/`html`/`markdown`/`text`/`eval`/登录态/`ocr`/滑块/`network_*`/`browser_context_*`/`profile_*`/`pass_cf`/`browser_identity*` |
+| `core`(默认) | 浏览主循环 + **`browser_network` / `browser_console` / `browser_download`** |
+| `browser` | `core` + `ax`/`html`/`markdown`/`pdf`/`inspect`/`record`/`ocr`/滑块/旧 `network_*`/`browser_context_*`/`profile_*`/`pass_cf`/`browser_identity*` |
 | `identity` | `identity_assets_*` + `browser_identity*` + `profile_*` |
 | `all` | 全量 |
 
@@ -508,6 +503,10 @@ Cursor 配置 key 为 **`drs`**;Agent 侧 server id 通常为 **`user-drs`**。M
 - `browser_press`
 - `browser_wait`
 - `browser_screenshot`
+- `browser_network`（`action=inspect|listen|wait|block|mock|rewrite|record|replay|stop`）
+- `browser_console`（`action=start|wait|list|stop`）
+- `browser_download`（`action=start|list|wait|stop`）
+- `browser_pdf` / `browser_inspect` / `browser_record`（`browser` toolset）
 - `network_listen_start`
 - `network_listen_wait`
 - `network_listen_stop`
@@ -526,6 +525,32 @@ Cursor 配置 key 为 **`drs`**;Agent 侧 server id 通常为 **`user-drs`**。M
 - `identity_assets_reconcile_runtime`
 - `identity_assets_health`
 - `identity_assets_sweep`
+
+### 语义工具配方(默认 core)
+
+抓 XHR **不必**改 `DRS_MCP_TOOLS`。`CallMcpTool` 的 server 是 `user-drs`。
+
+```
+browser_network { "action": "listen", "keywords": ["/api/"], "xhr_only": true, "methods": ["POST"] }
+browser_network { "action": "wait", "count": 3, "timeout_ms": 5000 }
+browser_network { "action": "inspect", "limit": 20 }
+browser_network { "action": "block", "keywords": ["/tracker"] }
+browser_network { "action": "mock", "keywords": ["/api/user"], "status": 200, "body": "{\"ok\":true}" }
+browser_network { "action": "record", "out": "data/browser/session.har" }
+browser_network { "action": "replay", "har": "data/browser/session.har", "fallback": true }
+browser_network { "action": "stop" }
+
+browser_console { "action": "start", "level": "error" }
+browser_console { "action": "wait", "timeout_ms": 5000 }
+browser_console { "action": "list" }
+browser_console { "action": "stop" }
+
+browser_download { "action": "start", "dir": "data/browser/downloads" }
+browser_download { "action": "wait", "timeout_ms": 15000, "count": 1 }
+browser_download { "action": "list" }
+```
+
+`browser` toolset 另有 `browser_inspect` / `browser_pdf` / `browser_record`。对照见 [`产品级CLI.md`](产品级CLI.md)。
 
 `browser_snapshot` 是 AI 读当前页的首选工具:返回 `title` / `url` / `snapshot`(interesting-only 大纲,可交互节点带 `[ref=eN]`) / `refs` / **`markdown`(htmd 从 body HTML 转换)** / 截断正文。随后可用 `browser_click` / `browser_type` 传 `ref: "e1"`(或 `selector: "ref:e1"`)操作;多步交互可传 `return_snapshot: true`,成功后在结果里附带轻量 `page` 快照(跳过 markdown)。完整无障碍树仍用 `browser_ax`;整页 HTML 用 `browser_html`(默认截断 20 万字符,防 MCP 卡退)。只要 Markdown 用 `browser_markdown` / `drs markdown`。
 
@@ -592,4 +617,4 @@ drs --json ocr clickword ./captcha.png 税实企
 
 ## 设计边界
 
-MCP 聚焦 AI 可调用的浏览器运行时和账号/Profile 治理控制面,不直接承诺完整批量爬虫 UI、HAR 回放、recorder、dump_env、代理池 UI、滑块全流程命令。这些能力仍可通过 Rust API 或 CLI 使用,后续可逐步接入 MCP。
+MCP 给 AI 的是语义化浏览器工具,不暴露 CDP。HAR 回放 / codegen / PDF / console / download 已从库接到 `drs` 和 MCP(`browser_network` / `browser_record` / `browser_pdf` / `browser_console` / `browser_download`)。dump_env、代理池 UI、滑块全流程仍走 Rust API 或现有 CLI。

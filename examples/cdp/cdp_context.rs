@@ -76,14 +76,24 @@ async fn main() -> drission::Result<()> {
     let tb = b.new_tab(None).await?;
     ta.get(&format!("{base}/")).await?;
     tb.get(&format!("{base}/")).await?;
-    check!(ta.ele_text("#who").await?.as_deref() == Some("u1"), "context A cookie=u1");
-    check!(tb.ele_text("#who").await?.as_deref() == Some("u2"), "context B cookie=u2");
+    check!(
+        ta.ele_text("#who").await?.as_deref() == Some("u1"),
+        "context A cookie=u1"
+    );
+    check!(
+        tb.ele_text("#who").await?.as_deref() == Some("u2"),
+        "context B cookie=u2"
+    );
 
     let route = ta
         .network()
         .filter("/api/me")
         .method("GET")
-        .mock(200, vec![("content-type".into(), "application/json".into())], r#"{"hello":"mocked"}"#)
+        .mock(
+            200,
+            vec![("content-type".into(), "application/json".into())],
+            r#"{"hello":"mocked"}"#,
+        )
         .await?;
     ta.get(&format!("{base}/")).await?;
     tokio::time::sleep(Duration::from_millis(400)).await;
@@ -98,7 +108,10 @@ async fn main() -> drission::Result<()> {
     let profiles = ProfileManager::open(&root)?;
     let lease = profiles.acquire("user_001").await?;
     check!(lease.id() == "user_001", "profile acquire id");
-    check!(profiles.list()?.contains(&"user_001".into()), "profile list");
+    check!(
+        profiles.list()?.contains(&"user_001".into()),
+        "profile list"
+    );
     drop(lease);
     let _ = std::fs::remove_dir_all(&root);
 

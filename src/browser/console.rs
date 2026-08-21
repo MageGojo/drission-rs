@@ -192,6 +192,19 @@ impl Console {
         }
     }
 
+    /// 偷看当前缓冲(不消费)。给 `drs inspect` / `drs console list` 用。
+    pub async fn peek(&self) -> Vec<ConsoleData> {
+        self.tab
+            .core
+            .console
+            .buf
+            .lock()
+            .await
+            .iter()
+            .cloned()
+            .collect()
+    }
+
     /// 取走当前已缓冲的所有消息并清空(对应 DP `console.messages`)。
     pub async fn messages(&self) -> Vec<ConsoleData> {
         self.tab.core.console.buf.lock().await.drain(..).collect()

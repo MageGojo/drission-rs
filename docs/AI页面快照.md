@@ -21,6 +21,8 @@
 
 单独只要 Markdown：`drs markdown` / MCP `browser_markdown`。`extract` 默认也带 `markdown`（`--no-markdown` 可关）。
 
+整页调试包用 `drs inspect` / MCP `browser_inspect`（后者要 `DRS_MCP_TOOLS=browser`）：轻量 snapshot + `network inspect` peek + console peek。抓 XHR 用默认 core 的 `browser_network`，不必先改 toolset。怎么选命令见 [`产品级CLI.md`](产品级CLI.md)。
+
 ### 防卡退
 
 | 层 | 措施 |

@@ -31,6 +31,18 @@ pub fn screenshots_dir() -> Result<PathBuf> {
     Ok(cli_dir()?.join("screenshots"))
 }
 
+pub fn downloads_dir() -> Result<PathBuf> {
+    Ok(cli_dir()?.join("downloads"))
+}
+
+pub fn pdf_dir() -> Result<PathBuf> {
+    Ok(cli_dir()?.join("pdf"))
+}
+
+pub fn codegen_dir() -> Result<PathBuf> {
+    Ok(cli_dir()?.join("codegen"))
+}
+
 pub async fn ensure_cli_dir() -> Result<PathBuf> {
     let dir = cli_dir()?;
     tokio::fs::create_dir_all(&dir)

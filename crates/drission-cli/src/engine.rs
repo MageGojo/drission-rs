@@ -5,8 +5,8 @@ use anyhow::{Result, anyhow};
 use serde_json::{Value, json};
 
 use crate::backend::{
-    BackendBrowser, BackendRecorder, BackendRoute, BackendTab, ContextUseSpec,
-    ensure_backend_available,
+    BackendBrowser, BackendCodegen, BackendHarPlayer, BackendRecorder, BackendRoute, BackendTab,
+    ContextUseSpec, ensure_backend_available,
 };
 use crate::protocol::{BackendKind, EngineCommand, IdentityGate, TabSummary};
 
@@ -33,6 +33,8 @@ struct TabSlot {
     context: Option<String>,
     routes: Vec<BackendRoute>,
     recorder: Option<(PathBuf, BackendRecorder)>,
+    codegen: Option<BackendCodegen>,
+    har_player: Option<BackendHarPlayer>,
 }
 
 pub struct EngineResult {
@@ -124,7 +126,10 @@ impl BrowserState {
                 max_items,
                 max_text_chars,
                 max_markdown_chars,
-            } => self.snapshot(budget_ms, max_items, max_text_chars, max_markdown_chars).await?,
+            } => {
+                self.snapshot(budget_ms, max_items, max_text_chars, max_markdown_chars)
+                    .await?
+            }
             EngineCommand::Markdown { max_chars } => self.page_markdown(max_chars).await?,
             EngineCommand::Html { max_chars } => {
                 let html_fut = self.active_tab()?.html();
@@ -301,7 +306,87 @@ impl BrowserState {
                 self.active_slot_mut()?.recorder = Some((path.clone(), recorder));
                 json!({ "recording": true, "out": path })
             }
+            EngineCommand::NetworkInspect { limit } => {
+                self.active_tab()?.listen_inspect(limit).await?
+            }
+            EngineCommand::NetworkReplay {
+                path,
+                ignore_query,
+                fallback,
+            } => {
+                if let Some(player) = self.active_slot_mut()?.har_player.take() {
+                    player.stop().await?;
+                }
+                let player = self
+                    .active_tab()?
+                    .network_replay(&path, ignore_query, fallback)
+                    .await?;
+                self.active_slot_mut()?.har_player = Some(player);
+                json!({
+                    "replaying": true,
+                    "har": path,
+                    "ignoreQuery": ignore_query,
+                    "fallback": fallback,
+                })
+            }
             EngineCommand::NetworkStop => self.stop_network().await?,
+            EngineCommand::Pdf {
+                out,
+                landscape,
+                print_background,
+            } => {
+                self.active_tab()?
+                    .save_pdf(out, landscape, print_background)
+                    .await?
+            }
+            EngineCommand::Inspect {
+                include_network,
+                include_console,
+                max_packets,
+            } => {
+                self.inspect_page(include_network, include_console, max_packets)
+                    .await?
+            }
+            EngineCommand::RecordStart => {
+                if let Some(old) = self.active_slot_mut()?.codegen.take() {
+                    let _ = old.stop(None).await;
+                }
+                let rec = self.active_tab()?.codegen_start().await?;
+                let status = rec.status().await?;
+                self.active_slot_mut()?.codegen = Some(rec);
+                status
+            }
+            EngineCommand::RecordStop { out } => {
+                let rec =
+                    self.active_slot_mut()?.codegen.take().ok_or_else(|| {
+                        anyhow!("没有正在进行的 codegen 录制;先 `drs record start`")
+                    })?;
+                rec.stop(out.map(PathBuf::from)).await?
+            }
+            EngineCommand::RecordStatus => match &self.active_slot_mut()?.codegen {
+                Some(rec) => rec.status().await?,
+                None => json!({ "recording": false, "actions": 0 }),
+            },
+            EngineCommand::ConsoleStart { level, text } => {
+                self.active_tab()?.console_start(level, text).await?
+            }
+            EngineCommand::ConsoleWait { timeout_ms } => {
+                self.active_tab()?
+                    .console_wait(timeout_ms.map(Duration::from_millis))
+                    .await?
+            }
+            EngineCommand::ConsoleList => self.active_tab()?.console_list().await?,
+            EngineCommand::ConsoleStop => self.active_tab()?.console_stop().await?,
+            EngineCommand::DownloadStart { dir } => {
+                self.active_tab()?.download_start(dir.as_deref()).await?
+            }
+            EngineCommand::DownloadList => self.active_tab()?.download_list().await?,
+            EngineCommand::DownloadWait { timeout_ms, count } => {
+                self.active_tab()?
+                    .download_wait(timeout_ms.map(Duration::from_millis), count)
+                    .await?
+            }
+            EngineCommand::DownloadStop => self.active_tab()?.download_stop().await?,
             EngineCommand::ListenWait { count, timeout_ms } => {
                 self.active_tab()?
                     .listen_wait(count, timeout_ms.map(Duration::from_millis))
@@ -488,28 +573,26 @@ impl BrowserState {
             // Accessibility outline can hang on automation-hostile pages; soft-fail
             // so extract still returns title/url/text for agents.
             let ax_timeout = Duration::from_millis(timeout_ms.unwrap_or(8_000).min(15_000));
-            let (outline, outline_error) = match tokio::time::timeout(
-                ax_timeout,
-                tab.ax(crate::protocol::AxFormat::Outline),
-            )
-            .await
-            {
-                Ok(Ok(v)) => (
-                    v.get("outline")
-                        .and_then(Value::as_str)
-                        .unwrap_or_default()
-                        .to_string(),
-                    None,
-                ),
-                Ok(Err(e)) => (String::new(), Some(e.to_string())),
-                Err(_) => (
-                    String::new(),
-                    Some(format!(
-                        "ax outline timed out after {}ms",
-                        ax_timeout.as_millis()
-                    )),
-                ),
-            };
+            let (outline, outline_error) =
+                match tokio::time::timeout(ax_timeout, tab.ax(crate::protocol::AxFormat::Outline))
+                    .await
+                {
+                    Ok(Ok(v)) => (
+                        v.get("outline")
+                            .and_then(Value::as_str)
+                            .unwrap_or_default()
+                            .to_string(),
+                        None,
+                    ),
+                    Ok(Err(e)) => (String::new(), Some(e.to_string())),
+                    Err(_) => (
+                        String::new(),
+                        Some(format!(
+                            "ax outline timed out after {}ms",
+                            ax_timeout.as_millis()
+                        )),
+                    ),
+                };
 
             let mut data = json!({
                 "tabId": tab_id,
@@ -564,11 +647,17 @@ impl BrowserState {
     }
 
     async fn status(&self) -> Result<Value> {
+        let contexts = self
+            .browser
+            .list_contexts()
+            .unwrap_or_else(|_| json!({ "contexts": [] }));
         Ok(json!({
             "pid": std::process::id(),
             "backend": self.backend,
             "activeTabId": self.active,
+            "activeContext": self.active_context,
             "tabs": self.tab_summaries().await?,
+            "contexts": contexts.get("contexts").cloned().unwrap_or_else(|| json!([])),
         }))
     }
 
@@ -650,6 +739,8 @@ impl BrowserState {
             context,
             routes: Vec::new(),
             recorder: None,
+            codegen: None,
+            har_player: None,
         });
         self.active = Some(id);
         id
@@ -683,10 +774,34 @@ impl BrowserState {
         }
     }
 
+    async fn inspect_page(
+        &mut self,
+        include_network: bool,
+        include_console: bool,
+        max_packets: Option<usize>,
+    ) -> Result<Value> {
+        let tab_id = self.active.ok_or_else(|| anyhow!("no active tab"))?;
+        let mut data = self
+            .snapshot(Some(1500), Some(80), Some(2000), Some(0))
+            .await?;
+        if include_network {
+            data["network"] = self.active_tab()?.listen_inspect(max_packets).await?;
+        }
+        if include_console {
+            data["console"] = self.active_tab()?.console_list().await?;
+        }
+        if let Some(obj) = data.as_object_mut() {
+            obj.insert("tabId".into(), json!(tab_id));
+            obj.insert("kind".into(), json!("inspect"));
+        }
+        Ok(data)
+    }
+
     async fn stop_network(&mut self) -> Result<Value> {
         let slot = self.active_slot_mut()?;
         let routes = std::mem::take(&mut slot.routes);
         let recorder = slot.recorder.take();
+        let player = slot.har_player.take();
         for route in routes {
             route.stop().await?;
         }
@@ -694,10 +809,14 @@ impl BrowserState {
         if let Some((path, recorder)) = recorder {
             saved = Some(recorder.save(&path).await?);
         }
+        if let Some(player) = player {
+            player.stop().await?;
+        }
         self.active_tab()?.listen_stop().await?;
         Ok(json!({
             "listening": false,
             "har": saved,
+            "replaying": false,
         }))
     }
 

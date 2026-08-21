@@ -54,6 +54,16 @@ pub struct ChromiumPoolOptions {
     pub retry: RetryPolicy,
     /// 任务结束后是否关闭该标签(默认 `true`,防泄漏 + 强隔离)。
     pub close_tab_after_task: bool,
+    /// Chrome 进程 RSS 上限(MB)。超过则标 worker 不健康,下次重建。`None` = 不限。
+    pub memory_limit_mb: Option<u64>,
+    /// Chrome 进程 CPU 上限(百分比,`ps` 的 `%cpu`)。超过同样标不健康。`None` = 不限。
+    pub cpu_limit_pct: Option<f32>,
+    /// 空闲 Tab 回收间隔。`ZERO` = 不按时间回收。
+    pub idle_recycle: Duration,
+    /// 每个 Browser 上命名 Context 建议上限(回收时作线索,同名仍复用)。
+    pub max_contexts_per_browser: usize,
+    /// Tab 池空闲条数上限。
+    pub max_tabs_per_context: usize,
 }
 
 impl Default for ChromiumPoolOptions {
@@ -69,6 +79,11 @@ impl Default for ChromiumPoolOptions {
             rotate: RotateStrategy::default(),
             retry: RetryPolicy::default(),
             close_tab_after_task: true,
+            memory_limit_mb: None,
+            cpu_limit_pct: None,
+            idle_recycle: Duration::from_secs(300),
+            max_contexts_per_browser: 8,
+            max_tabs_per_context: 4,
         }
     }
 }
@@ -127,6 +142,26 @@ impl ChromiumPoolOptions {
         self.close_tab_after_task = yes;
         self
     }
+    pub fn memory_limit_mb(mut self, mb: u64) -> Self {
+        self.memory_limit_mb = Some(mb);
+        self
+    }
+    pub fn cpu_limit_pct(mut self, pct: f32) -> Self {
+        self.cpu_limit_pct = Some(pct);
+        self
+    }
+    pub fn idle_recycle(mut self, d: Duration) -> Self {
+        self.idle_recycle = d;
+        self
+    }
+    pub fn max_contexts_per_browser(mut self, n: usize) -> Self {
+        self.max_contexts_per_browser = n.max(1);
+        self
+    }
+    pub fn max_tabs_per_context(mut self, n: usize) -> Self {
+        self.max_tabs_per_context = n.max(1);
+        self
+    }
 }
 
 /// 池内一个 Chrome worker:持浏览器进程 + 健康标志,支持惰性重建(自愈)。
@@ -169,6 +204,12 @@ pub struct ChromiumPool {
     ua_rotator: Rotator,
     retry: RetryPolicy,
     close_tab_after_task: bool,
+    memory_limit_mb: Option<u64>,
+    cpu_limit_pct: Option<f32>,
+    idle_recycle: Duration,
+    max_contexts_per_browser: usize,
+    max_tabs_per_context: usize,
+    idle_tabs: Arc<Mutex<Vec<(std::time::Instant, ChromiumTab)>>>,
 }
 
 impl ChromiumPool {
@@ -185,6 +226,11 @@ impl ChromiumPool {
             rotate,
             retry,
             close_tab_after_task,
+            memory_limit_mb,
+            cpu_limit_pct,
+            idle_recycle,
+            max_contexts_per_browser,
+            max_tabs_per_context,
         } = opts;
 
         let size = size.max(1);
@@ -224,6 +270,12 @@ impl ChromiumPool {
             ua_rotator: Rotator::new(rotate),
             retry,
             close_tab_after_task,
+            memory_limit_mb,
+            cpu_limit_pct,
+            idle_recycle,
+            max_contexts_per_browser,
+            max_tabs_per_context,
+            idle_tabs: Arc::new(Mutex::new(Vec::new())),
         })
     }
 
@@ -419,6 +471,103 @@ impl ChromiumPool {
         out
     }
 
+    /// 代理池(若启动时配了 [`ProxyPool`])。
+    pub fn proxies(&self) -> Option<&ProxyPool> {
+        self.proxy_pool.as_ref()
+    }
+
+    /// 取/建命名 Context(Browser → Context)。
+    pub async fn acquire_context(&self, name: &str) -> Result<ContextLease> {
+        self.recycle().await?;
+        let lease = self.acquire().await?;
+        let ctx = lease.context(name).await?;
+        let _ = self.max_contexts_per_browser;
+        Ok(ContextLease { lease, ctx })
+    }
+
+    /// 从 Tab 池取一个标签;没有空闲的就新开。Drop 时回到空闲池(满则关掉)。
+    pub async fn acquire_tab(&self) -> Result<TabLease> {
+        self.recycle().await?;
+        if let Some((_, tab)) = self.idle_tabs.lock().await.pop() {
+            return Ok(TabLease::new(
+                tab,
+                None,
+                self.idle_tabs.clone(),
+                self.max_tabs_per_context,
+            ));
+        }
+        let lease = self.acquire().await?;
+        let tab = lease.new_tab().await?;
+        Ok(TabLease::new(
+            tab,
+            Some(lease),
+            self.idle_tabs.clone(),
+            self.max_tabs_per_context,
+        ))
+    }
+
+    /// 空闲 Tab 回收 + 超内存/CPU 的 worker 标不健康。
+    pub async fn recycle(&self) -> Result<RecycleReport> {
+        let mut report = RecycleReport::default();
+        let now = std::time::Instant::now();
+        let mut keep = Vec::new();
+        for (t, tab) in self.idle_tabs.lock().await.drain(..) {
+            let stale = !self.idle_recycle.is_zero() && now.duration_since(t) >= self.idle_recycle;
+            if stale {
+                let _ = tab.close().await;
+                report.tabs_closed += 1;
+            } else {
+                keep.push((t, tab));
+            }
+        }
+        *self.idle_tabs.lock().await = keep;
+
+        for w in &self.workers {
+            let browser = w.browser.lock().await.clone();
+            let Some(pid) = browser.pid() else {
+                continue;
+            };
+            let Some(st) = proc_stat(pid) else {
+                continue;
+            };
+            let over_mem = self
+                .memory_limit_mb
+                .map(|m| st.rss_bytes > m.saturating_mul(1024 * 1024))
+                .unwrap_or(false);
+            let over_cpu = self.cpu_limit_pct.map(|c| st.cpu_pct > c).unwrap_or(false);
+            if over_mem || over_cpu {
+                w.mark_unhealthy();
+                report.workers_flagged += 1;
+                if Arc::strong_count(&browser) == 1 {
+                    let _ = browser.quit().await;
+                    report.workers_restarted += 1;
+                }
+            }
+        }
+        Ok(report)
+    }
+
+    /// 各 worker 当前 RSS / CPU(读不到的跳过)。
+    pub async fn resource_stats(&self) -> Vec<WorkerResource> {
+        let mut out = Vec::new();
+        for (i, w) in self.workers.iter().enumerate() {
+            let browser = w.browser.lock().await.clone();
+            let Some(pid) = browser.pid() else {
+                continue;
+            };
+            if let Some(st) = proc_stat(pid) {
+                out.push(WorkerResource {
+                    worker: i,
+                    pid,
+                    rss_bytes: st.rss_bytes,
+                    cpu_pct: st.cpu_pct,
+                    healthy: w.healthy.load(Ordering::Acquire),
+                });
+            }
+        }
+        out
+    }
+
     /// 领取一个并发槽 + 一个 worker 浏览器。Drop 释放槽。
     ///
     /// ```ignore
@@ -492,5 +641,165 @@ impl std::ops::Deref for PoolLease {
     type Target = ChromiumBrowser;
     fn deref(&self) -> &ChromiumBrowser {
         &self.browser
+    }
+}
+
+/// `acquire_context` 租约:持并发槽 + 命名 Context。
+pub struct ContextLease {
+    lease: PoolLease,
+    ctx: ChromiumBrowserContext,
+}
+
+impl ContextLease {
+    pub fn browser(&self) -> &ChromiumBrowser {
+        self.lease.browser()
+    }
+    pub fn context(&self) -> &ChromiumBrowserContext {
+        &self.ctx
+    }
+    pub async fn new_tab(&self, url: Option<&str>) -> Result<ChromiumTab> {
+        self.ctx.new_tab(url).await
+    }
+}
+
+impl std::ops::Deref for ContextLease {
+    type Target = ChromiumBrowserContext;
+    fn deref(&self) -> &ChromiumBrowserContext {
+        &self.ctx
+    }
+}
+
+/// `acquire_tab` 租约:Drop 时把 Tab 放回空闲池。
+pub struct TabLease {
+    tab: ChromiumTab,
+    _lease: Option<PoolLease>,
+    idle: Arc<Mutex<Vec<(std::time::Instant, ChromiumTab)>>>,
+    max_idle: usize,
+    return_idle: bool,
+}
+
+impl TabLease {
+    fn new(
+        tab: ChromiumTab,
+        lease: Option<PoolLease>,
+        idle: Arc<Mutex<Vec<(std::time::Instant, ChromiumTab)>>>,
+        max_idle: usize,
+    ) -> Self {
+        Self {
+            tab,
+            _lease: lease,
+            idle,
+            max_idle,
+            return_idle: true,
+        }
+    }
+
+    pub fn tab(&self) -> &ChromiumTab {
+        &self.tab
+    }
+
+    /// 取出 Tab,不再回池。
+    pub fn into_inner(mut self) -> ChromiumTab {
+        self.return_idle = false;
+        self.tab.clone()
+    }
+}
+
+impl std::ops::Deref for TabLease {
+    type Target = ChromiumTab;
+    fn deref(&self) -> &ChromiumTab {
+        &self.tab
+    }
+}
+
+impl Drop for TabLease {
+    fn drop(&mut self) {
+        if !self.return_idle {
+            return;
+        }
+        let tab = self.tab.clone();
+        let idle = self.idle.clone();
+        let max = self.max_idle;
+        if let Ok(rt) = tokio::runtime::Handle::try_current() {
+            rt.spawn(async move {
+                let mut g = idle.lock().await;
+                if g.len() < max {
+                    g.push((std::time::Instant::now(), tab));
+                } else {
+                    drop(g);
+                    let _ = tab.close().await;
+                }
+            });
+        }
+    }
+}
+
+/// [`ChromiumPool::recycle`] 结果。
+#[derive(Debug, Clone, Default)]
+pub struct RecycleReport {
+    pub tabs_closed: usize,
+    pub workers_flagged: usize,
+    pub workers_restarted: usize,
+}
+
+/// 一个 worker 的进程资源。
+#[derive(Debug, Clone)]
+pub struct WorkerResource {
+    pub worker: usize,
+    pub pid: u32,
+    pub rss_bytes: u64,
+    pub cpu_pct: f32,
+    pub healthy: bool,
+}
+
+/// 读 Chrome 进程 RSS / CPU。Unix 走 `ps`;读不到返回 `None`。
+pub fn proc_stat(pid: u32) -> Option<ProcStat> {
+    #[cfg(unix)]
+    {
+        let out = std::process::Command::new("ps")
+            .args(["-o", "rss=,pcpu=", "-p", &pid.to_string()])
+            .output()
+            .ok()?;
+        if !out.status.success() {
+            return None;
+        }
+        let s = String::from_utf8_lossy(&out.stdout);
+        let mut it = s.split_whitespace();
+        let rss_kb: u64 = it.next()?.parse().ok()?;
+        let cpu_pct: f32 = it.next()?.parse().ok()?;
+        Some(ProcStat {
+            rss_bytes: rss_kb.saturating_mul(1024),
+            cpu_pct,
+        })
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = pid;
+        None
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ProcStat {
+    pub rss_bytes: u64,
+    pub cpu_pct: f32,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn proc_stat_self() {
+        let st = proc_stat(std::process::id());
+        #[cfg(unix)]
+        {
+            let st = st.expect("ps 应能读本进程");
+            assert!(st.rss_bytes > 0);
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = st;
+        }
     }
 }

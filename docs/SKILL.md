@@ -11,6 +11,7 @@ description: Rust browser automation skill for the drission crate and drs CLI/MC
 
 - `docs/API映射.md`: 从 DrissionPage 迁移或查完整 API 对照。
 - `docs/CLI.md`: 使用 `drs` CLI / MCP 让 AI 直接操作浏览器。
+- `docs/产品级CLI.md`: **AI 怎么选命令**：产品 CLI + 语义 MCP 配方（`browser_network` / `console` / `download`）。
 - `docs/标配补齐.md`: CDP PDF/MHTML/HAR/expose/media/network/device/storage/wait 补齐。
 - `docs/录制与无障碍.md`: `tab.recorder()` 录制生成 Rust + `ax_tree/ax_snapshot`。
 - `docs/指纹.md`: CDP 每浏览器不同指纹 `CdpFingerprint*`。
@@ -26,17 +27,23 @@ description: Rust browser automation skill for the drission crate and drs CLI/MC
 
 **强制规则**：浏览器观察、页面内容提取、截图、抓包、过盾 — 必须走 `drs` CLI 或 MCP（详见项目 skill `.cursor/skills/drs-browser/SKILL.md`）。不要写 Playwright/Puppeteer/Selenium/WebFetch 替代。
 
-如果任务只是让 AI 观察页面、点选、输入、截图、抓接口、读无障碍树,优先用 `drs` CLI/MCP:
+如果任务只是让 AI 观察页面、点选、输入、截图、抓接口、读无障碍树,优先用 `drs` CLI/MCP。怎么选命令见 [`产品级CLI.md`](产品级CLI.md)。
 
 ```bash
 cargo install drission-cli --bin drs
 drs ensure-serve --headless
+drs --json tab open https://example.com
+drs --json snapshot
 drs --json extract https://example.com --save-out data/browser/page.json
-drs --ensure-serve --ensure-headless --json open https://example.com
-drs --json ax --json
-drs --json listen start /api/ --xhr-only
+drs --json inspect
+drs --json listen start /api/ --xhr-only --method POST
+drs --json network inspect --limit 20
 drs --json listen wait --count 3 --timeout-ms 5000
+drs --json console start --level error
+drs --json download start --dir data/browser/downloads
 drs --json screenshot --out /tmp/page.png --full
+drs --json pdf --out data/browser/page.pdf
+drs --json stop
 drs --json identity --pool
 drs --json identity --pool --snapshots-out ./snapshots.json
 drs --json identity --pool --snapshots-out ./snapshots.ndjson --append-snapshots
@@ -64,7 +71,9 @@ MCP（Cursor 项目已配 `.cursor/mcp.json`, server 名 `drs`）:
 drs mcp --backend cdp --headless
 ```
 
-MCP 默认 attach 到常驻 daemon 的**同一个持久浏览器**(浏览器活在 `drs serve` 进程,固定 profile,MCP 重启不丢标签/登录态,CLI 与 MCP 共享标签),因此适合“AI 下次直接接着查数据、不用重登”。要一次性独立浏览器时用 `drs mcp --standalone`。稳定 MCP 工具名包括 **`browser_snapshot`(读懂当前页首选)**、`browser_extract`、`browser_open`、`browser_tabs`、`browser_ax`、`browser_html`(默认截断)、`browser_title`、`browser_url`、`browser_text`、`browser_eval`、`browser_click`/`browser_type`(可用 snapshot 的 `ref`)、`browser_wait`、`browser_screenshot`、`browser_close`、`network_listen_start`、`network_listen_wait`、`network_listen_stop`、`browser_identity`、`browser_identity_pool`、`browser_pass_cf`,以及账号/Profile 运行态治理工具 `identity_assets_validate`、`identity_assets_status`、`identity_assets_forecast`、`identity_assets_gate`、`identity_assets_select`、`identity_assets_release`、`identity_assets_reconcile_runtime`、`identity_assets_health`、`identity_assets_sweep`。详见 [`AI页面快照.md`](AI页面快照.md)。
+MCP 默认 attach 到常驻 daemon 的**同一个持久浏览器**(浏览器活在 `drs serve` 进程,固定 profile,MCP 重启不丢标签/登录态,CLI 与 MCP 共享标签)。要一次性独立浏览器时用 `drs mcp --standalone`。
+
+默认 `core` 工具:**`browser_snapshot`**(读页首选)、`browser_extract`、`browser_open`、`browser_tabs`、`browser_click`/`type`/`press`/`wait`、`browser_screenshot`、**`browser_network` / `browser_console` / `browser_download`**。抓 XHR 用 `browser_network action=listen|wait|inspect`,不必改 `DRS_MCP_TOOLS`。`browser` toolset 才有 `browser_pdf` / `browser_inspect` / `browser_record`、旧 `network_*`、`browser_pass_cf`。identity 治理另开 `identity`/`all`。配方见 [`产品级CLI.md`](产品级CLI.md),读页细节见 [`AI页面快照.md`](AI页面快照.md)。
 
 只有需要嵌入业务、复杂并发、验证码闭环、协议逆向、补环境/签名、HAR 回放或自定义流程时,再写 Rust。
 

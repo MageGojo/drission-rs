@@ -192,6 +192,59 @@ pub enum Command {
         #[command(subcommand)]
         command: ProfileCommand,
     },
+    /// Browser process / daemon view.
+    Browser {
+        #[command(subcommand)]
+        command: BrowserCommand,
+    },
+    /// Tab commands (`tab list` / `tab open URL` …). Old `open`/`tabs`/`use`/`close` still work.
+    Tab {
+        #[command(subcommand)]
+        command: TabCommand,
+    },
+    /// Record user actions and emit runnable Rust (`tab.recorder()`).
+    Record {
+        #[command(subcommand)]
+        command: RecordCommand,
+    },
+    /// Replay a HAR file on the active tab (call before navigation).
+    Replay {
+        har: PathBuf,
+        /// Ignore `?...` when matching HAR entries.
+        #[arg(long)]
+        ignore_query: bool,
+        /// Fall through to the real network when HAR misses.
+        #[arg(long)]
+        fallback: bool,
+    },
+    /// Print the active page to PDF (headless Chrome / CDP).
+    Pdf {
+        #[arg(long)]
+        out: Option<PathBuf>,
+        #[arg(long)]
+        landscape: bool,
+        #[arg(long, default_value_t = true)]
+        print_background: bool,
+    },
+    /// Combined page debug dump: title/url + snapshot + optional network/console peek.
+    Inspect {
+        #[arg(long)]
+        no_network: bool,
+        #[arg(long)]
+        no_console: bool,
+        #[arg(long)]
+        max_packets: Option<usize>,
+    },
+    /// Console listener (`tab.console()`). Starts `Runtime.enable` on CDP.
+    Console {
+        #[command(subcommand)]
+        command: ConsoleCliCommand,
+    },
+    /// Download tracker (`tab.downloads()`).
+    Download {
+        #[command(subcommand)]
+        command: DownloadCommand,
+    },
     /// Pass Cloudflare challenge in the active tab.
     PassCf {
         #[arg(long)]
@@ -1321,7 +1374,95 @@ pub enum NetworkCommand {
         #[arg(long)]
         out: Option<PathBuf>,
     },
-    /// Stop block/mock/rewrite/record (and the old listener) on the active tab.
+    /// Peek captured packets without consuming the listener buffer.
+    Inspect {
+        #[arg(long)]
+        limit: Option<usize>,
+    },
+    /// Replay a HAR file on the active tab (call before navigation).
+    Replay {
+        har: PathBuf,
+        #[arg(long)]
+        ignore_query: bool,
+        #[arg(long)]
+        fallback: bool,
+    },
+    /// Stop block/mock/rewrite/record/replay (and the old listener) on the active tab.
+    Stop,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum BrowserCommand {
+    /// List daemon / browser process info and tabs.
+    List,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum TabCommand {
+    /// List daemon tabs.
+    List,
+    /// Open a URL in a new tab and make it active.
+    Open {
+        url: String,
+        #[arg(long)]
+        context: Option<String>,
+    },
+    /// Switch active tab by drs tab id.
+    Use { tab_id: u64 },
+    /// Close a tab, defaulting to the active tab.
+    Close { tab_id: Option<u64> },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum RecordCommand {
+    /// Start codegen recording on the active tab (call before navigation when possible).
+    Start,
+    /// Stop recording and write generated Rust.
+    Stop {
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Show whether codegen recording is active.
+    Status,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ConsoleCliCommand {
+    /// Start console listening.
+    Start {
+        #[arg(long)]
+        level: Option<String>,
+        #[arg(long)]
+        text: Option<String>,
+    },
+    /// Wait for one console message.
+    Wait {
+        #[arg(long)]
+        timeout_ms: Option<u64>,
+    },
+    /// Peek buffered console messages without consuming them.
+    List,
+    /// Stop console listening.
+    Stop,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum DownloadCommand {
+    /// Start tracking downloads (sets the download directory).
+    Start {
+        #[arg(long)]
+        dir: Option<PathBuf>,
+    },
+    /// List download missions seen in this tracking session.
+    List,
+    /// Wait for completed downloads.
+    Wait {
+        #[arg(long)]
+        timeout_ms: Option<u64>,
+        #[arg(long, default_value_t = 1)]
+        count: usize,
+    },
+    /// Stop download tracking.
     Stop,
 }
 
@@ -1512,7 +1653,79 @@ impl Command {
                 NetworkCommand::Record { out } => EngineCommand::NetworkRecord {
                     out: out.map(|p| p.display().to_string()),
                 },
+                NetworkCommand::Inspect { limit } => EngineCommand::NetworkInspect { limit },
+                NetworkCommand::Replay {
+                    har,
+                    ignore_query,
+                    fallback,
+                } => EngineCommand::NetworkReplay {
+                    path: har.display().to_string(),
+                    ignore_query,
+                    fallback,
+                },
                 NetworkCommand::Stop => EngineCommand::NetworkStop,
+            },
+            Command::Browser { command } => match command {
+                BrowserCommand::List => EngineCommand::Status,
+            },
+            Command::Tab { command } => match command {
+                TabCommand::List => EngineCommand::Tabs,
+                TabCommand::Open { url, context } => EngineCommand::Open { url, context },
+                TabCommand::Use { tab_id } => EngineCommand::UseTab { tab_id },
+                TabCommand::Close { tab_id } => EngineCommand::Close { tab_id },
+            },
+            Command::Record { command } => match command {
+                RecordCommand::Start => EngineCommand::RecordStart,
+                RecordCommand::Stop { out } => EngineCommand::RecordStop {
+                    out: out.map(|p| p.display().to_string()),
+                },
+                RecordCommand::Status => EngineCommand::RecordStatus,
+            },
+            Command::Replay {
+                har,
+                ignore_query,
+                fallback,
+            } => EngineCommand::NetworkReplay {
+                path: har.display().to_string(),
+                ignore_query,
+                fallback,
+            },
+            Command::Pdf {
+                out,
+                landscape,
+                print_background,
+            } => EngineCommand::Pdf {
+                out,
+                landscape,
+                print_background,
+            },
+            Command::Inspect {
+                no_network,
+                no_console,
+                max_packets,
+            } => EngineCommand::Inspect {
+                include_network: !no_network,
+                include_console: !no_console,
+                max_packets,
+            },
+            Command::Console { command } => match command {
+                ConsoleCliCommand::Start { level, text } => {
+                    EngineCommand::ConsoleStart { level, text }
+                }
+                ConsoleCliCommand::Wait { timeout_ms } => EngineCommand::ConsoleWait { timeout_ms },
+                ConsoleCliCommand::List => EngineCommand::ConsoleList,
+                ConsoleCliCommand::Stop => EngineCommand::ConsoleStop,
+            },
+            Command::Download { command } => match command {
+                DownloadCommand::Start { dir } => EngineCommand::DownloadStart {
+                    dir: dir.map(|p| p.display().to_string()),
+                },
+                DownloadCommand::List => EngineCommand::DownloadList,
+                DownloadCommand::Wait { timeout_ms, count } => EngineCommand::DownloadWait {
+                    timeout_ms,
+                    count: Some(count),
+                },
+                DownloadCommand::Stop => EngineCommand::DownloadStop,
             },
             Command::Profile { .. }
             | Command::IdentityPool { .. }
@@ -1601,6 +1814,49 @@ mod tests {
             EngineCommand::Open { url, context } => {
                 assert_eq!(url, "https://example.com");
                 assert!(context.is_none());
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_product_tab_open() {
+        let cli = Cli::try_parse_from([
+            "drs",
+            "--json",
+            "tab",
+            "open",
+            "https://example.com",
+            "--context",
+            "acct",
+        ])
+        .unwrap();
+        match cli.command.into_engine().unwrap() {
+            EngineCommand::Open { url, context } => {
+                assert_eq!(url, "https://example.com");
+                assert_eq!(context.as_deref(), Some("acct"));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_network_inspect_and_pdf() {
+        let inspect = Cli::try_parse_from(["drs", "network", "inspect", "--limit", "20"]).unwrap();
+        match inspect.command.into_engine().unwrap() {
+            EngineCommand::NetworkInspect { limit } => assert_eq!(limit, Some(20)),
+            other => panic!("unexpected command: {other:?}"),
+        }
+        let pdf =
+            Cli::try_parse_from(["drs", "pdf", "--out", "/tmp/p.pdf", "--landscape"]).unwrap();
+        match pdf.command.into_engine().unwrap() {
+            EngineCommand::Pdf {
+                landscape,
+                print_background,
+                ..
+            } => {
+                assert!(landscape);
+                assert!(print_background);
             }
             other => panic!("unexpected command: {other:?}"),
         }

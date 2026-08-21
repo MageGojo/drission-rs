@@ -1,0 +1,3 @@
+# clap 产品命令 + identity 子命令很多,debug 测试解析时默认栈不够。
+[env]
+RUST_MIN_STACK = "16777216"

@@ -24,25 +24,31 @@ pub mod browser {
 /// HTTP 运行时:统一请求/响应形状;无浏览器 Session(camoufox)与 TLS 指纹。
 pub mod http {
     pub use crate::net::{
-        DataPacket, ListenFilter, NetRequest, NetResponse, RequestData, ResponseData,
-        ResumeOptions,
+        DataPacket, ListenFilter, NetRequest, NetResponse, RequestData, ResponseData, ResumeOptions,
     };
     #[cfg(feature = "camoufox")]
     pub use crate::session::{BrowserProfile, SessionOptions, SessionPage};
 }
 
-/// AI 运行时:页面快照、Markdown、MCP/JSONL 读页。
+/// AI 运行时:页面快照、Markdown、MCP/JSONL 读页、Agent 编排。
 pub mod ai {
+    #[cfg(feature = "cdp")]
+    pub use crate::agent::{
+        AgentBrowser, AgentElement, AgentPage, FindOp, Observation, SemanticTarget,
+    };
     pub use crate::ai_snapshot::{AiSnapshot, SnapshotRef, ai_snapshot_js, resolve_selector};
     pub use crate::html_md::{html_to_markdown, html_to_markdown_truncated, markdown_fields};
+    pub use crate::locator::Locator;
 }
 
 /// 任务运行时:池、重试、代理、断点、磁盘 Profile。
 pub mod task {
     #[cfg(feature = "cdp")]
+    pub use crate::cdp::TaskScheduler;
+    #[cfg(feature = "cdp")]
     pub use crate::cdp::{
-        ChromiumPool as Pool, ChromiumPoolOptions as PoolOptions, ManagedProfile, ProfileLease,
-        ProfileManager, ProfileManifest,
+        ChromiumPool as Pool, ChromiumPoolOptions as PoolOptions, ContextLease, ManagedProfile,
+        ProfileLease, ProfileManager, ProfileManifest, RecycleReport, TabLease, WorkerResource,
     };
     #[cfg(any(feature = "camoufox", feature = "cdp"))]
     pub use crate::pool::{Checkpoint, RetryPolicy, RotateStrategy};

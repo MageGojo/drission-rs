@@ -110,11 +110,7 @@ impl ChromiumBrowserContext {
     pub(crate) async fn create(attach: CdpAttach, spec: ContextSpec) -> Result<Self> {
         if let Some(name) = spec.name.as_deref() {
             if let Some(id) = attach.lookup_named(name) {
-                return Ok(Self {
-                    attach,
-                    id,
-                    spec,
-                });
+                return Ok(Self { attach, id, spec });
             }
         }
 
@@ -242,9 +238,18 @@ impl ChromiumBrowserContext {
                 value: s(c, "value"),
                 domain: s(c, "domain"),
                 path: s(c, "path"),
-                expires: c.get("expires").and_then(serde_json::Value::as_f64).unwrap_or(-1.0),
-                http_only: c.get("httpOnly").and_then(serde_json::Value::as_bool).unwrap_or(false),
-                secure: c.get("secure").and_then(serde_json::Value::as_bool).unwrap_or(false),
+                expires: c
+                    .get("expires")
+                    .and_then(serde_json::Value::as_f64)
+                    .unwrap_or(-1.0),
+                http_only: c
+                    .get("httpOnly")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false),
+                secure: c
+                    .get("secure")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false),
             })
             .collect())
     }
@@ -293,10 +298,7 @@ impl ChromiumBrowserContext {
             for (k, v) in &self.spec.extra_headers {
                 obj.insert(k.clone(), json!(v));
             }
-            let _ = tab
-                .core
-                .send("Network.enable", json!({}))
-                .await;
+            let _ = tab.core.send("Network.enable", json!({})).await;
             let _ = tab
                 .core
                 .send(

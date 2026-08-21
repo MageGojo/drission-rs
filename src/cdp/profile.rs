@@ -164,7 +164,10 @@ impl ProfileManager {
         validate_id(id)?;
         let dir = self.root.join(id);
         if !dir.is_dir() {
-            return Err(Error::Other(format!("profile `{id}` 不存在: {}", dir.display())));
+            return Err(Error::Other(format!(
+                "profile `{id}` 不存在: {}",
+                dir.display()
+            )));
         }
         self.ensure(id)
     }
@@ -173,7 +176,10 @@ impl ProfileManager {
     pub async fn acquire(&self, id: &str) -> Result<ProfileLease> {
         let profile = self.ensure(id)?;
         let lock = lock_profile(&profile.dir)?;
-        Ok(ProfileLease { profile, _lock: lock })
+        Ok(ProfileLease {
+            profile,
+            _lock: lock,
+        })
     }
 }
 
@@ -271,10 +277,7 @@ fn lock_profile(dir: &Path) -> Result<ProfileLock> {
         use std::os::unix::io::AsRawFd;
         let rc = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
         if rc != 0 {
-            return Err(Error::Other(format!(
-                "profile 已被占用: {}",
-                dir.display()
-            )));
+            return Err(Error::Other(format!("profile 已被占用: {}", dir.display())));
         }
     }
     #[cfg(windows)]

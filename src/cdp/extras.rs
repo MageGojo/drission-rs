@@ -633,9 +633,31 @@ impl ChromiumWait {
                 None,
             )
             .await;
+        let opener = self.core.target_id.clone();
+        if let Ok(list) = self
+            .core
+            .conn
+            .send("Target.getTargets", json!({}), None)
+            .await
+        {
+            if let Some(infos) = list["targetInfos"].as_array() {
+                for ti in infos {
+                    if ti["type"].as_str() != Some("page") {
+                        continue;
+                    }
+                    let target_id = ti["targetId"].as_str().unwrap_or_default();
+                    if target_id.is_empty() || target_id == opener {
+                        continue;
+                    }
+                    if ti["openerId"].as_str() != Some(opener.as_str()) {
+                        continue;
+                    }
+                    return Ok(Some(self.attach_popup(target_id.to_string()).await?));
+                }
+            }
+        }
         let mut events = self.core.conn.subscribe();
         let deadline = self.deadline_at(timeout);
-        let opener = self.core.target_id.clone();
         loop {
             let remain = deadline.saturating_duration_since(Instant::now());
             if remain.is_zero() {

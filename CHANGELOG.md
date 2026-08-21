@@ -7,6 +7,31 @@
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-08-21
+
+库 `drission` 和命令行 `drs`（`drission-cli`）同一号。Agent 编排、产品 CLI、语义 MCP。
+
+### 新增 Added
+
+- **Agent 编排层** `tab.agent()` / `browser.agent()`:`observe()` 给 AX 大纲 + `{role,name}`;`find` / `click` / `type_text` / `wait_for`。LLM 不直接写 `querySelector`。见 `docs/Agent运行时.md`。
+- **统一 `Locator`**:`role` / `name` / `text` / `css` / `xpath` / `id` / `label` / `placeholder`;「登录按钮」解析成 role+name。
+- **链式等待** `tab.wait().element("#x").visible().timeout(...)`,以及 `url` / `title` / `text` / `function` / `idle`。
+- **媒体入口** `tab.capture()`:`screenshot` / `full_page` / `pdf` / `mhtml` / `html` / `har`;`tab.download()` / `tab.upload()`。
+- **`TaskScheduler`**:在 `ChromiumPool` 上加任务超时。并发、代理、重试仍在池里。
+- Resolver 最后一档:可见字旁边的可点区域;`--features ocr` 时对无字按钮截图识别。
+- `tab.wait().popup()` / `network().idle()|.url()` / `download()`。
+- 分层池:`acquire_context` / `acquire_tab` / `proxies()`;`recycle()` 按空闲时间和内存/CPU 阈值回收。
+- 示例 `cdp_agent`(离线)。
+- **产品级 CLI**：`drs browser list`、`drs tab list|open|use|close`、`drs network inspect|replay`、`drs record`、`drs replay`、`drs pdf`、`drs inspect`、`drs console`、`drs download`。旧 `open`/`tabs`/`use`/`close` 仍可用。
+- **语义 MCP**：`browser_network` / `browser_console` / `browser_download` 进入默认 `core`；`browser_pdf` / `browser_inspect` / `browser_record` 在 `browser` toolset。
+- 库：`listen.peek()` / `console.peek()`（不消费缓冲），给 inspect 用。
+
+### 变更 Changed
+
+- `drission` 与 `drission-cli` 都是 **0.6.2**。`drs --version` 与库、GitHub tag `v0.6.2` 同一号。
+- README / 安装说明只写这一版，不再并列两套号。
+- AI 入口：`docs/产品级CLI.md` 可复制配方；仓库 skill 与 `~/.claude/skills/drs-browser` 同步；抓 XHR 用默认 core 的 `browser_network`。
+
 ## [0.6.1] - 2026-08-21
 
 `drs` 补上 Context / 网络门面 / 磁盘 profile；README 改成对着 0.6.x 写。
@@ -392,6 +417,7 @@
 - **内置验证码 OCR**(ddddocr 模型 + tract 纯 Rust 推理)与**图片滑块缺口距离识别**(极验)。
 - 跨平台:macOS / Linux / Windows(命名管道传输)。
 
+[0.6.2]: https://github.com/MageGojo/drission-rs/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/MageGojo/drission-rs/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/MageGojo/drission-rs/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/MageGojo/drission-rs/compare/v0.5.0...v0.5.1

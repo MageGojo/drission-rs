@@ -566,6 +566,14 @@ impl ChromiumBrowser {
 
     /// 优雅关闭:`Browser.close` + 杀子进程(自启动时)+ 清临时 profile。
     /// 取 `&self`(对齐 camoufox `Browser::quit`);可省略,`Drop` 时 `kill_on_drop` 兜底杀进程。
+    /// 自启动 Chrome 的进程号;接管已有浏览器时为 `None`。
+    pub fn pid(&self) -> Option<u32> {
+        self.child
+            .lock()
+            .ok()
+            .and_then(|g| g.as_ref().and_then(|c| c.id()))
+    }
+
     pub async fn quit(&self) -> Result<()> {
         let _ = self.conn.send("Browser.close", json!({}), None).await;
         // 先从 Mutex 取出再 await(不跨 await 持锁)。

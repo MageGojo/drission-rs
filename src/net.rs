@@ -157,7 +157,9 @@ impl ListenFilter {
             return true;
         }
         let m = method.to_ascii_uppercase();
-        self.methods.iter().any(|want| want.eq_ignore_ascii_case(&m))
+        self.methods
+            .iter()
+            .any(|want| want.eq_ignore_ascii_case(&m))
     }
 }
 

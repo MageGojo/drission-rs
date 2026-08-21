@@ -116,6 +116,12 @@ impl CdpListen {
         }
     }
 
+    /// 偷看当前缓冲(不消费)。给 `drs network inspect` / 调试用。
+    pub async fn peek(&self) -> Vec<DataPacket> {
+        let buf = self.core.listen.lock().await.buf.clone();
+        buf.lock().await.iter().cloned().collect()
+    }
+
     /// 在总超时内尽量收集 `n` 个数据包(不足返回已收到的)。
     pub async fn wait_count(&self, n: usize, timeout: Option<Duration>) -> Result<Vec<DataPacket>> {
         let buf = self.core.listen.lock().await.buf.clone();

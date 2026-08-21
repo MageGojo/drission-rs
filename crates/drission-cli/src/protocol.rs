@@ -13,11 +13,13 @@ pub enum BackendKind {
 }
 
 /// Which MCP tool surface to expose (`DRS_MCP_TOOLS` / `--tools`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ValueEnum, JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ValueEnum, JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 #[value(rename_all = "kebab-case")]
 pub enum McpToolset {
-    /// Core browse loop only (~11 tools). Default for agents.
+    /// Core browse loop + semantic network/console/download (~14 tools). Default for agents.
     #[default]
     Core,
     /// Core + extended browser/network (no `identity_assets_*`).
@@ -229,6 +231,17 @@ pub enum EngineCommand {
     NetworkRecord {
         out: Option<String>,
     },
+    NetworkInspect {
+        #[serde(default)]
+        limit: Option<usize>,
+    },
+    NetworkReplay {
+        path: String,
+        #[serde(default)]
+        ignore_query: bool,
+        #[serde(default)]
+        fallback: bool,
+    },
     NetworkStop,
     ListenWait {
         count: usize,
@@ -259,6 +272,45 @@ pub enum EngineCommand {
         screenshot_out: Option<PathBuf>,
         full_screenshot: bool,
     },
+    Pdf {
+        out: Option<PathBuf>,
+        #[serde(default)]
+        landscape: bool,
+        #[serde(default)]
+        print_background: bool,
+    },
+    Inspect {
+        #[serde(default)]
+        include_network: bool,
+        #[serde(default)]
+        include_console: bool,
+        #[serde(default)]
+        max_packets: Option<usize>,
+    },
+    RecordStart,
+    RecordStop {
+        out: Option<String>,
+    },
+    RecordStatus,
+    ConsoleStart {
+        level: Option<String>,
+        text: Option<String>,
+    },
+    ConsoleWait {
+        timeout_ms: Option<u64>,
+    },
+    ConsoleList,
+    ConsoleStop,
+    DownloadStart {
+        dir: Option<String>,
+    },
+    DownloadList,
+    DownloadWait {
+        timeout_ms: Option<u64>,
+        #[serde(default)]
+        count: Option<usize>,
+    },
+    DownloadStop,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum, JsonSchema)]

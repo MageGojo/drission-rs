@@ -10,7 +10,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/MageGojo/drission-rs/main/install/drs-install.sh | sh
 #
 # Env overrides:
-#   DRS_VERSION=v0.3.2      install a specific tag (default: latest)
+#   DRS_VERSION=v0.6.2      install a specific tag (default: latest)
 #   DRS_INSTALL_DIR=~/bin   install location  (default: ~/.local/bin)
 #   DRS_REPO=owner/name     source repo       (default: MageGojo/drission-rs)
 # =============================================================================

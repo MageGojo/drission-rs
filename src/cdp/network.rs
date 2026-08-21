@@ -38,9 +38,7 @@ impl NetworkHandle {
 
     /// 仅匹配该 HTTP 方法(可多次,OR;`POST` / `GET` …,大小写不敏感)。
     pub fn method(mut self, method: impl Into<String>) -> Self {
-        self.filter
-            .methods
-            .push(method.into().to_ascii_uppercase());
+        self.filter.methods.push(method.into().to_ascii_uppercase());
         self
     }
 
@@ -101,9 +99,7 @@ impl NetworkHandle {
         path: impl AsRef<Path>,
         opts: &HarReplayOptions,
     ) -> Result<HarPlayer> {
-        ChromiumTab::new(self.core)
-            .route_from_har(path, opts)
-            .await
+        ChromiumTab::new(self.core).route_from_har(path, opts).await
     }
 
     async fn route(self, rule: RouteRule) -> Result<NetworkRoute> {
