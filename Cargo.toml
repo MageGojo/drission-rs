@@ -18,6 +18,7 @@ categories = ["web-programming", "api-bindings", "computer-vision"]
 # 发布到 crates.io 时排除:构建产物 / 内部文档 / 各类运行测试产物(样本/吐环境/自训脚手架),
 # 这些已在 .gitignore,这里再显式排除(双保险,确保 `cargo publish` 不打包)。
 exclude = [
+    "/data",
     "/dist",
     "/docs",
     "/target",
