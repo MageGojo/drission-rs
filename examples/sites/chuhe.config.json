@@ -1,0 +1,10 @@
+{
+  "url": "https://chuhe.lk888.ai/apidoc#common/list_models",
+  "username": "",
+  "password": "",
+  "engine": "lightpanda",
+  "webhook": "",
+  "seconds": 0,
+  "reload_secs": 30,
+  "profile_dir": "target/chuhe-profile"
+}

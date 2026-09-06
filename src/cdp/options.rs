@@ -5,10 +5,29 @@
 
 use std::path::PathBuf;
 
+/// CDP 线协议后面的**浏览器引擎**。协议与 `Browser`/`Tab` API 相同,只换启动方式。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CdpEngine {
+    /// Google Chrome / Edge / Brave / Chromium / Chrome for Testing(默认)。
+    #[default]
+    Chromium,
+    /// [Lightpanda](https://lightpanda.io):Zig 无头浏览器,`lightpanda serve` 讲 CDP。
+    /// 永远无头;无原生 Windows 二进制。详见 `docs/Lightpanda.md`。
+    Lightpanda,
+}
+
+impl CdpEngine {
+    pub fn is_lightpanda(self) -> bool {
+        matches!(self, Self::Lightpanda)
+    }
+}
+
 /// CDP 浏览器启动选项。
 #[derive(Debug, Clone)]
 pub struct ChromiumOptions {
-    /// 显式可执行文件路径(Chrome/Edge/Brave/Chromium);为空走自动定位 + 自动下载。
+    /// 引擎:`Chromium`(默认)或 [`CdpEngine::Lightpanda`]。
+    pub engine: CdpEngine,
+    /// 显式可执行文件路径(Chrome/Edge/Brave/Chromium 或 `lightpanda`);为空走自动定位 + 自动下载。
     pub binary_path: Option<PathBuf>,
     /// 是否无头(默认 `false` = 有头)。
     pub headless: bool,
@@ -73,6 +92,7 @@ impl Default for ChromiumOptions {
     /// 大道至简:**有头 + 反检测开箱即用**。无头一行 `.headless(true)`。
     fn default() -> Self {
         Self {
+            engine: CdpEngine::Chromium,
             binary_path: None,
             headless: false,
             user_data_dir: None,
@@ -97,6 +117,20 @@ impl Default for ChromiumOptions {
 impl ChromiumOptions {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// 选 CDP 引擎(默认 Chromium)。
+    pub fn engine(mut self, engine: CdpEngine) -> Self {
+        self.engine = engine;
+        if engine.is_lightpanda() {
+            self.headless = true;
+        }
+        self
+    }
+
+    /// 快捷开关:用 Lightpanda 而不是 Chrome。等价 `.engine(CdpEngine::Lightpanda)`。
+    pub fn lightpanda(self) -> Self {
+        self.engine(CdpEngine::Lightpanda)
     }
 
     pub fn headless(mut self, yes: bool) -> Self {
@@ -203,15 +237,19 @@ impl ChromiumOptions {
 
     /// 校验用户参数不覆盖库内部管理的关键启动参数(否则会破坏调试端口/profile/无头管理)。
     pub fn validate(&self) -> crate::Result<()> {
-        const PROTECTED: [&str; 4] = [
-            "--remote-debugging-port",
-            "--user-data-dir",
-            "--headless",
-            "--remote-debugging-pipe",
-        ];
+        let protected: &[&str] = if self.engine.is_lightpanda() {
+            &["--host", "--port", "--advertise-host"]
+        } else {
+            &[
+                "--remote-debugging-port",
+                "--user-data-dir",
+                "--headless",
+                "--remote-debugging-pipe",
+            ]
+        };
         for a in &self.args {
             let key = a.split('=').next().unwrap_or(a).trim();
-            if PROTECTED.iter().any(|p| key.eq_ignore_ascii_case(p)) {
+            if protected.iter().any(|p| key.eq_ignore_ascii_case(p)) {
                 return Err(crate::Error::Other(format!(
                     "非法启动参数 `{a}`:`{key}` 由库内部管理(改用 ChromiumOptions 的对应方法)"
                 )));
@@ -309,8 +347,26 @@ mod tests {
         let o = ChromiumOptions::new();
         assert!(!o.headless, "默认有头");
         assert!(o.stealth, "默认开反检测");
+        assert_eq!(o.engine, CdpEngine::Chromium);
         assert!(o.binary_path.is_none(), "默认自动定位浏览器");
         assert!(o.locale.is_none() && o.timezone.is_none(), "默认不设地区");
+    }
+
+    #[test]
+    fn lightpanda_shortcut_sets_engine_and_headless() {
+        let o = ChromiumOptions::new().lightpanda();
+        assert_eq!(o.engine, CdpEngine::Lightpanda);
+        assert!(o.headless, "Lightpanda 永远无头");
+    }
+
+    #[test]
+    fn lightpanda_rejects_managed_host_port() {
+        let err = ChromiumOptions::new()
+            .lightpanda()
+            .add_arg("--port=9222")
+            .validate()
+            .expect_err("port 由库管理");
+        assert!(err.to_string().contains("--port"));
     }
 
     #[test]

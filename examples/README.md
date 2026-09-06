@@ -126,6 +126,7 @@ HL=0 cargo run --example bilibili_covers         # 有头,看着它跑
 | [hubei_zfwj_csv](sites/hubei_zfwj_csv.rs) | 湖北省人民政府「政府文件」公开列表:动态翻页,逐条进详情页抽正文/发文字号/来源并导出 CSV | 🌐 · cdp |
 | [hubei_zfwj_protocol](sites/hubei_zfwj_protocol.rs) | 湖北省政府文件纯协议版:SessionPage 抓挑战页,本地 JS 引擎解 challenge 后抓列表/详情并导出 CSV | 🌐 · camoufox,signer |
 | [qcc_login](sites/qcc_login.rs) | 企查查账号密码登录:打开密码表单、环境变量安全填充、识别极验滑块/点选并在有头窗口等待用户完成,持久 profile 复用登录态 | 🌐 · cdp |
+| [chuhe_price](sites/chuhe_price.rs) | 初和站报价：`click` 模型价格 + `listen` 听 XHR，Rust 解析渠道价 | 🌐 · cdp · lightpanda |
 
 ```bash
 # probe:只验证登录表单选择器,不提交
@@ -133,6 +134,14 @@ cargo run --example qcc_login
 
 # 实际登录:默认有头,验证码在浏览器窗口中完成
 QCC_USERNAME='用户名' QCC_PASSWORD='密码' cargo run --example qcc_login
+
+# 初和报价：打进 dist（内置 Lightpanda），自己跑
+./scripts/pack-chuhe-dist.sh
+cd dist/chuhe && ./chuhe_price
+
+# 开发：复制配置填账号
+cp examples/sites/chuhe.config.json examples/sites/chuhe.config.local.json
+CHUHE_CONFIG=examples/sites/chuhe.config.local.json cargo run --example chuhe_price --features cdp,ocr
 ```
 
 ## 验证码·字符 OCR(ocr/,`--features ocr`)
@@ -225,6 +234,7 @@ QCC_USERNAME='用户名' QCC_PASSWORD='密码' cargo run --example qcc_login
 | 示例 | 说明 | 需要 |
 |---|---|---|
 | [cdp_demo](cdp/cdp_demo.rs) | CDP demo:启动/接管 Google Chrome → 导航 → run_js → 元素文本 → 截图 | 🌐 |
+| [lightpanda_demo](cdp/lightpanda_demo.rs) | Lightpanda:同一套 Browser/Tab API,`ChromiumOptions::new().lightpanda()` | 🌐 |
 | [cdp_advanced](cdp/cdp_advanced.rs) | CDP 深化能力端到端自验证(进程内 HTTP 服务,Chrome 访问 localhost) | 🔌 |
 | [cdp_fetch](cdp/cdp_fetch.rs) | **自动下载 Chrome for Testing** 并用它驱动 example.com | 🌐 |
 | [cdp_download](cdp/cdp_download.rs) | CDP 原生下载事件多任务管理 `tab.downloads()` | 🔌 |

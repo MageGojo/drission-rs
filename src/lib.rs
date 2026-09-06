@@ -4,7 +4,9 @@
 //! 一个 **Rust** 编写的浏览器自动化库,提供与 [DrissionPage](https://github.com/g1879/DrissionPage)
 //! 一致的简洁语法。**双后端**:
 //!
-//! - **Chromium / CDP**(默认,`--features cdp`):驱动或接管 Chrome / Edge / Brave / Electron 应用。
+//! - **Chromium / CDP**(默认,`--features cdp`):驱动或接管 Chrome / Edge / Brave / Electron。
+//!   同一套 API 也可驱动 [Lightpanda](https://lightpanda.io):`BrowserOptions::new().lightpanda()`
+//!   （服务器简单听接口；本机可视化 / 强反爬仍用 Chrome。`drs` 不接 Lightpanda）。
 //! - **Camoufox / Firefox(Juggler)**(`--features camoufox`):反检测浏览器,附带自动过盾 / 吐环境 /
 //!   滑块识别 / 高并发池 / Session(HTTP)双模等**全部高层能力**(`Page`/`WebPage`/`SessionPage`…)。
 //!
@@ -158,7 +160,7 @@ pub mod prelude {
         ChromiumBrowserContext as BrowserContext, ChromiumConsole as Console,
         ChromiumDownloads as Downloads, ChromiumElement as Element,
         ChromiumElementRect as ElementRect, ChromiumElementWait as ElementWait,
-        ChromiumFrame as Frame, ChromiumOptions as BrowserOptions, ChromiumPage as Page,
+        CdpEngine, ChromiumFrame as Frame, ChromiumOptions as BrowserOptions, ChromiumPage as Page,
         ChromiumRecorder as Recorder, ChromiumScreencast as Screencast, ChromiumScroll as Scroll,
         ChromiumSetTab as SetTab, ChromiumShadowRoot as ShadowRoot, ChromiumTab as Tab,
         ChromiumWait as Wait, ChromiumWindow as Window, ChromiumWsListener as WsListener,

@@ -714,6 +714,87 @@ impl ChromiumElement {
         Ok(true)
     }
 
+    /// 取出元素上的**原图字节**(验证码 / `<img>` / `<canvas>`)。
+    ///
+    /// **不依赖** `Page.captureScreenshot`——Lightpanda 的截图常是占位图,OCR 会全错。
+    /// 顺序:`data:` URL → canvas/`drawImage` → `fetch(src)`(含 cookie)→ 截图兜底。
+    pub async fn image_bytes(&self) -> Result<Vec<u8>> {
+        const JS: &str = r#"async function(){
+  function b64(s){
+    if(!s) return '';
+    s=String(s);
+    var i=s.indexOf('base64,');
+    return i>=0 ? s.slice(i+7) : '';
+  }
+  function bgUrl(el){
+    try{
+      var bg=getComputedStyle(el).backgroundImage||'';
+      return bg.replace(/^url\(\s*['"]?/,'').replace(/['"]?\s*\)$/,'');
+    }catch(e){ return ''; }
+  }
+  async function fromUrl(u){
+    var d=b64(u); if(d) return d;
+    if(!u) return '';
+    if(u.indexOf('blob:')===0 || /^https?:/i.test(u) || u.indexOf('/')===0){
+      var r=await fetch(u,{credentials:'include'});
+      var buf=await r.arrayBuffer();
+      var bytes=new Uint8Array(buf);
+      var bin='';
+      for(var i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]);
+      return btoa(bin);
+    }
+    return '';
+  }
+  var el=this;
+  if(el.tagName==='CANVAS' && el.toDataURL){
+    var t=b64(el.toDataURL('image/png'));
+    if(t) return t;
+  }
+  var src=el.currentSrc||el.getAttribute('src')||'';
+  var u=src||bgUrl(el);
+  var d=await fromUrl(u);
+  if(d) return d;
+  if(el.tagName==='IMG' && (el.naturalWidth||el.width)){
+    try{
+      var c=document.createElement('canvas');
+      c.width=el.naturalWidth||el.width||1;
+      c.height=el.naturalHeight||el.height||1;
+      var ctx=c.getContext('2d');
+      if(ctx){
+        ctx.drawImage(el,0,0);
+        d=b64(c.toDataURL('image/png'));
+        if(d) return d;
+      }
+    }catch(e){}
+  }
+  var inner=el.querySelector && el.querySelector('img,canvas');
+  if(inner && inner!==el){
+    if(inner.tagName==='CANVAS' && inner.toDataURL){
+      d=b64(inner.toDataURL('image/png'));
+      if(d) return d;
+    }
+    d=await fromUrl(inner.currentSrc||inner.getAttribute('src')||bgUrl(inner));
+    if(d) return d;
+  }
+  return '';
+}"#;
+        let v = self.call_value(JS, vec![]).await?;
+        if let Some(s) = v.as_str()
+            && let Some(b) = crate::util::base64_decode(s)
+            && looks_like_image(&b)
+        {
+            return Ok(b);
+        }
+        let shot = self.screenshot_bytes().await?;
+        if looks_like_image(&shot) {
+            Ok(shot)
+        } else {
+            Err(Error::msg(
+                "元素取图失败:无 data:/canvas/fetch 原图,截图也不是可用图片(Lightpanda 常见)",
+            ))
+        }
+    }
+
     /// 元素截图,返回 PNG 字节。先把元素**滚到视口中央**再按其页面矩形裁剪。
     pub async fn screenshot_bytes(&self) -> Result<Vec<u8>> {
         self.scroll_into_view().await?;
@@ -751,6 +832,22 @@ impl ChromiumElement {
             .map_err(|e| Error::msg(format!("写入截图 {} 失败: {e}", path.display())))?;
         Ok(path)
     }
+}
+
+fn looks_like_image(b: &[u8]) -> bool {
+    // 太小多半是空图 / Lightpanda 占位。
+    if b.len() < 80 || b.starts_with(b"<!") || b.starts_with(b"<html") {
+        return false;
+    }
+    matches!(
+        b,
+        [0x89, b'P', b'N', b'G', ..]
+            | [0xFF, 0xD8, 0xFF, ..]
+            | [b'G', b'I', b'F', b'8', ..]
+            | [b'R', b'I', b'F', b'F', ..]
+            | [0x00, 0x00, 0x00, _, b'f', b't', b'y', b'p', ..]
+    ) || b.starts_with(b"<svg")
+        || b.starts_with(b"<?xml")
 }
 
 /// 元素级等待句柄(由 [`ChromiumElement::wait`] 返回),对齐 camoufox `ElementWait`。

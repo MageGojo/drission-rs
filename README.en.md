@@ -8,20 +8,22 @@ Drive a local Chrome from Rust over CDP. The same repo ships `drs`, a CLI / MCP 
 [![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue.svg)](#compatibility)
 [![License](https://img.shields.io/badge/license-source--available-lightgrey.svg)](LICENSE)
 
-[简体中文](README.md) · **English** · [docs.rs](https://docs.rs/drission/0.6.2) · [CHANGELOG](CHANGELOG.md)
+[简体中文](README.md) · **English** · [docs.rs](https://docs.rs/drission/0.6.3) · [CHANGELOG](CHANGELOG.md)
 
 > Use this only on systems you own or are written-authorized to test. Do not bypass login, CAPTCHAs, or paywalls. See [Responsible use](#responsible-use) and [LICENSE](LICENSE).
 
 ## This release
 
-**0.6.2**. The `drission` library and the `drs` binary (`drission-cli`) share that number.
+**0.6.3**. The `drission` library and the `drs` binary (`drission-cli`) share that number.
+
+The library can switch to [Lightpanda](https://lightpanda.io): same `Browser` / `Tab` API, change the launch for simple server-side listen jobs. Keep Chrome on a desktop when you need a window or a hard anti-bot site. `drs` is for local Agent / MCP and does **not** speak Lightpanda.
 
 ```bash
 cargo add drission
 cargo install drission-cli --bin drs
 ```
 
-`drs --version` prints `drs 0.6.2`. No Rust toolchain: download a `drs` archive from [GitHub Releases](https://github.com/MageGojo/drission-rs/releases/latest) (GitCode mirror available). Scripts under `install/` fetch Latest.
+`drs --version` prints `drs 0.6.3`. No Rust toolchain: download a `drs` archive from [GitHub Releases](https://github.com/MageGojo/drission-rs/releases/latest) (GitCode mirror available). Scripts under `install/` fetch Latest.
 
 ## 1. Library
 
@@ -45,6 +47,14 @@ async fn main() -> drission::Result<()> {
     Ok(())
 }
 ```
+
+On a server, same API, switch to Lightpanda (Zig headless, still CDP). Missing binary is fetched from GitHub nightly. No native Windows build.
+
+```rust
+let browser = Browser::launch(BrowserOptions::new().lightpanda()).await?;
+```
+
+Keep Chrome for a visible window or a tight anti-bot site. Details: [Lightpanda.md](https://github.com/MageGojo/drission-rs/blob/main/docs/Lightpanda.md).
 
 Three extras (CDP):
 
@@ -73,11 +83,11 @@ page.wait_for("Dashboard").await?;
 tab.wait().element("#dash").visible().timeout(Duration::from_secs(10)).await?;
 ```
 
-API: [docs.rs/drission](https://docs.rs/drission/0.6.2). In-repo: `cargo run --example cdp_demo`, `cargo run --example cdp_context`, `cargo run --example cdp_agent`.
+API: [docs.rs/drission](https://docs.rs/drission/0.6.3). In-repo: `cargo run --example cdp_demo`, `cargo run --example lightpanda_demo`, `cargo run --example cdp_context`, `cargo run --example cdp_agent`.
 
 ## 2. `drs`
 
-`drs` starts a local daemon that owns the browser. Later commands talk to that process. Use `--json` for scripts. How to pick a command: [`docs/产品级CLI.md`](docs/产品级CLI.md).
+`drs` starts a local daemon that owns the browser (local Chrome by default). Later commands talk to that process. Use `--json` for scripts. How to pick a command: [`docs/产品级CLI.md`](docs/产品级CLI.md). `drs` does not speak Lightpanda; use `.lightpanda()` in the library on servers.
 
 ```bash
 drs ensure-serve --backend cdp --headless
@@ -120,7 +130,7 @@ How to pick a command: [`docs/产品级CLI.md`](https://github.com/MageGojo/dris
 
 | Feature | What | Default |
 |---|---|---|
-| `cdp` | Chrome / Edge / Brave / Chromium / Electron | on |
+| `cdp` | Chrome / Edge / Brave / Chromium / Electron; same API via `.lightpanda()` | on |
 | `camoufox` | Camoufox / Firefox (Juggler) | off |
 | `ocr` | offline OCR (`tract`) | off |
 | `slider` | gap distance for authorized slider tests | off |
@@ -139,13 +149,15 @@ drission = { version = "0.6", features = ["ocr"] }
 | Rust | 1.85+, edition 2024 |
 | OS | macOS / Linux / Windows |
 | Browser | Google Chrome first; also Edge, Brave, Chromium, Electron |
-| No desktop | `headless` |
+| Server headless | library: `BrowserOptions::new().lightpanda()` (macOS / Linux; always headless) |
+| No desktop | Chrome `headless` |
 
 ## Docs (GitHub; not packed on crates.io)
 
 - https://github.com/MageGojo/drission-rs
-- https://docs.rs/drission/0.6.2
+- https://docs.rs/drission/0.6.3
 - [CLI.md](https://github.com/MageGojo/drission-rs/blob/main/docs/CLI.md)
+- [Lightpanda.md](https://github.com/MageGojo/drission-rs/blob/main/docs/Lightpanda.md)
 - [CHANGELOG](CHANGELOG.md)
 
 ## Responsible use
@@ -169,6 +181,7 @@ Custom **source-available, non-commercial**. Not OSI open source. See [LICENSE](
 
 - [DrissionPage](https://github.com/g1879/DrissionPage)
 - [Camoufox](https://github.com/daijro/camoufox)
+- [Lightpanda](https://lightpanda.io)
 - [ddddocr](https://github.com/sml2h3/ddddocr)
 - [tract](https://github.com/sonos/tract)
 

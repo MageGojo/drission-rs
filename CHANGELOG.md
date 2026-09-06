@@ -7,6 +7,26 @@
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-09-06
+
+库侧新增 Lightpanda 引擎变体。`drs` 仍是本机 Chrome / Agent / MCP，不接 Lightpanda。
+
+### 新增 Added
+
+- **Lightpanda 适配**（CDP 引擎变体，接口不变）：`BrowserOptions::new().lightpanda()` 启动
+  `lightpanda serve`，连上后仍是 `ChromiumBrowser` / `ChromiumTab`。找不到二进制时从 GitHub
+  nightly 下载。`connect` 现接受 `ws://` / `wss://`（含 Lightpanda Cloud）。
+  本机可视化、强反爬继续用 Chrome；服务器简单听接口换引擎即可。见 `docs/Lightpanda.md`。
+- `ChromiumElement::image_bytes()`：从 `data:` / canvas / `fetch(src)` 取原图，不靠
+  `Page.captureScreenshot`（Lightpanda 截图常是占位）。`ocr_image` / `ocr_calc` / `ocr_code` 走这条路径。
+- 案例 `chuhe_price`：`get` / `click` / `input` / `listen` 听初和站报价，不在页面里 fetch。
+  `./scripts/pack-chuhe-dist.sh` 打进 `dist/chuhe`，旁边内置 Lightpanda。
+  见 `docs/案例-chuhe价格监听.md`。
+
+### 变更 Changed
+
+- `drission` 与 `drission-cli` 都是 **0.6.3**。`drs` 功能未变（默认本机 Chrome）。
+
 ## [0.6.2] - 2026-08-21
 
 库 `drission` 和命令行 `drs`（`drission-cli`）同一号。Agent 编排、产品 CLI、语义 MCP。
@@ -417,6 +437,7 @@
 - **内置验证码 OCR**(ddddocr 模型 + tract 纯 Rust 推理)与**图片滑块缺口距离识别**(极验)。
 - 跨平台:macOS / Linux / Windows(命名管道传输)。
 
+[0.6.3]: https://github.com/MageGojo/drission-rs/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/MageGojo/drission-rs/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/MageGojo/drission-rs/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/MageGojo/drission-rs/compare/v0.5.1...v0.6.0

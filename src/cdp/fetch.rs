@@ -264,8 +264,8 @@ async fn pick_asset(platform: &str, channel: &str) -> Result<(String, String)> {
     )))
 }
 
-/// 流式下载到文件(每 16 MiB 打一次进度日志)。
-async fn download(url: &str, dest: &Path) -> Result<()> {
+/// 流式下载到文件(每 16 MiB 打一次进度日志)。Chrome / Lightpanda 共用。
+pub(crate) async fn download(url: &str, dest: &Path) -> Result<()> {
     let client = reqwest::Client::builder().user_agent(USER_AGENT).build()?;
     let resp = client.get(url).send().await?.error_for_status()?;
     let total = resp.content_length().unwrap_or(0);

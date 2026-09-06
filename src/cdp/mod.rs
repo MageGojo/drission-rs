@@ -1,7 +1,9 @@
 //! **Chromium 后端**(Chrome / Edge / Brave / Electron 应用),经 **CDP**(Chrome DevTools Protocol)。
 //!
 //! 与默认的 Camoufox/Juggler 后端并行:用于**驱动或接管 Chromium 系浏览器**,以及**控制 Electron 桌面
-//! 应用**(它们都内置 CDP)。CDP 线消息格式(`id`/`method`/`params`/`sessionId` + `result`/`error`/事件)
+//! 应用**(它们都内置 CDP)。同一套 API 也可驱动 [Lightpanda](https://lightpanda.io)
+//! (`ChromiumOptions::new().lightpanda()`):协议不变,只换 `lightpanda serve`。
+//! CDP 线消息格式(`id`/`method`/`params`/`sessionId` + `result`/`error`/事件)
 //! 与 Juggler 高度一致,故**复用** [`crate::protocol::Connection`] 的请求/响应/事件机制,只换方法名与目标管理。
 //!
 //! ```no_run
@@ -47,6 +49,7 @@ pub mod element;
 mod extras;
 pub mod fetch;
 mod fingerprint;
+mod lightpanda;
 pub mod frame;
 mod handles;
 mod hook;
@@ -89,6 +92,9 @@ pub use extras::{
     NetworkConditions, PdfOptions,
 };
 pub use fetch::{cft_platform, download_chrome_for, download_chrome_milestone, ensure_chrome};
+pub use lightpanda::{
+    download_lightpanda, ensure_lightpanda, lightpanda_platform, locate_lightpanda,
+};
 pub use fingerprint::{CdpFingerprint, CdpFingerprintPool, CdpOs};
 pub use frame::ChromiumFrame;
 pub use handles::{ChromiumScroll, ChromiumSetTab, ChromiumWait, ChromiumWindow};
@@ -98,7 +104,7 @@ pub use listener::CdpListen;
 pub use locate::chrome_path;
 pub use network::{NetworkHandle, NetworkRoute};
 pub use oopif::ChildTarget;
-pub use options::{ChromiumContextOverride, ChromiumOptions};
+pub use options::{CdpEngine, ChromiumContextOverride, ChromiumOptions};
 pub use page::ChromiumPage;
 pub use pool::{
     ChromiumPool, ChromiumPoolOptions, ContextLease, PoolLease, ProcStat, RecycleReport, TabLease,

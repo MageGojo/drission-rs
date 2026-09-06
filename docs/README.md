@@ -24,6 +24,8 @@
 | [标配补齐.md](标配补齐.md) | 对标 Playwright/Puppeteer/DrissionPage 的通用能力:PDF/MHTML/set_content、HAR 录制+回放、expose_function、媒体·网络·CPU 模拟、移动端设备预设、权限/storage、wait 补齐(及两端可行性) | 想要"开箱即用"的浏览器标配能力的人 |
 | [录制与无障碍.md](录制与无障碍.md) | 录制→生成可运行 Rust 代码(codegen/recorder,对标 PW codegen)+ 无障碍 `role "name"` 语义树快照(a11y,抗改版断言 / 喂 LLM) | 想录操作出代码、或用语义树做断言/喂 LLM 的人 |
 | [后端能力矩阵.md](后端能力矩阵.md) | **CDP(默认)vs Camoufox** 逐条能力对照:两端对称核心、仅 CDP 的标配补齐 + 逆向套件、仅 Camoufox 的滑块 / 服务器化 / 指针反检测,以及选后端建议 | 纠结用哪个后端、想按能力取舍的人 |
+| [Lightpanda.md](Lightpanda.md) | Lightpanda 作为 CDP 引擎变体:同一套 Browser/Tab,只换 `serve`;下载、能力边界。`drs` 不接 | 服务器上要轻量无头、或对接 Lightpanda Cloud 的人 |
+| [案例-chuhe价格监听.md](案例-chuhe价格监听.md) | Lightpanda 听楚河模型站报价,变价打 JSON / webhook | 要把上游牌价推给下游的人 |
 
 > 更新历史见 [`CHANGELOG.md`](../CHANGELOG.md);贡献指南见 [`CONTRIBUTING.md`](../CONTRIBUTING.md);
 > 安全策略见 [`SECURITY.md`](../SECURITY.md)。

@@ -783,7 +783,8 @@ impl ChromiumTab {
         Ok(())
     }
 
-    /// 识别图片验证码:`<img>` 的 data:URL 直接解码、否则元素截图,再走 OCR。需 `--features ocr`。
+    /// 识别图片验证码:取图走 [`ChromiumElement::image_bytes`](data:/canvas/`fetch`,不靠截图),
+    /// 再走 OCR。Lightpanda 也能用。需 `--features ocr`。
     /// 对齐 camoufox `Tab::ocr_image`:识别走共享识别器 [`crate::ocr::set_default_ocr`] 的**热替换槽
     /// 优先、否则懒加载默认 ddddocr**,故自训模型对本方法即时生效。
     #[cfg(feature = "ocr")]
@@ -792,27 +793,29 @@ impl ChromiumTab {
         crate::ocr::recognize_shared(&bytes).await
     }
 
-    /// **一步解计算题**验证码:取图(同 [`ocr_image`](Self::ocr_image))→ 识别算术式 → 求值 → 答案字符串
-    /// (如 `"8"`)。对齐 camoufox `Tab::ocr_calc`;识别不出算术式则报错。需 `--features ocr`。
+    /// **算数模式**:取图(同 [`ocr_image`](Self::ocr_image))→ 识别算术式 → 求值 → 答案字符串
+    /// (如 `"3+5=?"` → `"8"`)。对齐 camoufox `Tab::ocr_calc`;识别不出算术式则报错。需 `--features ocr`。
     #[cfg(feature = "ocr")]
     pub async fn ocr_calc(&self, selector: &str) -> Result<String> {
         let bytes = self.ocr_image_bytes(selector).await?;
         crate::ocr::recognize_calc_shared(&bytes).await
     }
 
-    /// 取验证码图字节:优先 `<img>` 的 `data:` URL 原图,缺失/解码失败/为空时回退元素截图。
+    /// 验证码自动模式:先按算数式求值,不是算数再退回 OCR 原文。
+    /// `"3+5=?"` → `"8"`;`"Ab3k"` → `"Ab3k"`。需 `--features ocr`。
+    #[cfg(feature = "ocr")]
+    pub async fn ocr_code(&self, selector: &str) -> Result<String> {
+        let bytes = self.ocr_image_bytes(selector).await?;
+        let text = crate::ocr::recognize_shared(&bytes).await?;
+        Ok(crate::ocr::eval_calc(&text)
+            .map(crate::ocr::calc_answer_string)
+            .unwrap_or(text))
+    }
+
+    /// 取验证码图字节:走元素 [`ChromiumElement::image_bytes`](Lightpanda 可用的原图路径)。
     #[cfg(feature = "ocr")]
     async fn ocr_image_bytes(&self, selector: &str) -> Result<Vec<u8>> {
-        let el = self.ele(selector).await?;
-        let src = el.attr("src").await.ok().flatten().unwrap_or_default();
-        match src
-            .find("base64,")
-            .and_then(|i| crate::util::base64_decode(&src[i + 7..]))
-            .filter(|b| !b.is_empty())
-        {
-            Some(b) => Ok(b),
-            None => el.screenshot_bytes().await,
-        }
+        self.ele(selector).await?.image_bytes().await
     }
 
     // ── 监听 / 拦截句柄 ──────────────────────────────────────────────────

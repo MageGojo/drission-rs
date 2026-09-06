@@ -1118,9 +1118,17 @@ fn preprocess(bytes: &[u8]) -> Result<(Vec<f32>, usize)> {
         return Err(Error::msg("OCR: 空图"));
     }
     let new_w = ((w as f32) * 64.0 / (h as f32)).round().max(1.0) as usize;
-    let luma = img
+    let mut luma = img
         .resize_exact(new_w as u32, 64, image::imageops::FilterType::Lanczos3)
         .to_luma8();
+    // 初和这类黑底点阵图：ddddocr 按浅底深字训的，暗图先反相。
+    let n = (luma.width() as u64).saturating_mul(luma.height() as u64).max(1);
+    let avg = luma.pixels().map(|p| p.0[0] as u64).sum::<u64>() / n;
+    if avg < 90 {
+        for p in luma.pixels_mut() {
+            p.0[0] = 255 - p.0[0];
+        }
+    }
     let mut data = Vec::with_capacity(64 * new_w);
     for y in 0..64u32 {
         for x in 0..new_w as u32 {
@@ -1270,6 +1278,15 @@ impl Tab {
     pub async fn ocr_calc(&self, selector: &str) -> Result<String> {
         let bytes = self.fetch_image_bytes(selector).await?;
         recognize_calc_shared(&bytes).await
+    }
+
+    /// 验证码自动模式:先按算数式求值,不是算数再退回 OCR 原文。
+    pub async fn ocr_code(&self, selector: &str) -> Result<String> {
+        let bytes = self.fetch_image_bytes(selector).await?;
+        let text = recognize_shared(&bytes).await?;
+        Ok(calc::eval_calc(&text)
+            .map(calc::calc_answer_string)
+            .unwrap_or(text))
     }
 
     /// 取元素的图字节:优先 `<img>` 的 `src`(`data:base64` 直接解码),否则元素浏览器级截图。

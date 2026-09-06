@@ -1,13 +1,13 @@
 [package]
 name = "drission"
-version = "0.6.2"
+version = "0.6.3"
 edition = "2024"
 rust-version = "1.85"
 # 示例按能力分文件夹(examples/<分类>/),每个 [[example]] 显式声明 path;关掉自动发现(子目录无
 # main.rs 本就不会被当示例,这里再加一道保险,杜绝把资源/子目录误判为示例)。
 autoexamples = false
 authors = ["极数本源 (apizero.cn)"]
-description = "Rust 里用 CDP 控 Chrome。Context / 磁盘 Profile / XHR 监听与 mock。同仓库有 drs CLI 和 MCP。"
+description = "Rust 里用 CDP 控 Chrome，同一套 API 也可驱动 Lightpanda。Context / 磁盘 Profile / XHR 监听与 mock。同仓库有 drs CLI 和 MCP（本机 Chrome）。"
 documentation = "https://docs.rs/drission"
 homepage = "https://apizero.cn"
 repository = "https://github.com/MageGojo/drission-rs"
@@ -124,6 +124,12 @@ sha2 = "0.10"
 [[example]]
 name = "cdp_demo"
 path = "examples/cdp/cdp_demo.rs"
+required-features = ["cdp"]
+
+# Lightpanda(同一套 CDP API,换引擎)。
+[[example]]
+name = "lightpanda_demo"
+path = "examples/cdp/lightpanda_demo.rs"
 required-features = ["cdp"]
 
 [[example]]
@@ -658,6 +664,12 @@ required-features = ["camoufox", "signer"]
 name = "qcc_login"
 path = "examples/sites/qcc_login.rs"
 required-features = ["cdp"]
+
+# 楚河 AI Model Hub 报价监听:Lightpanda/Chrome 同一套 API,XHR 听价,变动打 JSON / webhook。
+[[example]]
+name = "chuhe_price"
+path = "examples/sites/chuhe_price.rs"
+required-features = ["cdp", "ocr"]
 
 # 路飞学城(luffycity)播放页:CDP 监听抓 polyv secure JSON + HLS m3u8 + 课程接口(让浏览器解密,库只监听)。
 [[example]]

@@ -13,7 +13,7 @@ use crate::cdp::context::{ChromiumBrowserContext, ContextSpec};
 use crate::cdp::core::CdpCore;
 use crate::cdp::options::{ChromiumContextOverride, ChromiumOptions};
 use crate::cdp::tab::ChromiumTab;
-use crate::cdp::{container, fetch, locate, stealth};
+use crate::cdp::{container, fetch, lightpanda, locate, stealth};
 use crate::protocol::Connection;
 use crate::{Error, Result};
 
@@ -77,6 +77,9 @@ impl ChromiumBrowser {
     /// 时**自动下载** Chrome for Testing。只想定位/不下载用 [`Self::find_chrome`]。
     pub async fn launch(opts: ChromiumOptions) -> Result<Self> {
         opts.validate()?;
+        if opts.engine.is_lightpanda() {
+            return Self::launch_lightpanda(opts).await;
+        }
         let exe = match opts.binary_path.clone() {
             Some(p) => p,
             None => fetch::ensure_chrome().await?,
@@ -105,6 +108,39 @@ impl ChromiumBrowser {
     /// 跨平台预取(如在 mac 上为分发预取 `win64`)用 [`fetch::download_chrome_for`]。
     pub async fn download_chrome() -> Result<PathBuf> {
         fetch::ensure_chrome().await
+    }
+
+    /// 确保本机有 Lightpanda:环境变量 / PATH / 缓存,没有则下载 GitHub nightly。
+    /// 无原生 Windows 二进制。详见 `docs/Lightpanda.md`。
+    pub async fn download_lightpanda() -> Result<PathBuf> {
+        lightpanda::ensure_lightpanda().await
+    }
+
+    /// 启动 Lightpanda(`lightpanda serve`),连上后返回同一套 [`ChromiumBrowser`]。
+    async fn launch_lightpanda(opts: ChromiumOptions) -> Result<Self> {
+        let exe = match opts.binary_path.clone() {
+            Some(p) => p,
+            None => lightpanda::ensure_lightpanda().await?,
+        };
+        let spawned = lightpanda::spawn_serve(&exe, &opts).await?;
+        Ok(Self {
+            conn: Connection::from_ws(spawned.ws),
+            child: std::sync::Mutex::new(Some(spawned.child)),
+            // Lightpanda 无 Chrome user-data-dir;HTTP 缓存目录由 spawn 侧管理,quit 不删。
+            user_data_dir: None,
+            stealth: false,
+            headless: true,
+            full_ua_metadata: false,
+            ua_override: None,
+            ua_full_version: None,
+            platform_version: None,
+            download_dir: opts.download_path.clone(),
+            init_scripts: opts.init_scripts.clone(),
+            container_js: None,
+            named_contexts: CdpAttach::empty_registry(),
+            #[cfg(windows)]
+            job: std::sync::Mutex::new(None),
+        })
     }
 
     /// 用**指定的可执行文件**启动浏览器(`headless=true` 无头),开 CDP 调试端口并连接。
@@ -374,23 +410,28 @@ impl ChromiumBrowser {
         })
     }
 
-    /// 接管一个已开启 CDP 调试端口的浏览器 / Electron 应用(对齐 camoufox `Browser::connect`)。
-    /// `debug_http_url` 形如 `http://127.0.0.1:9222`(对方需以 `--remote-debugging-port=9222` 启动)。
+    /// 接管一个已开启 CDP 的浏览器 / Electron / Lightpanda。
+    ///
+    /// 接受:
+    /// - `http://127.0.0.1:9222`(查 `/json/version`;失败则回退为同端口 `ws://`)
+    /// - `ws://` / `wss://` 直连(Lightpanda Cloud:`wss://euwest.cloud.lightpanda.io/ws?token=…`)
     pub async fn connect(debug_http_url: &str) -> Result<Self> {
         Self::connect_with(debug_http_url, ChromiumOptions::new()).await
     }
 
     /// 同 [`connect`](Self::connect),可用 [`ChromiumOptions`] 指定反检测开关(对齐 camoufox
     /// `Browser::connect_with`)。接管不重启浏览器,故只有 `stealth` 等会话级项生效。
+    /// Lightpanda 引擎下默认不注入 Chrome stealth JS。
     pub async fn connect_with(debug_http_url: &str, opts: ChromiumOptions) -> Result<Self> {
-        let ws_url = browser_ws_url(debug_http_url.trim_end_matches('/')).await?;
+        let ws_url = resolve_cdp_ws_url(debug_http_url).await?;
         let ws = crate::transport::ws_connect(&ws_url).await?;
         Ok(Self {
             conn: Connection::from_ws(ws),
             child: std::sync::Mutex::new(None),
             user_data_dir: None,
             // 接管的浏览器同样不调用 Runtime.enable;按 opts 决定是否注入兜底脚本。
-            stealth: opts.stealth,
+            // Lightpanda 不要灌 Chrome stealth JS。
+            stealth: opts.stealth && !opts.engine.is_lightpanda(),
             // 接管方未知是否无头,保守不注入屏幕补丁。
             headless: false,
             // 接管不重启浏览器(无 `--user-agent` 注入路径),补环境不适用。
@@ -424,7 +465,15 @@ impl ChromiumBrowser {
             .as_str()
             .ok_or_else(|| Error::msg("CDP: 创建标签无 targetId"))?
             .to_string();
-        self.attach(target_id).await
+        let tab = self.attach(target_id).await?;
+        // Lightpanda 的 Target.createTarget 可能忽略 url,停在 about:blank;Chrome 已导航则跳过。
+        if let Some(u) = url.filter(|u| !u.is_empty() && *u != "about:blank") {
+            let current = tab.url().await.unwrap_or_default();
+            if current.is_empty() || current == "about:blank" {
+                tab.get(u).await?;
+            }
+        }
+        Ok(tab)
     }
 
     /// 按**上下文覆盖**开标签(对齐 camoufox `Browser::new_tab_with`):带 `proxy` 时新建独立
@@ -895,9 +944,33 @@ async fn wait_for_ws_url(port: u16, devtools_file: &Path, timeout: Duration) -> 
     }
 }
 
+/// 把用户给的调试地址收成 WebSocket URL。
+/// `ws://` / `wss://` 原样;`http(s)://` 先查 `/json/version`,失败则把 scheme 换成 ws(s)
+/// (Lightpanda `serve` 的端口本身就是 CDP WebSocket)。
+pub(crate) async fn resolve_cdp_ws_url(url: &str) -> Result<String> {
+    let url = url.trim();
+    if url.starts_with("ws://") || url.starts_with("wss://") {
+        return Ok(url.to_string());
+    }
+    let http = url.trim_end_matches('/');
+    match browser_ws_url(http).await {
+        Ok(ws) => Ok(ws),
+        Err(e) => http_to_ws(http).ok_or(e),
+    }
+}
+
+fn http_to_ws(http: &str) -> Option<String> {
+    http.strip_prefix("https://")
+        .map(|rest| format!("wss://{rest}"))
+        .or_else(|| {
+            http.strip_prefix("http://")
+                .map(|rest| format!("ws://{rest}"))
+        })
+}
+
 /// 查询 `{http}/json/version` 拿浏览器级 WebSocket 调试端点。**带超时**(5s),
 /// 避免端口已打开但 HTTP 不应答时 `reqwest` 无限挂起。
-async fn browser_ws_url(http: &str) -> Result<String> {
+pub(crate) async fn browser_ws_url(http: &str) -> Result<String> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(5))
         .build()
@@ -914,4 +987,36 @@ async fn browser_ws_url(http: &str) -> Result<String> {
         .as_str()
         .map(|s| s.to_string())
         .ok_or_else(|| Error::msg("CDP: /json/version 无 webSocketDebuggerUrl"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn resolve_ws_url_passthrough() {
+        assert_eq!(
+            resolve_cdp_ws_url("ws://127.0.0.1:9222").await.unwrap(),
+            "ws://127.0.0.1:9222"
+        );
+        assert_eq!(
+            resolve_cdp_ws_url("wss://euwest.cloud.lightpanda.io/ws?token=x")
+                .await
+                .unwrap(),
+            "wss://euwest.cloud.lightpanda.io/ws?token=x"
+        );
+    }
+
+    #[test]
+    fn http_to_ws_rewrites_scheme() {
+        assert_eq!(
+            http_to_ws("http://127.0.0.1:9222").as_deref(),
+            Some("ws://127.0.0.1:9222")
+        );
+        assert_eq!(
+            http_to_ws("https://host/path").as_deref(),
+            Some("wss://host/path")
+        );
+        assert_eq!(http_to_ws("ftp://x"), None);
+    }
 }
