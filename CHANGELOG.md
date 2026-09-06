@@ -7,6 +7,13 @@
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-09-07
+
+### 变更 Changed
+
+- README 恢复成库文档结构：上手路径仍是 Chrome；Lightpanda 单独成节，不再打断示例。
+- `drission` 与 `drission-cli` 都是 **0.6.4**。
+
 ## [0.6.3] - 2026-09-06
 
 库侧新增 Lightpanda 引擎变体。`drs` 仍是本机 Chrome / Agent / MCP，不接 Lightpanda。
@@ -437,6 +444,7 @@
 - **内置验证码 OCR**(ddddocr 模型 + tract 纯 Rust 推理)与**图片滑块缺口距离识别**(极验)。
 - 跨平台:macOS / Linux / Windows(命名管道传输)。
 
+[0.6.4]: https://github.com/MageGojo/drission-rs/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/MageGojo/drission-rs/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/MageGojo/drission-rs/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/MageGojo/drission-rs/compare/v0.6.0...v0.6.1
