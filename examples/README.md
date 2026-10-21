@@ -1,9 +1,16 @@
 # 示例
 
-公开示例只做两件事：本地页面，以及我们自己的公开站 [apizero.cn](https://apizero.cn/)。
+从这里开始：
 
 ```bash
 cargo run --example own_site
+```
+
+`own_site` 先在本地页填写并核对结果，再打开 [apizero.cn](https://apizero.cn/) 点进文档。测试你自己的网站时，把示例里的地址换成测试环境。说明见仓库根目录的 README。
+
+其他常用示例：
+
+```bash
 cargo run --example cdp_demo
 cargo run --example cdp_agent
 cargo run --example quickstart --no-default-features --features camoufox

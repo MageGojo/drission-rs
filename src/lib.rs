@@ -143,8 +143,7 @@ pub mod prelude {
     /// 作 canonical(两后端并存时这两个名归 camoufox,cdp 用 `Chromium*` 显式名)。
     #[cfg(feature = "cdp")]
     pub use crate::cdp::ChromiumPool as Pool;
-    /// CDP「主动逆向」能力类型(调试器/调用栈/脚本源码/Hook;Chromium 专有,仅 cdp 后端)。
-    /// 详见 `docs/逆向增强.md`。
+    /// 调试自己的页面时可用的类型：断点、调用栈、脚本源码、Hook。仅 CDP。
     #[cfg(feature = "cdp")]
     pub use crate::cdp::{
         CallFrame, ChildTarget, ChromiumDebugger, ChromiumHook, ChromiumScripts, HookHit,

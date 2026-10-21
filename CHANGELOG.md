@@ -7,6 +7,13 @@
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-10-21
+
+### 变更 Changed
+
+- README 改为按操作顺序说明：打开自有网站、填写点击、运行 `own_site`、用 `drs` 做同样的检查。
+- `drission` 与 `drission-cli` 都是 **0.6.6**。
+
 ## [0.6.5] - 2026-10-21
 
 公开示例改为测自己的页面。库 `drission` 和命令行 `drs` 都是 **0.6.5**。
@@ -455,6 +462,7 @@
 - **内置验证码 OCR**(ddddocr 模型 + tract 纯 Rust 推理)与**图片滑块缺口距离识别**(极验)。
 - 跨平台:macOS / Linux / Windows(命名管道传输)。
 
+[0.6.6]: https://github.com/MageGojo/drission-rs/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/MageGojo/drission-rs/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/MageGojo/drission-rs/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/MageGojo/drission-rs/compare/v0.6.2...v0.6.3

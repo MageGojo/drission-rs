@@ -1,13 +1,13 @@
 [package]
 name = "drission"
-version = "0.6.5"
+version = "0.6.6"
 edition = "2024"
 rust-version = "1.85"
 # 示例按能力分文件夹(examples/<分类>/),每个 [[example]] 显式声明 path;关掉自动发现(子目录无
 # main.rs 本就不会被当示例,这里再加一道保险,杜绝把资源/子目录误判为示例)。
 autoexamples = false
 authors = ["极数本源 (apizero.cn)"]
-description = "Rust 里用 CDP 控 Chrome，同一套 API 也可驱动 Lightpanda。Context / 磁盘 Profile / XHR 监听与 mock。同仓库有 drs CLI 和 MCP（本机 Chrome）。"
+description = "用 Rust 通过 CDP 控制本机 Chrome，对自有网站做打开、填写、点击和结果核对。同仓库提供命令行 drs。"
 documentation = "https://docs.rs/drission"
 homepage = "https://apizero.cn"
 repository = "https://github.com/MageGojo/drission-rs"
