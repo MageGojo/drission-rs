@@ -1,8 +1,7 @@
-//! **通用逆向探针**(对站点零硬编码):对任意 `URL=` 跑全套 ②脚本 / ③hook / ④反调试度量 / ⑤抓包。
+//! **通用逆向探针**:默认打开 `https://example.com`。
+//! 只把 `URL` 设成你有权调试的地址。
 //!
-//! 证明这些是**通用库能力**(`tab.debugger()/scripts()/hook()` + `tab.listen()`),不针对任何特定站点。
-//! 运行:`URL=<任意站> [GREP=<词>] [API=<api子串>] [SEC=12] [HL=0] cargo run --example re_probe`
-//! 例:`URL='https://www.youtube.com/watch?v=...' GREP=signature API=/youtubei/ cargo run --example re_probe`
+//! 运行:`cargo run --example re_probe`
 
 use std::collections::BTreeMap;
 use std::time::Duration;

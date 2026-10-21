@@ -8,20 +8,20 @@ Drive a local Chrome from Rust over CDP. The same repo ships `drs`, a CLI / MCP 
 [![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue.svg)](#compatibility)
 [![License](https://img.shields.io/badge/license-source--available-lightgrey.svg)](LICENSE)
 
-[简体中文](README.md) · **English** · [docs.rs](https://docs.rs/drission/0.6.4) · [CHANGELOG](CHANGELOG.md)
+[简体中文](README.md) · **English** · [docs.rs](https://docs.rs/drission/0.6.5) · [CHANGELOG](CHANGELOG.md)
 
 > Use this only on systems you own or are written-authorized to test. Do not bypass login, CAPTCHAs, or paywalls. See [Responsible use](#responsible-use) and [LICENSE](LICENSE).
 
 ## This release
 
-**0.6.4**. The `drission` library and the `drs` binary (`drission-cli`) share that number.
+**0.6.5**. The `drission` library and the `drs` binary (`drission-cli`) share that number.
 
 ```bash
 cargo add drission
 cargo install drission-cli --bin drs
 ```
 
-`drs --version` prints `drs 0.6.4`. No Rust toolchain: download a `drs` archive from [GitHub Releases](https://github.com/MageGojo/drission-rs/releases/latest) (GitCode mirror available). Scripts under `install/` fetch Latest.
+`drs --version` prints `drs 0.6.5`. No Rust toolchain: download a `drs` archive from [GitHub Releases](https://github.com/MageGojo/drission-rs/releases/latest) (GitCode mirror available). Scripts under `install/` fetch Latest.
 
 ## 1. Library
 
@@ -73,7 +73,7 @@ page.wait_for("Dashboard").await?;
 tab.wait().element("#dash").visible().timeout(Duration::from_secs(10)).await?;
 ```
 
-API: [docs.rs/drission](https://docs.rs/drission/0.6.4). In-repo: `cargo run --example cdp_demo`, `cargo run --example cdp_context`, `cargo run --example cdp_agent`.
+API: [docs.rs/drission](https://docs.rs/drission/0.6.5). In-repo: `cargo run --example own_site`, `cargo run --example cdp_demo`, `cargo run --example cdp_agent`. `own_site` fills a local page, then opens the public docs on [apizero.cn](https://apizero.cn/).
 
 ### Lightpanda
 
@@ -132,14 +132,10 @@ How to pick a command: [`docs/产品级CLI.md`](https://github.com/MageGojo/dris
 |---|---|---|
 | `cdp` | Chrome / Edge / Brave / Chromium / Electron | on |
 | `camoufox` | Camoufox / Firefox (Juggler) | off |
-| `ocr` | offline OCR (`tract`) | off |
-| `slider` | gap distance for authorized slider tests | off |
 | `signer` | embedded QuickJS | off |
-| `impersonate` | HTTP TLS fingerprinting; needs CMake | off |
 
 ```toml
-drission = { version = "0.6", features = ["ocr"] }
-# drission = { version = "0.6", default-features = false, features = ["camoufox"] }
+drission = { version = "0.6", default-features = false, features = ["camoufox"] }
 ```
 
 Lightpanda is an optional CDP engine, not a new feature.
@@ -156,21 +152,19 @@ Lightpanda is an optional CDP engine, not a new feature.
 ## Docs (GitHub; not packed on crates.io)
 
 - https://github.com/MageGojo/drission-rs
-- https://docs.rs/drission/0.6.4
+- https://docs.rs/drission/0.6.5
 - [CLI.md](https://github.com/MageGojo/drission-rs/blob/main/docs/CLI.md)
 - [Lightpanda.md](https://github.com/MageGojo/drission-rs/blob/main/docs/Lightpanda.md)
 - [CHANGELOG](CHANGELOG.md)
 
 ## Responsible use
 
-1. Only systems and accounts you are allowed to use.
+1. Only systems and accounts you are allowed to use. Examples cover a local page and our own public site ([apizero.cn](https://apizero.cn/)).
 2. Follow the law, site terms, `robots.txt`, rate limits.
 3. Do not bypass login, CAPTCHAs, paywalls, or impersonate people.
 4. Do not collect personal / secret / copyrighted data you cannot process.
 5. Keep purchases and deletes in a test env with a human in the loop.
 6. Do not commit profiles, cookies, or screenshots.
-
-OCR, image helpers, and request intercept do not authorize access to third-party sites.
 
 Report security issues via [SECURITY.md](SECURITY.md).
 

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>本地自测页</title>
+</head>
+<body>
+  <h1>本地自测页</h1>
+  <form>
+    <label>名称 <input id="name" name="name"></label>
+    <button id="save" type="button">保存</button>
+  </form>
+  <p id="out"></p>
+  <script>
+    document.getElementById("save").addEventListener("click", function () {
+      var name = document.getElementById("name").value;
+      document.getElementById("out").textContent = "已保存 " + name;
+    });
+  </script>
+</body>
+</html>

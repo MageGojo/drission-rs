@@ -524,8 +524,7 @@ pub struct ClickWord {
 const TEMPLATE_WEIGHT: f32 = 1.5;
 /// 模板**置信门控**上/下阈值:OCR 该框 top 亲和度 ≥ HI ⇒ 模板权重 0(完全信 OCR);≤ LO ⇒ 满权重
 /// (完全放手模板);之间线性。见 [`template_gate`]。
-/// 阈值取**较高**(0.6/0.2):易盾艺术字 OCR 多在 0.00–0.10 纯噪声,**不能**被它当「OCR 有信心」而压掉
-/// 真样本模板(实测 0.09 噪声把模板压到 0.11× → 目标被挤到假阳性框,故意调高门槛只在 OCR 真自信(≥0.6)时才信 OCR)。
+/// 阈值取较高(0.6/0.2):识别置信度很低时不要把它当成「已经认准」,留给模板信号。
 const TEMPLATE_GATE_HI: f32 = 0.60;
 const TEMPLATE_GATE_LO: f32 = 0.20;
 
@@ -608,8 +607,7 @@ impl ClickWord {
         Ok(out)
     }
 
-    /// 按**单个** [`BBox`] 从原图裁出该字图 PNG(与 [`solve`](Self::solve)/[`crops`](Self::crops) **同样的外扩裁剪**)。
-    /// 用于「过盾即验真」采样:拿到命中 [`ClickHit`] 后,按其 `bbox` 从干净图裁字 → [`SampleBank::save_labeled`]。
+    /// 按框从原图裁出 PNG。裁剪方式和求解用的是同一套。
     pub fn crop_bbox(&self, image: &[u8], b: &BBox) -> Result<Vec<u8>> {
         let img = image::load_from_memory(image).map_err(terr)?;
         let (iw, ih) = (img.width(), img.height());
@@ -620,13 +618,7 @@ impl ClickWord {
         Ok(buf.into_inner())
     }
 
-    /// **「过盾即验真」自动采样**:把一组**已验证正确**的命中按其 `bbox` 从 `image`(干净图)裁字,按
-    /// `{目标字}/` 存进样本库目录 `dir`(内容寻址去重)。返回**本次新增**样本数。
-    ///
-    /// 由来:易盾 `api/check` 回 `result:true` ⇒ 这一题各 [`ClickHit`] 的 `target` 就是其 `bbox` 框里
-    /// **真实的字**(点击序与 `front` 一致且被服务端判过)。于是每过一次盾就白捡若干**标签已验证**的真样本,
-    /// bank 越跑越厚、[`GlyphMatcher`]/[`SampleBank`] 模板信号越准——**零人工**破解里程碑 59 的「数据墙」。
-    /// 采到的样本下次进程启动即被 `DRISSION_GLYPH_SAMPLES` 自动加载,或本进程内调
+    /// 把已经确认正确的命中按框裁下来,按标签存进 `dir`。返回本次新增数量。
     /// [`reload_sample_bank`](Self::reload_sample_bank) 即时生效。
     pub fn harvest_verified(&self, image: &[u8], hits: &[ClickHit], dir: &Path) -> Result<usize> {
         let img = image::load_from_memory(image).map_err(terr)?;
@@ -663,10 +655,8 @@ impl ClickWord {
         self.solve_excluding(image, targets, &[])
     }
 
-    /// 同 [`solve`](Self::solve),但**先丢弃中心落在 `exclude` 任一矩形(原图像素)内的检测框**,
-    /// 再做识别 / 全局指派。用于排除验证码图上的**非文字干扰区**——典型如易盾弹窗右上角的
-    /// 刷新 / 语音 / 反馈工具栏:截图回退路径会把这些图标拍进图里,Det 易把它们误检成字框,
-    /// 一旦被指派点击就会把验证码**切成语音模式**(用户实测踩坑)。`exclude` 为空时等价于 `solve`。
+    /// 同 [`solve`](Self::solve),但先丢掉中心落在 `exclude` 矩形里的检测框。
+    /// `exclude` 为空时等价于 `solve`。
     pub fn solve_excluding(
         &self,
         image: &[u8],
@@ -1122,7 +1112,9 @@ fn preprocess(bytes: &[u8]) -> Result<(Vec<f32>, usize)> {
         .resize_exact(new_w as u32, 64, image::imageops::FilterType::Lanczos3)
         .to_luma8();
     // 初和这类黑底点阵图：ddddocr 按浅底深字训的，暗图先反相。
-    let n = (luma.width() as u64).saturating_mul(luma.height() as u64).max(1);
+    let n = (luma.width() as u64)
+        .saturating_mul(luma.height() as u64)
+        .max(1);
     let avg = luma.pixels().map(|p| p.0[0] as u64).sum::<u64>() / n;
     if avg < 90 {
         for p in luma.pixels_mut() {

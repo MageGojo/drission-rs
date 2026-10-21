@@ -8,20 +8,20 @@
 [![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue.svg)](#兼容性)
 [![License](https://img.shields.io/badge/license-source--available-lightgrey.svg)](LICENSE)
 
-**简体中文** · [English](README.en.md) · [docs.rs](https://docs.rs/drission/0.6.4) · [CHANGELOG](CHANGELOG.md)
+**简体中文** · [English](README.en.md) · [docs.rs](https://docs.rs/drission/0.6.5) · [CHANGELOG](CHANGELOG.md)
 
 > 只在你自己的、或书面授权过的系统上用。别拿去绕登录、验证码、付费墙。条款见[负责任使用](#负责任使用)和 [LICENSE](LICENSE)。
 
 ## 这一版
 
-**0.6.4**。库 `drission` 和命令行 `drs`（crate `drission-cli`）同一号。
+**0.6.5**。库 `drission` 和命令行 `drs`（crate `drission-cli`）同一号。
 
 ```bash
 cargo add drission
 cargo install drission-cli --bin drs
 ```
 
-`drs --version` 打出 `drs 0.6.4`。没有 Rust 工具链时，下 [GitHub Releases](https://github.com/MageGojo/drission-rs/releases/latest) 或 GitCode 镜像里对应平台的 `drs` 压缩包。`install/` 下有脚本，默认拉 Latest。
+`drs --version` 打出 `drs 0.6.5`。没有 Rust 工具链时，下 [GitHub Releases](https://github.com/MageGojo/drission-rs/releases/latest) 或 GitCode 镜像里对应平台的 `drs` 压缩包。`install/` 下有脚本，默认拉 Latest。
 
 ## 1. 当库用
 
@@ -76,7 +76,7 @@ tab.wait().element("#dash").visible().timeout(Duration::from_secs(10)).await?;
 let html = tab.capture().html().await?;
 ```
 
-类型和方法：[docs.rs/drission](https://docs.rs/drission/0.6.4)。仓库里可跑的例子：`cargo run --example cdp_demo`、`cargo run --example cdp_context`、`cargo run --example cdp_agent`。
+类型和方法：[docs.rs/drission](https://docs.rs/drission/0.6.5)。仓库里可跑的例子：`cargo run --example own_site`、`cargo run --example cdp_demo`、`cargo run --example cdp_agent`。`own_site` 先在本地页填表，再打开 [apizero.cn](https://apizero.cn/) 的公开文档页。
 
 ### Lightpanda
 
@@ -135,14 +135,10 @@ drs setup
 |---|---|---|
 | `cdp` | Chrome / Edge / Brave / Chromium / Electron | 开 |
 | `camoufox` | Camoufox / Firefox（Juggler） | 关 |
-| `ocr` | 本地 OCR（`tract`） | 关 |
-| `slider` | 授权测试里的滑块缺口距离 | 关 |
 | `signer` | 内嵌 QuickJS | 关 |
-| `impersonate` | HTTP 客户端 TLS 指纹，要 CMake | 关 |
 
 ```toml
-drission = { version = "0.6", features = ["ocr"] }
-# drission = { version = "0.6", default-features = false, features = ["camoufox"] }
+drission = { version = "0.6", default-features = false, features = ["camoufox"] }
 ```
 
 两端差哪些能力见仓库 [后端能力矩阵](https://github.com/MageGojo/drission-rs/blob/main/docs/后端能力矩阵.md)。Lightpanda 是 CDP 上的可选引擎，不是新 feature。
@@ -159,7 +155,7 @@ drission = { version = "0.6", features = ["ocr"] }
 ## 文档（都在 GitHub，不进 crates.io 包）
 
 - https://github.com/MageGojo/drission-rs — 源码、`docs/`、`examples/`
-- https://docs.rs/drission/0.6.4 — rustdoc
+- https://docs.rs/drission/0.6.5 — rustdoc
 - [CLI.md](https://github.com/MageGojo/drission-rs/blob/main/docs/CLI.md) — `drs` 全命令
 - [Lightpanda.md](https://github.com/MageGojo/drission-rs/blob/main/docs/Lightpanda.md)
 - [CHANGELOG](CHANGELOG.md)
@@ -168,14 +164,12 @@ drission = { version = "0.6", features = ["ocr"] }
 
 浏览器自动化会碰到登录态、个人数据和能写库的操作。用之前至少确认：
 
-1. 只碰你有权用的系统和账号。
+1. 只碰你有权用的系统和账号。示例只覆盖本地页和我们自己的公开站（[apizero.cn](https://apizero.cn/)）。
 2. 守法律、站点条款、`robots.txt`、频率限制。
 3. 不绕过登录、验证码、付费墙，不冒充别人。
 4. 不采集没权处理的个人 / 机密 / 版权数据。
 5. 下单、删除这类动作放测试环境，并要人确认。
 6. profile、Cookie、截图别提交到 git。
-
-可选的 OCR、图像分析、网络拦截不构成对任何第三方站点的授权。
 
 安全问题按 [SECURITY.md](SECURITY.md) 私下报。
 

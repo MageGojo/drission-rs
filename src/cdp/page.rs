@@ -30,7 +30,7 @@ impl ChromiumPage {
         Self::from_browser(ChromiumBrowser::launch_default().await?).await
     }
 
-    /// 一行起步:**无头 + 反检测**(无头自动补 UA/WebGL/屏幕,见 `docs/CDP过盾.md`)。
+    /// 一行起步:**无头**。无头时补齐 UA、WebGL 和屏幕，便于本地页和自己的站点。
     pub async fn headless() -> Result<Self> {
         Self::with(ChromiumOptions::new().headless(true)).await
     }

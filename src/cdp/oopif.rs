@@ -1,25 +1,11 @@
-//! 附着 **OOPIF(out-of-process iframe,跨域 iframe)/ worker** 子 target,把它当成可独立逆向的 tab。
-//!
-//! 站点隔离(site-isolation)下,跨域 iframe(典型如 Cloudflare Turnstile 的
-//! `challenges.cloudflare.com`)跑在**独立进程**,主 target 的 `Runtime.evaluate` /
-//! `Page.createIsolatedWorld{frameId}` 都进不去([`ChromiumFrame`](crate::cdp::ChromiumFrame)
-//! 适用于**同进程**子帧)。要真正进到这种 iframe 内部逆向,必须用
-//! `Target.setAutoAttach{flatten}` 拿到子 target 的独立 `sessionId`。
-//!
-//! 拿到 `sessionId` 后,本库的 [`CdpCore`] 完全按 session 工作,于是可以把这个 iframe **当成一个
-//! 普通 [`ChromiumTab`]** 来用——在它上面 `scripts()`(dump challenge 脚本)/ `debugger()`(下断点抠
-//! 解扰逻辑)/ `hook()`(偷 key/iv)/ `listen()`(抓包)/ `run_js()`。
+//! 附着跨域 iframe，把它当成独立标签调试。只用于你自己的页面。
 //!
 //! ```no_run
 //! use drission::prelude::*;
 //! use std::time::Duration;
 //! # async fn f(tab: ChromiumTab) -> drission::Result<()> {
-//! // 触发 Turnstile 后,等它的跨域 iframe 被附着:
-//! if let Some(cf) = tab.wait_oopif("challenges.cloudflare.com", Some(Duration::from_secs(8))).await? {
-//!     // 进到 iframe 内部 dump 它的 challenge 脚本:
-//!     for s in cf.tab().scripts().list().await? {
-//!         println!("{} ({}B)", s.url, s.length);
-//!     }
+//! if let Some(child) = tab.wait_oopif("example.com", Some(Duration::from_secs(8))).await? {
+//!     let _ = child.tab().url().await?;
 //! }
 //! # Ok(()) }
 //! ```

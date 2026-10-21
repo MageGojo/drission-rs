@@ -98,9 +98,9 @@ pub async fn download_lightpanda() -> Result<PathBuf> {
     let url = format!("{GITHUB_RELEASE}/{tag}/lightpanda-{platform}");
     tracing::info!(%url, %tag, %platform, "缓存未命中,开始下载 Lightpanda …");
     let tmp = dest.with_extension("download");
-    fetch::download(&url, &tmp).await.map_err(|e| {
-        Error::BrowserNotFound(format!("下载 Lightpanda 失败({url}): {e}"))
-    })?;
+    fetch::download(&url, &tmp)
+        .await
+        .map_err(|e| Error::BrowserNotFound(format!("下载 Lightpanda 失败({url}): {e}")))?;
     tokio::fs::rename(&tmp, &dest).await?;
     #[cfg(unix)]
     ensure_executable_bit(&dest);
@@ -151,12 +151,9 @@ pub(crate) async fn spawn_serve(exe: &Path, opts: &ChromiumOptions) -> Result<Sp
         cmd.arg(a);
     }
 
-    let mut child = cmd.spawn().map_err(|e| {
-        Error::msg(format!(
-            "Lightpanda: 启动失败({}): {e}",
-            exe.display()
-        ))
-    })?;
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| Error::msg(format!("Lightpanda: 启动失败({}): {e}", exe.display())))?;
 
     let stderr_buf = std::sync::Arc::new(tokio::sync::Mutex::new(String::new()));
     if let Some(err) = child.stderr.take() {
@@ -354,7 +351,10 @@ mod tests {
         if expected.is_file() {
             assert_eq!(sidecar_lightpanda().as_deref(), Some(expected.as_path()));
         } else {
-            assert!(sidecar_lightpanda().is_none() || sidecar_lightpanda() == Some(dir.join("bin").join(name)));
+            assert!(
+                sidecar_lightpanda().is_none()
+                    || sidecar_lightpanda() == Some(dir.join("bin").join(name))
+            );
         }
     }
 }

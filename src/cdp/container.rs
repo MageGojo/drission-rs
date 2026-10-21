@@ -1,29 +1,4 @@
-//! 容器 / 无 GPU Linux 环境探测 + 「**补环境**」——让无头 / 有头-via-Xvfb 的浏览器在 **Docker /
-//! 云服务器**里也能被强风控(如易盾点选)当成真实桌面,从而**下发并通过挑战**。
-//!
-//! ## 为什么需要(里程碑 73 在 Docker 里挑战图始终不弹的根因)
-//! Docker / 云主机 / `Xvfb`「假有头」里 Chrome **没有真实 GPU**,WebGL 只能走软件渲染
-//! (SwiftShader / llvmpipe / Mesa softpipe)。这带来两个**强机器人信号**:
-//! 1. **近期 Chrome(≥121)默认禁用 SwiftShader 的 WebGL**,不加 `--enable-unsafe-swiftshader`
-//!    时 `canvas.getContext('webgl')` 直接返回 `null` —— "**完全没有 WebGL**" 比软渲染更可疑;
-//! 2. 即便可用,`UNMASKED_RENDERER_WEBGL` 报 `Google SwiftShader` / `llvmpipe` / `SwiftShader Device`,
-//!    行为风控据此判定为机器人,**干脆不下发点选图**。
-//!
-//! ## 「补环境」两手(自动,识别到容器/无 GPU Linux 即生效)
-//! - **启动参数**(见 [`browser`](crate::cdp::browser)):自动补 `--enable-unsafe-swiftshader`,
-//!   保证软件 WebGL **可用**(否则下面的字符串改写无的放矢——上下文都建不出来);
-//! - **导航前注入**([`spoof_js`]):hook `getParameter`,把 `UNMASKED_VENDOR/RENDERER_WEBGL`
-//!   改写成与 **Linux UA 自洽**的常见桌面 GPU(默认 Intel Mesa),抹掉 SwiftShader/llvmpipe 破绽;
-//!   用 `Proxy` 包裹原生函数 → `getParameter.toString()` 仍是 `[native code]`(不留替换痕迹)。
-//!
-//! ## 触发条件([`should_spoof`])
-//! **Linux + stealth + (检测到容器 或 无 DRM 渲染节点 `/dev/dri/renderD*`)**。
-//! 后者能顺带覆盖"裸机无 GPU 的 Linux 服务器 + Xvfb"(非容器但同样软渲染)。
-//! - `ChromiumOptions::spoof_container(bool)` 显式开/关(优先级最高);
-//! - 环境变量 `DRISSION_CONTAINER_SPOOF=1/0` 同义;
-//! - `DRISSION_WEBGL_VENDOR` / `DRISSION_WEBGL_RENDERER` 自定义改写的 GPU 字符串。
-//!
-//! 非 Linux 一律不触发(改写的是 Linux GPU 字符串,在 mac/Win 上反而自相矛盾)。
+//! Linux 上没有真实 GPU 时，让 Chrome 仍能创建 WebGL 上下文。只用于自己的环境。
 
 /// 解析"开/关"型环境变量:`1/on/true/yes` → `Some(true)`,`0/off/false/no` → `Some(false)`,
 /// 其余(未设/无法识别)→ `None`。

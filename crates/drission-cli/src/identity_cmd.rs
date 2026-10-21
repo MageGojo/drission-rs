@@ -629,7 +629,8 @@ fn identity_job_preset_canonical(name: &str) -> Option<&'static str> {
     match normalize_identity_job_preset_name(name).as_str() {
         "publish" | "publish_conservative" | "conservative_publish" => Some("publish_conservative"),
         "login" | "login_sensitive" | "sensitive_login" => Some("login_sensitive"),
-        "scrape" | "scrape_aggressive" | "aggressive_scrape" => Some("scrape_aggressive"),
+        "batch" | "batch_guarded" | "guarded_batch" | "scrape" | "scrape_aggressive"
+        | "aggressive_scrape" => Some("batch_guarded"),
         _ => None,
     }
 }
@@ -777,7 +778,7 @@ fn identity_job_preset_policy(name: &str) -> Option<IdentityJobPolicy> {
                 ),
             ]);
         }
-        "scrape_aggressive" => {
+        "batch_guarded" => {
             policy.per_asset = Some(true);
             policy.child_concurrency = Some(5);
             policy.runtime_renew_interval_seconds = Some(300);
@@ -7028,7 +7029,7 @@ pub async fn run_identity_job(mut options: IdentityJobRunOptions) -> Result<Json
     if let Some(job_preset) = options.job_preset.clone() {
         let Some(canonical) = identity_job_preset_canonical(&job_preset) else {
             bail!(
-                "identity-job run job preset is unsupported: {job_preset}; supported presets are publish_conservative, login_sensitive, scrape_aggressive"
+                "identity-job run job preset is unsupported: {job_preset}; supported presets are publish_conservative, login_sensitive, batch_guarded"
             );
         };
         options.job_preset = Some(canonical.to_string());
@@ -18827,7 +18828,7 @@ mod tests {
         );
 
         let scrape = policy.merge_job_run(base_job_options(Some("scrape")));
-        assert_eq!(scrape.job_preset.as_deref(), Some("scrape_aggressive"));
+        assert_eq!(scrape.job_preset.as_deref(), Some("batch_guarded"));
         assert_eq!(scrape.child_concurrency, Some(5));
         assert_eq!(scrape.max_failed_assets, Some(5));
         assert_eq!(

@@ -8,6 +8,8 @@ All rights reserved.
 
 使用本项目需满足以下条款，如使用过程中出现违反任意一项条款的情形，授权自动失效。
 
+* 本许可不授权避开他人技术措施、未经授权访问、绕过验证码或付费墙、采集无权处理的个人信息
+
 * 禁止将 drission 应用到任何可能违反当地法律规定和道德约束的项目中
 
 * 禁止将 drission 用于任何可能有损他人利益的项目中
@@ -18,9 +20,7 @@ All rights reserved.
 
 * 禁止售卖、转售本项目或将其作为付费产品/服务的核心再分发牟利
 
-使用 drission 发生的一切行为均由使用人自行负责。
-因使用 drission 进行任何行为所产生的一切纠纷及后果均与版权持有人无关，
-版权持有人不承担任何使用 drission 带来的风险和损失。
+本许可不构成对任何第三方站点的授权。使用者对自己的行为负责。
 版权持有人不对 drission 可能存在的缺陷导致的任何损失负任何责任。
 
 ---------------------------------------------------------
@@ -35,6 +35,8 @@ redistribute this project (whether modified or not) as a paid product or for pro
 The following terms and conditions must be met in order to use this project. Authorization will
 automatically expire if any of the terms are violated during use.
 
+* This license does not authorize circumventing someone else's technical measures, unauthorized access, bypassing CAPTCHAs or paywalls, or collecting personal data you have no right to process.
+
 * It is strictly prohibited to use drission for any project that may violate local laws and
   ethical constraints.
 
@@ -48,9 +50,7 @@ automatically expire if any of the terms are violated during use.
 * It is strictly prohibited to sell or resell this project, or to redistribute it for profit as the
   core of a paid product or service.
 
-All actions taken using drission are the responsibility of the user.
-The copyright holder is not involved in any disputes or consequences arising from the use of
-drission for any actions, and the copyright holder shall not bear any risks and losses arising from
-the use of drission.
+This license is not authorization to access any third-party site. Users are responsible for their
+own actions.
 The copyright holder shall not bear any responsibility for any losses resulting from any defects in
 drission.

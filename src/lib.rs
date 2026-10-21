@@ -5,13 +5,10 @@
 //! 一致的简洁语法。**双后端**:
 //!
 //! - **Chromium / CDP**(默认,`--features cdp`):驱动或接管 Chrome / Edge / Brave / Electron。
-//!   同一套 API 也可驱动 [Lightpanda](https://lightpanda.io):`BrowserOptions::new().lightpanda()`
-//!   （服务器简单听接口；本机可视化 / 强反爬仍用 Chrome。`drs` 不接 Lightpanda）。
-//! - **Camoufox / Firefox(Juggler)**(`--features camoufox`):反检测浏览器,附带自动过盾 / 吐环境 /
-//!   滑块识别 / 高并发池 / Session(HTTP)双模等**全部高层能力**(`Page`/`WebPage`/`SessionPage`…)。
+//!   同一套 API 也可驱动 [Lightpanda](https://lightpanda.io):`BrowserOptions::new().lightpanda()`。
+//! - **Camoufox / Firefox(Juggler)**(`--features camoufox`):可选的 Firefox 后端。
 //!
-//! 默认构建 = **纯 CDP**(最精简,不含任何 Camoufox 代码);要用 Camoufox 及其高层能力,请显式开
-//! `--features camoufox`。两后端可同时开(`--features camoufox,cdp`)。
+//! 默认构建 = **纯 CDP**。公开示例只覆盖本地页和我们自己的站点。
 //!
 //! ## 设计目标
 //! - **语法像 DP**:`tab.get(url)`、`tab.ele("@id:kw")`、`ele.input(..)`、`ele.click()`、`tab.listen` 等。
@@ -155,12 +152,12 @@ pub mod prelude {
     };
     #[cfg(feature = "cdp")]
     pub use crate::cdp::{
-        CdpIntercept as Intercept, CdpInterceptedRequest as InterceptedRequest,
+        CdpEngine, CdpIntercept as Intercept, CdpInterceptedRequest as InterceptedRequest,
         CdpListen as Listen, ChromiumActions as Actions, ChromiumBrowser as Browser,
         ChromiumBrowserContext as BrowserContext, ChromiumConsole as Console,
         ChromiumDownloads as Downloads, ChromiumElement as Element,
         ChromiumElementRect as ElementRect, ChromiumElementWait as ElementWait,
-        CdpEngine, ChromiumFrame as Frame, ChromiumOptions as BrowserOptions, ChromiumPage as Page,
+        ChromiumFrame as Frame, ChromiumOptions as BrowserOptions, ChromiumPage as Page,
         ChromiumRecorder as Recorder, ChromiumScreencast as Screencast, ChromiumScroll as Scroll,
         ChromiumSetTab as SetTab, ChromiumShadowRoot as ShadowRoot, ChromiumTab as Tab,
         ChromiumWait as Wait, ChromiumWindow as Window, ChromiumWsListener as WsListener,

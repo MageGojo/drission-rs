@@ -42,8 +42,8 @@ impl ChromiumTab {
     /// `start()` 注入探针。详见 [`crate::envkit`]。
     ///
     /// ```ignore
-    /// let mut probe = tab.dump_env().target_query("a_bogus")
-    ///     .match_url("aweme/v1/web/aweme/detail").start().await?;
+    /// let mut probe = tab.dump_env().target_query("sid")
+    ///     .match_url("/api/item").start().await?;
     /// tab.get(url).await?;
     /// let dump = probe.collect().await?;
     /// dump.write_to("./dump-env")?;

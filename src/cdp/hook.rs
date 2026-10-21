@@ -1,19 +1,12 @@
-//! CDP **JS Hook 工具箱** [`ChromiumHook`](`tab.hook()`):一键 hook 常见 sink,命中把
-//! **参数 + 调用栈**回传 Rust;hook `crypto.subtle`/`CryptoJS` 即 **crypto tap —— 直接偷 key/iv/明文**。
-//!
-//! 很多站不必复现算法,**直接偷密钥**最快。本模块复用 `expose_function` 同款基建
-//! (`Runtime.addBinding` + `Page.addScriptToEvaluateOnNewDocument` + `Runtime.bindingCalled`),
-//! 注入的 wrapper **全程 try/catch、绝不弄坏页面**,且捕获原始 `JSON.stringify`/`btoa` 防自递归。
+//! 观察自己页面里脚本对 JSON 和 WebCrypto 的调用，参数和调用栈回到 Rust。
+//! 只在你有权调试的页面上用。
 //!
 //! ```no_run
 //! use drission::prelude::*;
 //! # async fn f(tab: ChromiumTab) -> drission::Result<()> {
-//! // 导航前装好 hook(crypto + json + 调用栈),再触发页面逻辑:
 //! let hook = tab.hook().crypto().json().with_stack().start().await?;
-//! // ... 触发签名/加密 ...
 //! while let Some(hit) = hook.wait(None).await? {
 //!     println!("[{}] {} args={:?}", hit.sink, hit.func, hit.args);
-//!     // crypto.subtle.encrypt 的明文在 args[2](bytes→base64),CryptoKey 元信息在 args[1]
 //! }
 //! # Ok(()) }
 //! ```

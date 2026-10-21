@@ -49,11 +49,11 @@ pub mod element;
 mod extras;
 pub mod fetch;
 mod fingerprint;
-mod lightpanda;
 pub mod frame;
 mod handles;
 mod hook;
 pub mod interceptor;
+mod lightpanda;
 pub mod listener;
 pub mod locate;
 mod network;
@@ -92,14 +92,14 @@ pub use extras::{
     NetworkConditions, PdfOptions,
 };
 pub use fetch::{cft_platform, download_chrome_for, download_chrome_milestone, ensure_chrome};
-pub use lightpanda::{
-    download_lightpanda, ensure_lightpanda, lightpanda_platform, locate_lightpanda,
-};
 pub use fingerprint::{CdpFingerprint, CdpFingerprintPool, CdpOs};
 pub use frame::ChromiumFrame;
 pub use handles::{ChromiumScroll, ChromiumSetTab, ChromiumWait, ChromiumWindow};
 pub use hook::{ChromiumHook, HookHit, HookSession};
 pub use interceptor::{CdpIntercept, CdpInterceptedRequest};
+pub use lightpanda::{
+    download_lightpanda, ensure_lightpanda, lightpanda_platform, locate_lightpanda,
+};
 pub use listener::CdpListen;
 pub use locate::chrome_path;
 pub use network::{NetworkHandle, NetworkRoute};

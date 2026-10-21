@@ -1,16 +1,5 @@
-//! Cloudflare 挑战自动通过(对标"过盾"诉求)。
-//!
-//! 两类挑战:
-//! - **非交互式(JS challenge)**:浏览器指纹/环境过关后**自动放行**(标题从 "Just a moment..."
-//!   变成真实页),我们只需轮询等待。
-//! - **交互式(Turnstile 复选框)**:页面里嵌一个 `challenges.cloudflare.com` 的 iframe,
-//!   左侧有"确认你是真人"复选框,**必须点一下**。复选框在跨域 iframe(还套 shadow DOM)里,
-//!   页面 JS 读不到内容,但能读到 **iframe 元素的位置**;于是用**可信鼠标事件**
-//!   (`Page.dispatchMouseEvent`,`isTrusted=true`)按坐标点它的复选框处即可。
-//!
-//! 关键点:点击必须是**可信**事件(我们的 `tab.actions()` 走的就是 `dispatchMouseEvent`,
-//! 实测 `isTrusted=true`),且鼠标移动带拟人轨迹;配合本库默认的干净指纹(`webdriver=false`、
-//! 屏幕自洽、`block_webrtc` 等),交互式 Turnstile 一般点一下即过。
+//! 页面上若出现 Cloudflare 挑战控件，这里负责探测并点击复选框。
+//! 只用于你自己的、或书面授权过的站点。不保证通过。
 
 use std::time::{Duration, Instant};
 

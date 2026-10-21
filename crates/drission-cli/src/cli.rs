@@ -1015,7 +1015,7 @@ pub enum IdentityJobCommand {
         /// JSON governance policy used as defaults for job runtime behavior.
         #[arg(long)]
         policy: Option<PathBuf>,
-        /// Built-in job governance preset: publish_conservative, login_sensitive, or scrape_aggressive.
+        /// Built-in job governance preset: publish_conservative, login_sensitive, or batch_guarded.
         #[arg(long)]
         job_preset: Option<String>,
         /// Desired business concurrency that must be available before running.

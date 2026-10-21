@@ -117,6 +117,8 @@ Lightpanda 无 Chromium 渲染管线。同一套 API 能调，但部分域是 st
 
 站点兼容性不如 Chrome：复杂 SPA / 强指纹 / 要真截图时，改回默认 Chromium。
 
+想自己用 Rust 重写这套内核？先读 [`分析-Lightpanda能否用Rust复现.md`](分析-Lightpanda能否用Rust复现.md)：语言能换，工作量几乎不减，本库不立项。
+
 `Target.createTarget` 在 Lightpanda 上可能忽略初始 url。`ChromiumBrowser::new_tab(Some(url))`
 会在附着后发现仍是 `about:blank` 时再走一次 `Page.navigate`，Chrome 已导航则不重复。
 

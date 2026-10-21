@@ -6,13 +6,11 @@
 //!
 //! ```ignore
 //! let mut probe = tab.dump_env()
-//!     .target_query("a_bogus").match_url("aweme/v1/web/aweme/detail")
-//!     .start().await?;                                // 注入探针(必须在 get 之前)
+//!     .target_query("sid").match_url("/api/item")
+//!     .start().await?;
 //! tab.get(url).await?;
-//! let dump = probe.collect().await?;                  // 采集
-//! dump.write_to("./dump-env")?;                       // 吐 seed/env.js/sinks/signers/targets
-//! dump.export_project("./douyin-env", EnvScope::Full)?;
-//! let report = dump.verify(&tab, "./dump-env", EnvScope::Full).await?; // 同构双跑自验证
+//! let dump = probe.collect().await?;
+//! dump.write_to("./dump-env")?;
 //! ```
 
 use std::future::Future;

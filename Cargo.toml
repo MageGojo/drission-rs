@@ -1,6 +1,6 @@
 [package]
 name = "drission"
-version = "0.6.4"
+version = "0.6.5"
 edition = "2024"
 rust-version = "1.85"
 # 示例按能力分文件夹(examples/<分类>/),每个 [[example]] 显式声明 path;关掉自动发现(子目录无
@@ -13,7 +13,7 @@ homepage = "https://apizero.cn"
 repository = "https://github.com/MageGojo/drission-rs"
 readme = "README.md"
 license-file = "LICENSE"
-keywords = ["captcha", "ddddocr", "anti-detect", "drissionpage", "browser-automation"]
+keywords = ["browser", "cdp", "automation", "chromium", "mcp"]
 categories = ["web-programming", "api-bindings", "computer-vision"]
 # 发布到 crates.io 时排除:构建产物 / 内部文档 / 各类运行测试产物(样本/吐环境/自训脚手架),
 # 这些已在 .gitignore,这里再显式排除(双保险,确保 `cargo publish` 不打包)。
@@ -45,22 +45,18 @@ resolver = "2"
 default = ["cdp"]
 # Chromium(Chrome / Edge / Brave / Electron,CDP)后端 —— 默认后端。
 cdp = []
-# Camoufox / Firefox(Juggler)反检测后端 + 全部高层能力(Page/WebPage/Session/Pool/吐环境/过盾…)。
-# opt-in,真正 gate:不开 camoufox 则 browser/launcher/page/web_page/session/pool 都不编译。
+# Camoufox / Firefox(Juggler)。opt-in。不开则 browser/launcher/page/web_page/session/pool 都不编译。
 camoufox = []
-# 滑块/图片缺口距离识别(通用滑块 + 极验 + 顶象 ContentNcc)。**后端无关**:缺口算法是页面内 JS,
-# 核心在 crate::slider,camoufox `Tab` 与 cdp `ChromiumTab` 各实现一次原语即两后端均可用(不再强制 camoufox)。
+# 本地页面上的缺口距离。默认关。公开示例只覆盖本地页。
 slider = []
-# 验证码 OCR(ddddocr 预训练模型 + 纯 Rust tract 推理)。Ocr 识别器后端无关;
-# tab.ocr_image 便捷方法需 camoufox。可选,避免给不需要的用户引入重依赖。
+# 可选图像文字识别。默认关。公开文档和示例不展开。
 ocr = ["dep:image", "dep:tract-onnx", "dep:fontdue"]
 tract-onnx = ["dep:tract-onnx"]
 image = ["dep:image"]
-# 纯算签名运行器:内嵌 QuickJS(rquickjs),把吐出的 env.js 编进单个二进制。后端无关,默认关、按需开。
+# 纯算运行器:内嵌 QuickJS。默认关。
 signer = ["dep:rquickjs"]
 fontdue = ["dep:fontdue"]
-# Session(HTTP)模式的浏览器 TLS/JA3/JA4 + HTTP2 指纹伪装(wreq + BoringSSL)。默认关,按需开;
-# 因 SessionPage 当前在 camoufox 门下,故 imply camoufox(同 slider)。需 cmake + C 编译器(编 BoringSSL)。
+# 可选 HTTP 客户端。默认关。需 cmake + C 编译器。Session 目前在 camoufox 门下,故 imply camoufox。
 impersonate = ["camoufox", "dep:wreq", "dep:wreq-util"]
 
 [dependencies]
@@ -76,7 +72,7 @@ image = { version = "0.25.10", default-features = false, features = ["png", "jpe
 libc = "0.2.186"
 os_pipe = { version = "1.2.3", features = ["io_safety"] }
 reqwest = { version = "0.13.4", features = ["json", "stream", "socks"] }
-# 内嵌 QuickJS 引擎(纯算签名运行器 `signer` feature 用),编译期把 QuickJS 由 C 源码静态编进二进制。
+# 内嵌 QuickJS,编译期静态编进二进制。
 rquickjs = { version = "0.11", optional = true }
 scraper = "0.27.0"
 serde = { version = "1.0.228", features = ["derive"] }
@@ -102,21 +98,15 @@ aes = "0.8"
 cbc = { version = "0.1", features = ["alloc", "block-padding"] }
 base64 = "0.22"
 hex = "0.4"
-# 仅供逆向实战示例(examples/reverse/re_rrmj_replay.rs:复现 x-ca-sign = HmacSHA256 → base64)。dev-only。
-hmac = "0.12"
-sha2 = "0.10"
 
 # ── 示例 feature 门控 ──────────────────────────────────────────────────────────
 # 默认后端是纯 CDP;用 Camoufox `Browser`/`Page` 的示例必须声明 `required-features=["camoufox"]`,
 # 否则默认 `cargo build --examples` 会因 camoufox 模块未编译而失败。
 # 运行各示例(头注释里也都写了对应命令,复制即用):
-#   cdp 示例:          cargo run --example cdp_demo                                   (默认即含 cdp)
+#   自测本站:          cargo run --example own_site
+#   cdp 示例:          cargo run --example cdp_demo
 #   Camoufox 系示例:   cargo run --example quickstart --no-default-features --features camoufox
-#   滑块(slider,camoufox):cargo run --example geetest_slide --no-default-features --features camoufox,slider
-#   Camoufox+OCR:      cargo run --example ocr_captcha --no-default-features --features camoufox,ocr
-#   cdp+OCR(点选):    cargo run --example yidun_click --features cdp,ocr
-#   cdp+OCR(点选稳定):cargo run --example yidun_click_stable --features cdp,ocr
-#   Session TLS 指纹:  cargo run --example session_tls --features impersonate
+#   本地缺口页:        cargo run --example slider_local --no-default-features --features camoufox,slider
 # ⚠️ Camoufox 系务必带 `--no-default-features`:默认 cdp 与 camoufox 并存时统一接口按「cdp 优先」解析,
 #    会与 camoufox 示例的类型冲突(编译失败或跑成 cdp 后端)。cdp 系反之(默认即可)。
 
@@ -124,6 +114,11 @@ sha2 = "0.10"
 [[example]]
 name = "cdp_demo"
 path = "examples/cdp/cdp_demo.rs"
+
+# 本地页填表 + 打开 apizero.cn 公开文档页。
+[[example]]
+name = "own_site"
+path = "examples/cdp/own_site.rs"
 required-features = ["cdp"]
 
 # Lightpanda(同一套 CDP API,换引擎)。
@@ -161,12 +156,6 @@ name = "cdp_pool"
 path = "examples/cdp/cdp_pool.rs"
 required-features = ["cdp"]
 
-# CDP 吐环境 tab.dump_env()(探针 + env.js + 导出工程 + 同构双跑验证,复用 envkit)。
-[[example]]
-name = "cdp_dump_env"
-path = "examples/cdp/cdp_dump_env.rs"
-required-features = ["cdp"]
-
 # CDP「标配补齐」(对标 PW/Puppeteer/DP):set_content/媒体模拟/网络离线/设备/storage/wait/HAR/expose/PDF/MHTML。
 [[example]]
 name = "cdp_extras"
@@ -198,235 +187,38 @@ name = "learn_basics"
 path = "examples/learn/learn_basics.rs"
 required-features = ["cdp"]
 
-# 实战第 ② 课:爬 B 站热门视频封面(联网)——边做业务边学 struct/迭代器/并发下载/文件 IO。
-[[example]]
-name = "bilibili_covers"
-path = "examples/learn/bilibili_covers.rs"
-required-features = ["cdp"]
-
-# ═════════ 主动逆向(examples/reverse/,见 docs/逆向增强.md)═════════
-# ① XHR 断点 + 调用栈:定位「请求在哪发起 / 签名在哪生成」+ 断点上下文读私有变量。
+# 调试自己的页面:断点、脚本、在 example.com 上重放自己发出的请求。
+# ① 在本地页面上对 fetch 下断点,看调用栈。
 [[example]]
 name = "re_xhr_break"
 path = "examples/reverse/re_xhr_break.rs"
 required-features = ["cdp"]
 
-# ② 脚本源码 dump + 全文搜索 + 美化:把站点 JS 全 dump 落盘、grep 签名字样。
+# ② 读当前页面的脚本源码。
 [[example]]
 name = "re_scripts"
 path = "examples/reverse/re_scripts.rs"
 required-features = ["cdp"]
 
-# ③ JS Hook / crypto tap:hook 常见 sink,命中回传参数 + 调用栈;偷 key/iv/明文。
-[[example]]
-name = "re_hook"
-path = "examples/reverse/re_hook.rs"
-required-features = ["cdp"]
-
-# ④ 反「无限 debugger」:defuse setInterval(debugger) / Function("debugger")()。
-[[example]]
-name = "re_anti_debug"
-path = "examples/reverse/re_anti_debug.rs"
-required-features = ["cdp"]
-
-# ⑤ 抓包 → impersonate 重放闭环:浏览器抓请求 → cookie 交接 → 改字段重放验真(需浏览器 TLS 指纹)。
+# 把监听到的请求再发出去。只应重放你有权访问的接口。
 [[example]]
 name = "re_replay"
 path = "examples/reverse/re_replay.rs"
 required-features = ["cdp", "impersonate"]
 
-# 真站验证:用 ④ anti_anti_debug 实测反调试强站(对照 defuse 前后的 Debugger.paused 次数)。
-[[example]]
-name = "re_verify"
-path = "examples/reverse/re_verify.rs"
-required-features = ["cdp"]
-
-# 真站端到端(侦察):③ crypto tap + ⑤ 抓包,偷 api.rrmj.plus 的 x-ca-sign 签名串与 key。
-[[example]]
-name = "re_rrmj"
-path = "examples/reverse/re_rrmj.rs"
-required-features = ["cdp"]
-
-# 真站端到端(复现+重放):Rust 复算 HmacSHA256 x-ca-sign,Session 重放验真(需浏览器 TLS 指纹)。
-[[example]]
-name = "re_rrmj_replay"
-path = "examples/reverse/re_rrmj_replay.rs"
-required-features = ["cdp", "impersonate"]
-
-# 通用逆向探针(零站点硬编码):对任意 URL 跑 ②脚本 / ③hook / ④反调试度量 / ⑤抓包。
+# 对自己的页面做一次调试探查。默认 example.com。
 [[example]]
 name = "re_probe"
 path = "examples/reverse/re_probe.rs"
 required-features = ["cdp"]
-
-# YouTube base.js 签名/n 参数:② dump base.js 美化源码 + 定位 sig/n 解扰函数(① 断点见 re_yt_sig2)。
-[[example]]
-name = "re_yt_sig"
-path = "examples/reverse/re_yt_sig.rs"
-required-features = ["cdp"]
-
-# YouTube n 参数:① 在 base.js n 处理处下断点,断点上下文运行解扰 + dump 源码。
-[[example]]
-name = "re_yt_sig2"
-path = "examples/reverse/re_yt_sig2.rs"
-required-features = ["cdp"]
-
-# YouTube n 参数诊断:摸清 headless 起播 / n 形态 / 能否从 ytInitialPlayerResponse 直接拿乱序 n。
-[[example]]
-name = "re_yt_diag"
-path = "examples/reverse/re_yt_diag.rs"
-required-features = ["cdp"]
-
-# YouTube 端到端:① 断点抠出统一 VM 的「直链构建器 y2」(sig+nsig 一把梭)→ 拼真实 googlevideo 直链 → 下载 + ffprobe 验真。
-[[example]]
-name = "re_yt_play"
-path = "examples/reverse/re_yt_play.rs"
-required-features = ["cdp"]
-
-# YouTube 纯协议·脱浏览器:reqwest 抓 base.js → 内嵌 QuickJS(signer)补环境跑整份 → 自算 n/sig 直链 → 下载 + ffprobe。
-[[example]]
-name = "re_yt_protocol"
-path = "examples/reverse/re_yt_protocol.rs"
-required-features = ["signer"]
-
-# YouTube 通用命令行下载器:InnerTube(TV客户端免pot拿全分轨)+ QuickJS 算 sig/n + 选清晰度/进度条/ffmpeg合并/pot透传。
-[[example]]
-name = "yt_dl"
-path = "examples/reverse/yt_dl.rs"
-required-features = ["signer", "cdp"]
-# ═════════ 反检测 / 指纹(examples/antidetect/)═════════
-# 指纹探针:dump 全面指纹 JSON,有头/无头 diff 出无头破绽(反检测诊断工具)。
-[[example]]
-name = "cdp_fp"
-path = "examples/antidetect/cdp_fp.rs"
-required-features = ["cdp"]
-
-# 无头 GPU 探针:读 WebGL UNMASKED_RENDERER_WEBGL 判断无头是否拿到真实 GPU(非 SwiftShader)。
-[[example]]
-name = "gpu_probe"
-path = "examples/antidetect/gpu_probe.rs"
-required-features = ["cdp"]
-
-# 无头 Client Hints 诊断:mask_ua 开/关对高熵 CH(fullVersionList 等)与 UA 的影响。
-[[example]]
-name = "hl_ch"
-path = "examples/antidetect/hl_ch.rs"
-required-features = ["cdp"]
-
-# 每浏览器不同指纹:CdpFingerprint/CdpFingerprintPool 起 N 个浏览器各套一份指纹,dump 验证各异。
-[[example]]
-name = "cdp_fingerprint"
-path = "examples/antidetect/cdp_fingerprint.rs"
-required-features = ["cdp"]
-
-# 指纹「确实换了」第三方验证:加载 FingerprintJS 取 visitorId + 自算 canvas/webgl/audio 哈希,
-# 不同画像两两不同、同画像复跑稳定。
-[[example]]
-name = "fp_verify"
-path = "examples/antidetect/fp_verify.rs"
-required-features = ["cdp"]
-
-# ═════════ 纯算签名 / 吐环境(examples/env/)═════════
-# 纯算签名运行器(QuickJS,不开浏览器)。
-[[example]]
-name = "env_signer"
-path = "examples/env/env_signer.rs"
-required-features = ["signer"]
-
-# ═════════ 验证码·字符 OCR(examples/ocr/)═════════
-# 目标检测(点选验证码)可行性探针:Det 跑通 common_det.onnx(CDP 截图喂入)。
-[[example]]
-name = "det_probe"
-path = "examples/ocr/det_probe.rs"
-required-features = ["cdp", "ocr"]
-
-# OCR/检测模型热替换(自训模型上线):自定义字符集 + 原地热替换 + 环境变量零改码(后端无关)。
-[[example]]
-name = "ocr_hotswap"
-path = "examples/ocr/ocr_hotswap.rs"
-required-features = ["ocr"]
-
-# 点选 OCR 命令行(无浏览器):图片+目标字 → 按序点击坐标 JSON(供补环境点选注入)。
-[[example]]
-name = "clickword_cli"
-path = "examples/ocr/clickword_cli.rs"
-required-features = ["ocr"]
-
-# 点选 OCR 离线精度自评(无浏览器):标注 crop → 量化 纯OCR vs OCR+字形模板第二信号(留一法,无泄漏)。
-[[example]]
-name = "clickword_eval"
-path = "examples/ocr/clickword_eval.rs"
-required-features = ["ocr"]
-
-# ═════════ 验证码·文字点选 / 易盾(examples/clickword/)═════════
-# 点选/文字点选验证码(易盾 picture-click):det → 逐框 OCR → 按序可信点击(CDP)。
-[[example]]
-name = "yidun_click"
-path = "examples/clickword/yidun_click.rs"
-required-features = ["cdp", "ocr"]
-
-# 易盾点选「稳定版」:先确认点选图真显示(hover 保活+重触发+iframe 兜底)才走识别/点击,
-# 且用 Outcome 诚实分类——绝不把「没出图/不稳定」误判成「过不了易盾」(CDP)。
-[[example]]
-name = "yidun_click_stable"
-path = "examples/clickword/yidun_click_stable.rs"
-required-features = ["cdp", "ocr"]
-
-# 易盾点选样本采集(为阶段3 自训攒数据):反复弹挑战 → 切字框落盘 + OCR 猜测标签(CDP)。
-[[example]]
-name = "yidun_collect"
-path = "examples/clickword/yidun_collect.rs"
-required-features = ["cdp", "ocr"]
-
-# 易盾点选请求侦察:监听网络看验证码图片格式/来源 + 提示文字下发方式(CDP)。
-[[example]]
-name = "yidun_probe"
-path = "examples/clickword/yidun_probe.rs"
-required-features = ["cdp"]
-
-# 易盾提交侦察(为「补轨迹/纯算」可行性评估):dump check 的 query 参数 + up 的 postData,定位轨迹字段。
-[[example]]
-name = "yidun_trace"
-path = "examples/clickword/yidun_trace.rs"
-required-features = ["cdp", "ocr"]
-
-# 易盾点选风控侦察:普查监听事件 + 测点击事件密度 + 抓提交/check 请求(CDP)。
-[[example]]
-name = "yidun_detect"
-path = "examples/clickword/yidun_detect.rs"
-required-features = ["cdp"]
-
-# ═════════ 验证码·滑块/缺口(examples/slider/)═════════
-# 滑块/缺口识别示例(这些示例用 Camoufox `Browser`/`Tab`,故显式声明 camoufox+slider;
-# 滑块能力本身后端无关,cdp `ChromiumTab` 上也有同名 tab.slider_gap/solve_slider)。
-[[example]]
-name = "dx_slide"
-path = "examples/slider/dx_slide.rs"
-required-features = ["camoufox", "slider"]
-
-[[example]]
-name = "geetest_slide"
-path = "examples/slider/geetest_slide.rs"
-required-features = ["camoufox", "slider"]
 
 [[example]]
 name = "slider_local"
 path = "examples/slider/slider_local.rs"
 required-features = ["camoufox", "slider"]
 
-# 验证码·字符 OCR(Camoufox 后端 tab.ocr_image,需 camoufox + ocr;归 examples/ocr/)。
-[[example]]
-name = "ocr_captcha"
-path = "examples/ocr/ocr_captcha.rs"
-required-features = ["camoufox", "ocr"]
-
-[[example]]
-name = "apizero_login"
-path = "examples/ocr/apizero_login.rs"
-required-features = ["camoufox", "ocr"]
-
 # ═════════ Camoufox 后端页面/元素/交互(examples/camoufox/)═════════
-# 需 --no-default-features --features camoufox(Browser/Page/Tab/Pool/Session/吐环境/过盾…)。
+# 需 --no-default-features --features camoufox。
 [[example]]
 name = "quickstart"
 path = "examples/camoufox/quickstart.rs"
@@ -498,59 +290,6 @@ name = "download_manager"
 path = "examples/camoufox/download_manager.rs"
 required-features = ["camoufox"]
 
-# ═════════ 反检测(承上 examples/antidetect/,Camoufox 系)═════════
-[[example]]
-name = "anti_detect"
-path = "examples/antidetect/anti_detect.rs"
-required-features = ["camoufox"]
-
-[[example]]
-name = "stealth_check"
-path = "examples/antidetect/stealth_check.rs"
-required-features = ["camoufox"]
-
-# ═════════ 过 Cloudflare 盾(examples/cloudflare/)═════════
-[[example]]
-name = "cf_check"
-path = "examples/cloudflare/cf_check.rs"
-required-features = ["camoufox"]
-
-[[example]]
-name = "cf_flow_capture"
-path = "examples/cloudflare/cf_flow_capture.rs"
-required-features = ["camoufox"]
-
-[[example]]
-name = "cf_jsd_recon"
-path = "examples/cloudflare/cf_jsd_recon.rs"
-required-features = ["camoufox"]
-
-[[example]]
-name = "exa_cf"
-path = "examples/cloudflare/exa_cf.rs"
-required-features = ["cdp"]
-
-[[example]]
-name = "cf_turnstile_recon"
-path = "examples/cloudflare/cf_turnstile_recon.rs"
-required-features = ["cdp"]
-
-[[example]]
-name = "cf_turnstile_dump"
-path = "examples/cloudflare/cf_turnstile_dump.rs"
-required-features = ["cdp"]
-
-[[example]]
-name = "cf_turnstile_e2e"
-path = "examples/cloudflare/cf_turnstile_e2e.rs"
-required-features = ["cdp"]
-
-# 混合方案·浏览器侧:只过盾铸 token(mint=新鲜未消费 token+导全 cookie;capture=抓 verify/signin 完整请求形状)。
-[[example]]
-name = "cf_turnstile_hybrid"
-path = "examples/cloudflare/cf_turnstile_hybrid.rs"
-required-features = ["cdp"]
-
 # ═════════ 网络监听 / 拦截 / console / ws(examples/network/)═════════
 [[example]]
 name = "concurrent_listen"
@@ -604,107 +343,9 @@ name = "session_mode"
 path = "examples/session/session_mode.rs"
 required-features = ["camoufox"]
 
-# Session 浏览器 TLS/JA3/JA4 指纹(wreq + BoringSSL),JA3 实测对比自验证。
-[[example]]
-name = "session_tls"
-path = "examples/session/session_tls.rs"
-required-features = ["impersonate"]
-
 [[example]]
 name = "web_page_scrape"
 path = "examples/session/web_page_scrape.rs"
-required-features = ["camoufox"]
-
-# ═════════ 吐环境·指纹(承上 examples/env/)═════════
-[[example]]
-name = "dump_env_fingerprint"
-path = "examples/env/dump_env_fingerprint.rs"
-required-features = ["camoufox"]
-
-# ═════════ 站点实战采集(examples/sites/)═════════
-[[example]]
-name = "douyin_listen"
-path = "examples/sites/douyin_listen.rs"
-required-features = ["camoufox"]
-
-[[example]]
-name = "douyin_listen_long"
-path = "examples/sites/douyin_listen_long.rs"
-required-features = ["camoufox"]
-
-[[example]]
-name = "douyin_capture"
-path = "examples/sites/douyin_capture.rs"
-required-features = ["camoufox"]
-
-[[example]]
-name = "douyin_dump_env"
-path = "examples/sites/douyin_dump_env.rs"
-required-features = ["camoufox"]
-
-[[example]]
-name = "bilibili_listen_long"
-path = "examples/sites/bilibili_listen_long.rs"
-required-features = ["camoufox"]
-
-# 湖北省人民政府「政府文件」公开列表:动态翻页 + 逐条进详情页抽正文/发文字号/来源并导出 CSV。
-[[example]]
-name = "hubei_zfwj_csv"
-path = "examples/sites/hubei_zfwj_csv.rs"
-required-features = ["cdp"]
-
-# 湖北省人民政府「政府文件」纯协议版:SessionPage 抓挑战页 + 本地 JS 引擎解 challenge,不启动浏览器。
-[[example]]
-name = "hubei_zfwj_protocol"
-path = "examples/sites/hubei_zfwj_protocol.rs"
-required-features = ["camoufox", "signer"]
-
-# 企查查账号密码登录:切换密码表单、环境变量填充、识别极验滑块/点选并在有头窗口等待用户完成。
-[[example]]
-name = "qcc_login"
-path = "examples/sites/qcc_login.rs"
-required-features = ["cdp"]
-
-# 楚河 AI Model Hub 报价监听:Lightpanda/Chrome 同一套 API,XHR 听价,变动打 JSON / webhook。
-[[example]]
-name = "chuhe_price"
-path = "examples/sites/chuhe_price.rs"
-required-features = ["cdp", "ocr"]
-
-# 路飞学城(luffycity)播放页:CDP 监听抓 polyv secure JSON + HLS m3u8 + 课程接口(让浏览器解密,库只监听)。
-[[example]]
-name = "luffycity_capture"
-path = "examples/sites/luffycity_capture.rs"
-required-features = ["cdp"]
-
-# 路飞学城(luffycity)下载:不逆 polyv DRM —— 导航前注入 MSE hook,在 SourceBuffer.appendBuffer 处
-# 截获 hls.js 解密后的明文 fMP4,高倍速播放过完时间线后用 ffmpeg remux 成可播放 mp4。
-[[example]]
-name = "luffycity_download"
-path = "examples/sites/luffycity_download.rs"
-required-features = ["cdp"]
-
-# 路飞学城(luffycity)纯协议下载:零浏览器、零 JS/WASM —— 直接逆 polyv v11 DRM,标准 MD5/AES 解密
-# (secure JSON → .pdx 真 m3u8 → playsafe 32B key 解包 → .ts AES 解密 → ffmpeg 合 mp4)。无需 feature。
-[[example]]
-name = "luffycity_protocol"
-path = "examples/sites/luffycity_protocol.rs"
-
-# ═════════ 验证码·滑块诊断(承上 examples/slider/)═════════
-[[example]]
-name = "geetest_diag"
-path = "examples/slider/geetest_diag.rs"
-required-features = ["camoufox"]
-
-[[example]]
-name = "geetest_probe"
-path = "examples/slider/geetest_probe.rs"
-required-features = ["camoufox"]
-
-# 验证码·OCR 诊断(承上 examples/ocr/)。
-[[example]]
-name = "ocr_probe"
-path = "examples/ocr/ocr_probe.rs"
 required-features = ["camoufox"]
 
 # ═════════ Windows 验证包(examples/windows/)═════════
@@ -716,16 +357,6 @@ required-features = ["camoufox"]
 [[example]]
 name = "win_diag"
 path = "examples/windows/win_diag.rs"
-required-features = ["camoufox"]
-
-[[example]]
-name = "win_cf_test"
-path = "examples/windows/win_cf_test.rs"
-required-features = ["camoufox"]
-
-[[example]]
-name = "win_bilibili_test"
-path = "examples/windows/win_bilibili_test.rs"
 required-features = ["camoufox"]
 
 [target."cfg(unix)".dependencies]

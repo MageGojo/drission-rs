@@ -7,6 +7,17 @@
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-10-21
+
+公开示例改为测自己的页面。库 `drission` 和命令行 `drs` 都是 **0.6.5**。
+
+### 变更 Changed
+
+- 新增 `own_site`：本地页填表，再打开 apizero.cn 公开文档。不登录。
+- 从仓库移除针对他人站点的过盾、验证码、签名下载类示例和操作文档。可选图像识别仍留在库里，公开文档不写用法。
+- crates.io 关键词改为 `browser` / `cdp` / `automation` / `chromium` / `mcp`。
+- `identity-job` 预设对外名称是 `batch_guarded`。旧名 `scrape_aggressive` 仍可作为别名。
+
 ## [0.6.4] - 2026-09-07
 
 ### 变更 Changed
@@ -28,7 +39,7 @@
   `Page.captureScreenshot`（Lightpanda 截图常是占位）。`ocr_image` / `ocr_calc` / `ocr_code` 走这条路径。
 - 案例 `chuhe_price`：`get` / `click` / `input` / `listen` 听初和站报价，不在页面里 fetch。
   `./scripts/pack-chuhe-dist.sh` 打进 `dist/chuhe`，旁边内置 Lightpanda。
-  见 `docs/案例-chuhe价格监听.md`。
+  见仓库内 Lightpanda 说明。
 
 ### 变更 Changed
 
@@ -301,7 +312,7 @@
   示例 `session_tls` 真机自验证:同进程 `None` vs `Chrome` 打 `tls.peet.ws`,**JA3/JA4/Akamai 指纹均改变**
   (`t13d1011h2…`→`t13d1516h2…`、UA Firefox→Chrome137),ALL CHECKS PASSED。**Windows 支持**:`x86_64-pc-windows-gnu`
   交叉编译已实测(BoringSSL+mingw+nasm,bindgen 喂 sysroot,产出真 `PE32+ .exe`),封装 `scripts/win-cross-build.sh`;
-  原生 Windows 走 MSVC(VS Build Tools + nasm)或 mingw。设计见 `docs/TLS指纹.md`。
+  原生 Windows 走 MSVC(VS Build Tools + nasm)或 mingw。
 - **CDP 修饰组合键 / 热键**(`tab.key_combo(&[Keys::CONTROL, "a"])` / `ele.shortcut(...)`):CDP 原生
   `modifiers` 位掩码下发,页面读得到 `e.ctrlKey`/`metaKey` 等为 `true`(真组合键);对常见编辑快捷键
   (Ctrl/Cmd + A/C/X/V/Z/Y)额外带 CDP `commands`(selectAll/copy…),**无头下也真正执行编辑动作**
@@ -351,7 +362,7 @@
     **依次点击点**)。配合浏览器可信点击即可自动点选。
   - 导出 `BBox` / `Det` / `ClickWord` 进 `prelude`(ocr feature)。
   - 示例 `det_probe`(检测可行性)、`yidun_click`(易盾 picture-click 全链路)。
-  - 局限:单字艺术体 OCR 非 100%(ddddocr 固有);易盾另有行为风控,字点准≠必过。详见 `docs/第三梯队.md` 里程碑 54。
+  - 局限:单字艺术体识别不是 100%。
 
 ### 修复 Fixed
 
@@ -444,6 +455,7 @@
 - **内置验证码 OCR**(ddddocr 模型 + tract 纯 Rust 推理)与**图片滑块缺口距离识别**(极验)。
 - 跨平台:macOS / Linux / Windows(命名管道传输)。
 
+[0.6.5]: https://github.com/MageGojo/drission-rs/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/MageGojo/drission-rs/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/MageGojo/drission-rs/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/MageGojo/drission-rs/compare/v0.6.1...v0.6.2

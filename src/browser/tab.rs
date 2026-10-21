@@ -1779,8 +1779,8 @@ impl Tab {
     /// 详见 [`dump_env`](crate::browser::dump_env) 模块。
     ///
     /// ```ignore
-    /// let mut probe = tab.dump_env().target_query("a_bogus")
-    ///     .match_url("aweme/v1/web/aweme/detail").start().await?;
+    /// let mut probe = tab.dump_env().target_query("sid")
+    ///     .match_url("/api/item").start().await?;
     /// tab.get(url).await?;
     /// let dump = probe.collect().await?;
     /// dump.write_to("./dump-env")?;

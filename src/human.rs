@@ -4,7 +4,7 @@
 //! - **视图** [`ImageView`]:把"图像像素坐标"(检测/OCR 在图上得到的点)映射到"页面坐标"(可信点击用);
 //!   `Humanize::image_view` 读某 `<img>`/元素的显示 rect + 自然尺寸 + src。
 //! - **轨迹** [`Humanize::human_click`]:点与点之间走**连续曲线**(二次贝塞尔 + minimum-jerk 变速 + 手抖
-//!   + 落点微停),产生密集 `mousemove/pointermove`,对冲"轨迹稀疏/机械"类行为风控(如易盾/极验点选)。
+//!   + 落点微停),让指针移动更连续。只用于自己的页面。
 //!
 //! ```no_run
 //! // 后端无关:任何实现了 `Humanize` 的 tab(CDP `ChromiumTab` / Camoufox `Tab`)都可用。
